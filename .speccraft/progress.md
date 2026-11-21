@@ -34,14 +34,14 @@
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "scripting", "storage"]`.
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, active milestone branch `milestone/M05-quality-and-release-playwright-e2e-tests-edge-case-hardening-and-web-store-package`
+- **Git:** base branch `main`, active milestone branch none (all v1 milestones accepted and merged to `main`)
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
 - [M04] `[x]` accepted (2026-11-21) — Complete features: Vector annotation editor, undo history and export (4/4 tasks done)
-- [M05] `[?]` in review — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
+- [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
 
 ## Decisions and deviations
 - none
@@ -87,3 +87,4 @@
 - [024] [x] 2026-11-21 — Implemented end-to-end extension verification suite (`npm run test:e2e`, `tests/e2e/extension.spec.ts`, `playwright.config.ts`, `scripts/run-e2e.mjs`).
 - [025] [x] 2026-11-21 — Added Chrome Web Store release packager (`npm run package` -> `snapmark-extension.zip`), GitHub Actions CI (`.github/workflows/ci.yml`), and final `README.md`.
 - [M05] [?] 2026-11-21 — Milestone M05 completed and ready for operator review.
+- [M05] [x] 2026-11-21 — Milestone M05 accepted by operator and merged into `main` (v1 complete).
