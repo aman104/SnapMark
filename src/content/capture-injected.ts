@@ -663,3 +663,282 @@ export function restoreFullPageScrollInDom(
     window.scrollTo(restoreX, restoreY);
   }
 }
+
+export interface AreaSelectionMeasurementResult {
+  cancelled: boolean;
+  cropRectCss: CssRect | null;
+  viewportWidthCss: number;
+  viewportHeightCss: number;
+  dpr: number;
+}
+
+/**
+ * Self-contained interactive screen area selection overlay injected via `chrome.scripting.executeScript`.
+ * Displays a full-viewport crosshair overlay (`[data-snapmark-area-overlay]`) allowing the user to drag
+ * any rectangular region on the webpage (`mousedown` -> `mousemove` -> `mouseup`) or cancel via `Escape`.
+ * Guaranteed to remove the overlay from DOM and wait for a browser paint frame before resolving.
+ */
+export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult> {
+  return new Promise((resolve) => {
+    const rawDpr =
+      typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+    const dpr =
+      typeof rawDpr === 'number' && Number.isFinite(rawDpr) && rawDpr > 0
+        ? rawDpr
+        : 1;
+    const viewportWidthCss = Math.max(
+      1,
+      (typeof window !== 'undefined' ? window.innerWidth : 0) ||
+        (typeof document !== 'undefined' && document.documentElement
+          ? document.documentElement.clientWidth
+          : 0) ||
+        1280,
+    );
+    const viewportHeightCss = Math.max(
+      1,
+      (typeof window !== 'undefined' ? window.innerHeight : 0) ||
+        (typeof document !== 'undefined' && document.documentElement
+          ? document.documentElement.clientHeight
+          : 0) ||
+        800,
+    );
+
+    if (
+      typeof window === 'undefined' ||
+      typeof document === 'undefined' ||
+      !document.body
+    ) {
+      resolve({
+        cancelled: true,
+        cropRectCss: null,
+        viewportWidthCss,
+        viewportHeightCss,
+        dpr,
+      });
+      return;
+    }
+
+    // Remove any pre-existing area overlay
+    document
+      .querySelectorAll('[data-snapmark-area-overlay]')
+      .forEach((node) => node.remove());
+
+    const clampX = (x: number): number =>
+      Math.max(0, Math.min(viewportWidthCss, x));
+    const clampY = (y: number): number =>
+      Math.max(0, Math.min(viewportHeightCss, y));
+
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-snapmark-area-overlay', 'true');
+    overlay.style.cssText = [
+      'position: fixed !important',
+      'inset: 0 !important',
+      'top: 0 !important',
+      'left: 0 !important',
+      'width: 100vw !important',
+      'height: 100vh !important',
+      'z-index: 2147483647 !important',
+      'cursor: crosshair !important',
+      'user-select: none !important',
+      '-webkit-user-select: none !important',
+      'background: rgba(15, 17, 21, 0.35) !important',
+      'margin: 0 !important',
+      'padding: 0 !important',
+      'box-sizing: border-box !important',
+    ].join('; ');
+
+    const hintPill = document.createElement('div');
+    hintPill.setAttribute('data-snapmark-area-hint', 'true');
+    hintPill.textContent =
+      'Przeciągnij myszą, aby zaznaczyć fragment ekranu • Esc anuluje';
+    hintPill.style.cssText = [
+      'position: fixed !important',
+      'top: 16px !important',
+      'left: 50% !important',
+      'transform: translateX(-50%) !important',
+      'padding: 8px 14px !important',
+      'background: rgba(15, 17, 21, 0.92) !important',
+      'color: #F3F4F6 !important',
+      'border: 1px solid rgba(255, 255, 255, 0.16) !important',
+      'border-radius: 9999px !important',
+      'font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif !important',
+      'font-size: 12px !important',
+      'font-weight: 600 !important',
+      'line-height: 1.3 !important',
+      'box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important',
+      'pointer-events: none !important',
+      'white-space: nowrap !important',
+    ].join('; ');
+
+    const selectionBox = document.createElement('div');
+    selectionBox.setAttribute('data-snapmark-area-box', 'true');
+    selectionBox.style.cssText = [
+      'display: none !important',
+      'position: fixed !important',
+      'border: 2px solid #FF3B30 !important',
+      'background: transparent !important',
+      'box-shadow: 0 0 0 9999px rgba(15, 17, 21, 0.48) !important',
+      'pointer-events: none !important',
+      'box-sizing: border-box !important',
+    ].join('; ');
+
+    const dimensionsBadge = document.createElement('div');
+    dimensionsBadge.setAttribute('data-snapmark-area-dimensions', 'true');
+    dimensionsBadge.style.cssText = [
+      'position: absolute !important',
+      'right: 0 !important',
+      'bottom: -26px !important',
+      'padding: 2px 8px !important',
+      'background: #FF3B30 !important',
+      'color: #FFFFFF !important',
+      'border-radius: 4px !important',
+      'font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important',
+      'font-size: 11px !important',
+      'font-weight: 600 !important',
+      'line-height: 1.4 !important',
+      'white-space: nowrap !important',
+      'pointer-events: none !important',
+    ].join('; ');
+
+    selectionBox.appendChild(dimensionsBadge);
+    overlay.appendChild(hintPill);
+    overlay.appendChild(selectionBox);
+
+    let isDragging = false;
+    let settled = false;
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+
+    function updateBoxVisual(): void {
+      const left = Math.round(Math.min(startX, currentX));
+      const top = Math.round(Math.min(startY, currentY));
+      const width = Math.round(Math.abs(currentX - startX));
+      const height = Math.round(Math.abs(currentY - startY));
+
+      selectionBox.style.setProperty('display', 'block', 'important');
+      selectionBox.style.setProperty('left', `${left}px`, 'important');
+      selectionBox.style.setProperty('top', `${top}px`, 'important');
+      selectionBox.style.setProperty('width', `${width}px`, 'important');
+      selectionBox.style.setProperty('height', `${height}px`, 'important');
+      dimensionsBadge.textContent = `${width} × ${height} px`;
+    }
+
+    function cleanup(): void {
+      window.removeEventListener('mousemove', onMouseMove, true);
+      window.removeEventListener('mouseup', onMouseUp, true);
+      window.removeEventListener('keydown', onKeyDown, true);
+      overlay.removeEventListener('mousedown', onMouseDown, true);
+      overlay.remove();
+      document
+        .querySelectorAll('[data-snapmark-area-overlay]')
+        .forEach((node) => node.remove());
+    }
+
+    function finish(result: AreaSelectionMeasurementResult): void {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve(result);
+    }
+
+    function onMouseDown(event: MouseEvent): void {
+      if (event.button !== 0 || settled) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      isDragging = true;
+      startX = clampX(event.clientX);
+      startY = clampY(event.clientY);
+      currentX = startX;
+      currentY = startY;
+      overlay.style.setProperty('background', 'transparent', 'important');
+      updateBoxVisual();
+    }
+
+    function onMouseMove(event: MouseEvent): void {
+      if (!isDragging || settled) {
+        return;
+      }
+      event.preventDefault();
+      currentX = clampX(event.clientX);
+      currentY = clampY(event.clientY);
+      updateBoxVisual();
+    }
+
+    function onMouseUp(event: MouseEvent): void {
+      if (!isDragging || settled) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      isDragging = false;
+      currentX = clampX(event.clientX);
+      currentY = clampY(event.clientY);
+
+      const x = Math.round(Math.min(startX, currentX));
+      const y = Math.round(Math.min(startY, currentY));
+      const width = Math.round(Math.abs(currentX - startX));
+      const height = Math.round(Math.abs(currentY - startY));
+
+      if (width < 8 || height < 8) {
+        finish({
+          cancelled: true,
+          cropRectCss: null,
+          viewportWidthCss,
+          viewportHeightCss,
+          dpr,
+        });
+        return;
+      }
+
+      settled = true;
+      cleanup();
+
+      const payload: AreaSelectionMeasurementResult = {
+        cancelled: false,
+        cropRectCss: { x, y, width, height },
+        viewportWidthCss,
+        viewportHeightCss,
+        dpr,
+      };
+
+      const isJsdom =
+        typeof navigator !== 'undefined' &&
+        /jsdom/i.test(navigator.userAgent ?? '');
+
+      if (!isJsdom && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => {
+          setTimeout(() => resolve(payload), 16);
+        });
+      } else {
+        resolve(payload);
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key === 'Escape' && !settled) {
+        event.preventDefault();
+        event.stopPropagation();
+        finish({
+          cancelled: true,
+          cropRectCss: null,
+          viewportWidthCss,
+          viewportHeightCss,
+          dpr,
+        });
+      }
+    }
+
+    overlay.addEventListener('mousedown', onMouseDown, true);
+    window.addEventListener('mousemove', onMouseMove, true);
+    window.addEventListener('mouseup', onMouseUp, true);
+    window.addEventListener('keydown', onKeyDown, true);
+
+    document.body.appendChild(overlay);
+  });
+}
