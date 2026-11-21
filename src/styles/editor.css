@@ -144,6 +144,78 @@
   cursor: crosshair;
 }
 
+/* Max Canvas Height Warning Banner (#max-height-banner) */
+.editor-banner-region {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto var(--space-lg) auto;
+}
+
+.banner-dismiss-btn {
+  background: transparent;
+  border: 1px solid var(--color-hairline-strong);
+  color: var(--color-ink);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.banner-dismiss-btn:hover {
+  background-color: var(--color-surface-elevated);
+}
+
+/* Editor Empty / Fallback State Card (#editor-empty-state) — 04-Interface-spec.md §5.3 */
+.editor-empty-card {
+  width: 100%;
+  max-width: 440px;
+  margin: var(--space-section) auto;
+  padding: var(--space-xl);
+  background-color: var(--color-surface-1);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.empty-state-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background-color: rgba(255, 59, 48, 0.14);
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  color: var(--color-ink);
+}
+
+.empty-state-description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-ink-muted);
+}
+
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: var(--space-xs);
+}
+
 /* Responsive Compact Mode (< 1100px) — 04-Interface-spec.md §8 */
 @media (max-width: 1100px) {
   .editor-toolbar .kbd-badge {

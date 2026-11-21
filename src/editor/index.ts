@@ -21,6 +21,7 @@ import type {
   StrokeWidth,
   TextStyleMode,
 } from '../shared/types';
+import { hitTestAnnotations, renderCanvasStage } from './canvas-stage';
 
 export interface EditorState {
   prototypeState: EditorPrototypeState;
@@ -74,7 +75,8 @@ export function initEditor(
     parsed.mode,
     parsed.highlightApplied,
   );
-  const initialAnnotations = getInitialMockAnnotations(parsed.mode);
+  const initialAnnotations =
+    parsed.state === 'empty' ? [] : getInitialMockAnnotations(parsed.mode);
 
   const state: EditorState = {
     prototypeState: parsed.state,
@@ -86,7 +88,10 @@ export function initEditor(
     strokeWidth: DEFAULT_USER_SETTINGS.strokeWidth,
     textStyleMode: DEFAULT_USER_SETTINGS.textStyleMode,
     annotations: cloneAnnotations(initialAnnotations),
-    historyStack: [cloneAnnotations(initialAnnotations.slice(0, -1))],
+    historyStack:
+      initialAnnotations.length > 0
+        ? [cloneAnnotations(initialAnnotations.slice(0, -1))]
+        : [],
     selectedAnnotationId: initialAnnotations[0]?.id ?? null,
     copySuccess: false,
     warningDismissed: false,
@@ -96,6 +101,34 @@ export function initEditor(
 
   function pushHistorySnapshot(): void {
     state.historyStack.push(cloneAnnotations(state.annotations));
+  }
+
+  function syncToolbarWithSelectedAnnotation(): void {
+    if (!state.selectedAnnotationId) {
+      return;
+    }
+    const selected = state.annotations.find(
+      (item) => item.id === state.selectedAnnotationId,
+    );
+    if (!selected) {
+      return;
+    }
+    state.activeTool = selected.type;
+    state.activeColor = selected.color;
+    if (selected.type === 'arrow') {
+      state.strokeWidth = selected.strokeWidth;
+    } else if (selected.type === 'line') {
+      state.lineSubtype = selected.subtype;
+      if (
+        selected.strokeWidth === 2 ||
+        selected.strokeWidth === 4 ||
+        selected.strokeWidth === 8
+      ) {
+        state.strokeWidth = selected.strokeWidth;
+      }
+    } else if (selected.type === 'text') {
+      state.textStyleMode = selected.styleMode;
+    }
   }
 
   function notifyAndRender(): void {
@@ -210,9 +243,66 @@ export function initEditor(
     `;
   }
 
+  function renderStageHtml(): string {
+    if (state.prototypeState === 'empty') {
+      return `
+        <section id="editor-empty-state" class="editor-empty-card" aria-labelledby="empty-state-heading">
+          <div class="empty-state-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6V3h3M10 3h3v3M13 10v3h-3M6 13H3v-3" />
+              <path d="M6 10l4-4M10 10V6H6" />
+            </svg>
+          </div>
+          <h1 id="empty-state-heading" class="empty-state-title">
+            Brak aktywnego zrzutu na płótnie
+          </h1>
+          <p class="empty-state-description">
+            Zrzuty tymczasowe są usuwane z pamięci zaraz po wczytaniu dla ochrony prywatności. Wykonaj nowy zrzut z menu kontekstowego (PPM), popupu wtyczki lub wklej obraz bezpośrednio ze schowka.
+          </p>
+          <div class="empty-state-actions">
+            <button type="button" id="btn-paste-clipboard" class="btn-primary">
+              Wklej ze schowka (Ctrl+V)
+            </button>
+            <button type="button" id="btn-open-file" class="btn-secondary">
+              Wczytaj plik PNG/JPG...
+            </button>
+            <input type="file" id="input-open-file" accept="image/*" hidden />
+          </div>
+        </section>
+      `;
+    }
+
+    const showMaxHeightBanner =
+      state.prototypeState === 'max-height-warning' && !state.warningDismissed;
+
+    const warningBannerHtml = showMaxHeightBanner
+      ? `
+        <div class="editor-banner-region">
+          <div id="max-height-banner" class="status-banner is-warning" role="status">
+            <span>
+              Osiągnięto maksymalną bezpieczną wysokość płótna w pełnej rozdzielczości Retina. Zrzut został zapisany do tej wysokości.
+            </span>
+            <button type="button" id="btn-dismiss-warning" class="banner-dismiss-btn">
+              Zamknij
+            </button>
+          </div>
+        </div>
+      `
+      : '';
+
+    return `
+      ${warningBannerHtml}
+      <div class="canvas-wrapper" id="canvas-wrapper">
+        <canvas id="editor-canvas"></canvas>
+        <div id="text-overlay-layer"></div>
+      </div>
+    `;
+  }
+
   function render(): void {
     const canUndo = state.historyStack.length > 0;
     const hasSelection = state.selectedAnnotationId !== null;
+    const isEmptyState = state.prototypeState === 'empty';
 
     container.innerHTML = `
       <div class="editor-shell" data-editor-state="${state.prototypeState}" data-capture-mode="${state.captureMode}">
@@ -329,7 +419,13 @@ export function initEditor(
                 </svg>
               </button>
 
-              <button type="button" id="btn-download-png" class="btn-secondary" title="Pobierz spłaszczony plik PNG">
+              <button
+                type="button"
+                id="btn-download-png"
+                class="btn-secondary"
+                ${isEmptyState ? 'disabled' : ''}
+                title="Pobierz spłaszczony plik PNG"
+              >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M8 2.5v7.5m0 0L5.5 7.5M8 10l2.5-2.5M3 12.5h10" />
                 </svg>
@@ -340,6 +436,7 @@ export function initEditor(
                 type="button"
                 id="btn-copy-clipboard"
                 class="btn-primary ${state.copySuccess ? 'is-success' : ''}"
+                ${isEmptyState ? 'disabled' : ''}
                 title="Skopiuj obraz do schowka systemowego"
               >
                 ${
@@ -359,20 +456,26 @@ export function initEditor(
         </header>
 
         <main class="editor-stage" id="editor-stage">
-          <div class="canvas-wrapper" id="canvas-wrapper">
-            <canvas id="editor-canvas"></canvas>
-            <div id="text-overlay-layer"></div>
-          </div>
+          ${renderStageHtml()}
         </main>
       </div>
     `;
 
-    bindToolbarEvents();
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    if (canvas) {
+      renderCanvasStage(
+        canvas,
+        state.metadata,
+        state.annotations,
+        state.selectedAnnotationId,
+      );
+    }
+
+    bindToolbarAndStageEvents();
   }
 
   function setTool(tool: EditorTool): void {
     state.activeTool = tool;
-    // Automatically select the sample annotation of that type if present
     const matching = state.annotations.find((item) => item.type === tool);
     if (matching) {
       state.selectedAnnotationId = matching.id;
@@ -479,14 +582,12 @@ export function initEditor(
     state.captureMode = mode;
     state.metadata = getMockCaptureMetadata(mode);
     state.annotations = cloneAnnotations(getInitialMockAnnotations(mode));
-    state.historyStack = [
-      cloneAnnotations(state.annotations.slice(0, -1)),
-    ];
+    state.historyStack = [cloneAnnotations(state.annotations.slice(0, -1))];
     state.selectedAnnotationId = state.annotations[0]?.id ?? null;
     notifyAndRender();
   }
 
-  function bindToolbarEvents(): void {
+  function bindToolbarAndStageEvents(): void {
     container
       .querySelector<HTMLButtonElement>('#tool-arrow')
       ?.addEventListener('click', () => setTool('arrow'));
@@ -554,7 +655,22 @@ export function initEditor(
     container
       .querySelector<HTMLButtonElement>('#btn-download-png')
       ?.addEventListener('click', () => {
-        options.onDownloadPng?.(state.metadata.filename, state);
+        if (options.onDownloadPng) {
+          options.onDownloadPng(state.metadata.filename, state);
+          return;
+        }
+        const canvas =
+          container.querySelector<HTMLCanvasElement>('#editor-canvas');
+        if (canvas && typeof canvas.toDataURL === 'function') {
+          try {
+            const link = document.createElement('a');
+            link.download = state.metadata.filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+          } catch {
+            // Ignored in non-canvas environments
+          }
+        }
       });
 
     container
@@ -571,6 +687,41 @@ export function initEditor(
           notifyAndRender();
         }, 2000);
       });
+
+    // Empty state actions
+    container
+      .querySelector<HTMLButtonElement>('#btn-paste-clipboard')
+      ?.addEventListener('click', () => {
+        loadSampleCapture(state.captureMode);
+      });
+
+    container
+      .querySelector<HTMLButtonElement>('#btn-open-file')
+      ?.addEventListener('click', () => {
+        loadSampleCapture(state.captureMode);
+      });
+
+    // Max canvas height warning dismissal
+    container
+      .querySelector<HTMLButtonElement>('#btn-dismiss-warning')
+      ?.addEventListener('click', () => {
+        state.warningDismissed = true;
+        notifyAndRender();
+      });
+
+    // Canvas click hit-testing to select vector annotations
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    canvas?.addEventListener('click', (event: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const cssX = event.clientX - rect.left;
+      const cssY = event.clientY - rect.top;
+      const hit = hitTestAnnotations(state.annotations, cssX, cssY);
+      if (hit) {
+        state.selectedAnnotationId = hit.id;
+        syncToolbarWithSelectedAnnotation();
+        notifyAndRender();
+      }
+    });
   }
 
   const handleKeyDown = (event: KeyboardEvent): void => {
@@ -581,6 +732,16 @@ export function initEditor(
         target.tagName === 'INPUT' ||
         target.isContentEditable)
     ) {
+      return;
+    }
+
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === 'v' &&
+      state.prototypeState === 'empty'
+    ) {
+      event.preventDefault();
+      loadSampleCapture(state.captureMode);
       return;
     }
 
@@ -622,6 +783,7 @@ export function initEditor(
     setTextStyleMode,
     selectAnnotation: (id: string | null) => {
       state.selectedAnnotationId = id;
+      syncToolbarWithSelectedAnnotation();
       notifyAndRender();
     },
     undo,
