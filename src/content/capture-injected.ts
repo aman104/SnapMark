@@ -359,3 +359,307 @@ export function measureTargetImageInDom(
       bestImg.currentSrc || bestImg.src || bestImg.getAttribute('src') || null,
   };
 }
+
+export interface FullPageScrollPlan {
+  originalScrollX: number;
+  originalScrollY: number;
+  totalWidthCss: number;
+  totalHeightCss: number;
+  viewportWidthCss: number;
+  viewportHeightCss: number;
+  dpr: number;
+  frameOffsetsY: number[];
+  exceededMaxHeight: boolean;
+}
+
+/**
+ * Pure helper computing vertical scrollY offsets for multi-frame full-page scroll capture,
+ * respecting the browser's maximum safe physical canvas height (default 16384 px).
+ */
+export function computeFullPageFrameOffsets(
+  totalHeightCss: number,
+  viewportHeightCss: number,
+  dpr: number,
+  maxPhysicalHeight = 16384,
+): {
+  frameOffsetsY: number[];
+  cappedHeightCss: number;
+  exceededMaxHeight: boolean;
+} {
+  const safeVpH = Math.max(1, Math.round(viewportHeightCss));
+  const safeDpr =
+    typeof dpr === 'number' && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  const maxAllowedCssHeight = Math.max(
+    safeVpH,
+    Math.floor(maxPhysicalHeight / safeDpr),
+  );
+
+  const rawTotalH = Math.max(safeVpH, Math.round(totalHeightCss));
+  const exceededMaxHeight = rawTotalH > maxAllowedCssHeight;
+  const cappedHeightCss = exceededMaxHeight ? maxAllowedCssHeight : rawTotalH;
+
+  if (cappedHeightCss <= safeVpH) {
+    return {
+      frameOffsetsY: [0],
+      cappedHeightCss: safeVpH,
+      exceededMaxHeight,
+    };
+  }
+
+  const offsets: number[] = [];
+  let nextY = 0;
+  const maxScrollY = cappedHeightCss - safeVpH;
+
+  while (nextY < maxScrollY) {
+    offsets.push(nextY);
+    nextY += safeVpH;
+  }
+
+  if (offsets[offsets.length - 1] !== maxScrollY) {
+    offsets.push(maxScrollY);
+  }
+
+  return {
+    frameOffsetsY: offsets,
+    cappedHeightCss,
+    exceededMaxHeight,
+  };
+}
+
+/**
+ * Self-contained DOM helper executed inside the active tab before Frame #1 of a Full-Page Scroll Capture.
+ * Saves original scroll position, hides scrollbars, and scrolls to (0, 0) while leaving fixed/sticky
+ * headers visible for Frame #1.
+ */
+export function prepareFullPageScrollInDom(
+  maxPhysicalHeight = 16384,
+): FullPageScrollPlan {
+  const viewportWidthCss = Math.max(1, window.innerWidth || 1280);
+  const viewportHeightCss = Math.max(1, window.innerHeight || 800);
+  const dpr =
+    typeof window.devicePixelRatio === 'number' &&
+    Number.isFinite(window.devicePixelRatio) &&
+    window.devicePixelRatio > 0
+      ? window.devicePixelRatio
+      : 1;
+
+  const originalScrollX = Math.round(window.scrollX || window.pageXOffset || 0);
+  const originalScrollY = Math.round(window.scrollY || window.pageYOffset || 0);
+
+  const docEl = document.documentElement;
+  const body = document.body;
+
+  if (docEl) {
+    docEl.setAttribute('data-snapmark-orig-scroll-x', String(originalScrollX));
+    docEl.setAttribute('data-snapmark-orig-scroll-y', String(originalScrollY));
+  }
+
+  // Inject temporary style disabling scrollbars and smooth scroll transitions
+  document
+    .querySelectorAll('[data-snapmark-scroll-style]')
+    .forEach((node) => node.remove());
+
+  const styleEl = document.createElement('style');
+  styleEl.setAttribute('data-snapmark-scroll-style', 'true');
+  styleEl.textContent = `
+    html, body {
+      scroll-behavior: auto !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+    }
+    html::-webkit-scrollbar, body::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
+  `;
+  (document.head ?? docEl ?? body)?.appendChild(styleEl);
+
+  const rawTotalHeight = Math.max(
+    viewportHeightCss,
+    docEl?.scrollHeight ?? 0,
+    docEl?.offsetHeight ?? 0,
+    body?.scrollHeight ?? 0,
+    body?.offsetHeight ?? 0,
+  );
+
+  // Compute vertical frame plan directly (inlined so executeScript requires no external closure)
+  const safeVpH = Math.max(1, Math.round(viewportHeightCss));
+  const maxAllowedCssHeight = Math.max(
+    safeVpH,
+    Math.floor(maxPhysicalHeight / dpr),
+  );
+  const rawTotalH = Math.max(safeVpH, Math.round(rawTotalHeight));
+  const exceededMaxHeight = rawTotalH > maxAllowedCssHeight;
+  const cappedHeightCss = exceededMaxHeight ? maxAllowedCssHeight : rawTotalH;
+
+  const frameOffsetsY: number[] = [];
+  if (cappedHeightCss <= safeVpH) {
+    frameOffsetsY.push(0);
+  } else {
+    let nextY = 0;
+    const maxScrollY = cappedHeightCss - safeVpH;
+    while (nextY < maxScrollY) {
+      frameOffsetsY.push(nextY);
+      nextY += safeVpH;
+    }
+    if (frameOffsetsY[frameOffsetsY.length - 1] !== maxScrollY) {
+      frameOffsetsY.push(maxScrollY);
+    }
+  }
+
+  // Scroll to top (0, 0) for Frame #1
+  if (typeof window.scrollTo === 'function') {
+    window.scrollTo(0, 0);
+  }
+
+  return {
+    originalScrollX,
+    originalScrollY,
+    totalWidthCss: viewportWidthCss,
+    totalHeightCss: cappedHeightCss,
+    viewportWidthCss,
+    viewportHeightCss,
+    dpr,
+    frameOffsetsY,
+    exceededMaxHeight,
+  };
+}
+
+/**
+ * Self-contained DOM helper executed after Frame #1 of a Full-Page Scroll Capture.
+ * Detects all visible elements with computed position 'fixed' or 'sticky' and hides them
+ * with visibility: hidden !important so they do not duplicate on Frames #2..N.
+ */
+export function hideFixedAndStickyElementsInDom(): number {
+  if (typeof document === 'undefined' || !document.body) {
+    return 0;
+  }
+
+  const allElements = Array.from(
+    document.body.querySelectorAll<HTMLElement>('*'),
+  );
+  let hiddenCount = 0;
+
+  for (const el of allElements) {
+    if (el.hasAttribute('data-snapmark-hidden-fixed')) {
+      continue;
+    }
+
+    const computed = window.getComputedStyle(el);
+    const pos = computed.position;
+    if (pos !== 'fixed' && pos !== 'sticky') {
+      continue;
+    }
+
+    if (
+      computed.display === 'none' ||
+      computed.visibility === 'hidden' ||
+      computed.opacity === '0'
+    ) {
+      continue;
+    }
+
+    const origVal = el.style.getPropertyValue('visibility');
+    const origPriority = el.style.getPropertyPriority('visibility');
+
+    el.setAttribute('data-snapmark-hidden-fixed', 'true');
+    el.setAttribute('data-snapmark-orig-visibility', origVal);
+    el.setAttribute('data-snapmark-orig-visibility-priority', origPriority);
+    el.style.setProperty('visibility', 'hidden', 'important');
+    hiddenCount += 1;
+  }
+
+  return hiddenCount;
+}
+
+/**
+ * Self-contained DOM helper stepping the page scroll position to targetScrollY.
+ */
+export function stepFullPageScrollInDom(targetScrollY: number): {
+  actualScrollY: number;
+  viewportWidthCss: number;
+  viewportHeightCss: number;
+} {
+  if (typeof window.scrollTo === 'function') {
+    window.scrollTo(0, targetScrollY);
+  }
+
+  const actualScrollY = Math.round(
+    window.scrollY ||
+      window.pageYOffset ||
+      document.documentElement?.scrollTop ||
+      0,
+  );
+
+  return {
+    actualScrollY,
+    viewportWidthCss: Math.max(1, window.innerWidth || 1280),
+    viewportHeightCss: Math.max(1, window.innerHeight || 800),
+  };
+}
+
+/**
+ * Self-contained DOM cleanup function guaranteed to run in a finally block after Full-Page Scroll Capture.
+ * Restores all hidden fixed/sticky elements, removes scrollbar suppression styles, and restores original scrollX/scrollY.
+ */
+export function restoreFullPageScrollInDom(
+  originalScrollX?: number,
+  originalScrollY?: number,
+): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const hiddenElements = document.querySelectorAll<HTMLElement>(
+    '[data-snapmark-hidden-fixed]',
+  );
+
+  hiddenElements.forEach((el) => {
+    const origVal = el.getAttribute('data-snapmark-orig-visibility') ?? '';
+    const origPriority =
+      el.getAttribute('data-snapmark-orig-visibility-priority') ?? '';
+
+    if (origVal) {
+      el.style.setProperty('visibility', origVal, origPriority);
+    } else {
+      el.style.removeProperty('visibility');
+    }
+
+    el.removeAttribute('data-snapmark-hidden-fixed');
+    el.removeAttribute('data-snapmark-orig-visibility');
+    el.removeAttribute('data-snapmark-orig-visibility-priority');
+  });
+
+  document
+    .querySelectorAll('[data-snapmark-scroll-style]')
+    .forEach((node) => node.remove());
+
+  const docEl = document.documentElement;
+  const fallbackX = Number(
+    docEl?.getAttribute('data-snapmark-orig-scroll-x') ?? 0,
+  );
+  const fallbackY = Number(
+    docEl?.getAttribute('data-snapmark-orig-scroll-y') ?? 0,
+  );
+
+  docEl?.removeAttribute('data-snapmark-orig-scroll-x');
+  docEl?.removeAttribute('data-snapmark-orig-scroll-y');
+
+  const restoreX =
+    typeof originalScrollX === 'number' && Number.isFinite(originalScrollX)
+      ? originalScrollX
+      : Number.isFinite(fallbackX)
+        ? fallbackX
+        : 0;
+  const restoreY =
+    typeof originalScrollY === 'number' && Number.isFinite(originalScrollY)
+      ? originalScrollY
+      : Number.isFinite(fallbackY)
+        ? fallbackY
+        : 0;
+
+  if (typeof window.scrollTo === 'function') {
+    window.scrollTo(restoreX, restoreY);
+  }
+}
