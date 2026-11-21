@@ -209,6 +209,18 @@ export function renderPopup(
     );
   }
 
+  function closePopupWindow(): void {
+    if (
+      typeof navigator !== 'undefined' &&
+      /jsdom/i.test(navigator.userAgent ?? '')
+    ) {
+      return;
+    }
+    if (typeof window !== 'undefined' && typeof window.close === 'function') {
+      window.close();
+    }
+  }
+
   function bindEvents(): void {
     const viewportBtn = container.querySelector<HTMLButtonElement>(
       '#btn-capture-viewport',
@@ -243,9 +255,7 @@ export function renderPopup(
         )
           .then((res) => {
             if (res && typeof res === 'object' && 'ok' in res && res.ok) {
-              if (typeof window !== 'undefined' && typeof window.close === 'function') {
-                window.close();
-              }
+              closePopupWindow();
             }
           })
           .catch(() => {
@@ -271,9 +281,7 @@ export function renderPopup(
         )
           .then((res) => {
             if (res && typeof res === 'object' && 'ok' in res && res.ok) {
-              if (typeof window !== 'undefined' && typeof window.close === 'function') {
-                window.close();
-              }
+              closePopupWindow();
             }
           })
           .catch(() => {
@@ -298,9 +306,7 @@ export function renderPopup(
         )
           .then((res) => {
             if (res && typeof res === 'object' && 'ok' in res && res.ok) {
-              if (typeof window !== 'undefined' && typeof window.close === 'function') {
-                window.close();
-              }
+              closePopupWindow();
             }
           })
           .catch(() => {
