@@ -16,6 +16,8 @@
   - `tests/unit/` — Vitest unit tests (JSDOM environment)
 - **Key modules and helpers:**
   - `src/styles/tokens.css` — Dark Studio Utility CSS custom properties and shared UI component primitives (`.btn-primary`, `.btn-secondary`, `.btn-danger-ghost`, `.toolbar-tool-btn`, `.popup-action-card`, `.kbd-badge`, `.segmented-control`, `.color-swatch-tray`, `.toggle-switch`, `.status-banner`).
+  - `src/shared/types.ts` & `src/shared/constants.ts` — Shared contracts (`CaptureSession`, `AnnotationItem`, `UserSettings`, `ANNOTATION_COLORS`, `STROKE_WIDTHS`, `DEFAULT_USER_SETTINGS`).
+  - `src/shared/mock-captures.ts` — Prototype URL state parsers (`parsePopupStateFromSearch`, `parseEditorStateFromSearch`), mock HiDPI metadata (`getMockCaptureMetadata`), sample vector objects (`getInitialMockAnnotations`), and 2D backdrop drawer (`renderMockScreenshotBackdrop`).
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
@@ -25,7 +27,7 @@
 - **Git:** base branch `main`, active milestone branch `milestone/M01-look-and-feel-and-clickable-prototype`
 
 ## Milestones
-- [M01] `[>]` in progress — Look & feel and clickable prototype (2/6 tasks done)
+- [M01] `[>]` in progress — Look & feel and clickable prototype (3/6 tasks done)
 
 ## Decisions and deviations
 - none
@@ -39,3 +41,4 @@
 ## Log
 - [001] [x] 2026-11-21 — Scaffolded TypeScript 5, Vite multi-entry build, Vitest JSDOM test runner, and Manifest V3 baseline.
 - [002] [x] 2026-11-21 — Implemented Dark Studio Utility design tokens and shared UI component primitives in `src/styles/tokens.css`.
+- [003] [x] 2026-11-21 — Created shared TypeScript domain types, default constants, and mock HiDPI capture fixtures.
