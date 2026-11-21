@@ -23,19 +23,20 @@
   - `src/shared/dpi.ts`, `src/shared/filename.ts`, `src/shared/url-guard.ts` — DPR scaling & 20px viewport clamping (`clampRectWithPaddingToViewport`, `multiplyRectByDpr`, `computePhysicalCropRect`), `<domain>_YYYY-MM-DD_HH-mm.png` formatter (`formatCaptureFilename`), and restricted URL detector (`isRestrictedBrowserUrl`).
   - `src/shared/settings.ts` — Typed `chrome.storage.local` settings manager (`loadUserSettings`, `saveUserSettings`, `updateUserSettings`, `sanitizeUserSettings`).
   - `src/shared/db.ts` — IndexedDB (`SnapMarkDB.captures`) `Blob` session store (`saveCaptureSession`, `getCaptureSession`, `consumeCaptureSession` immediate purge, `cleanupStaleCaptures` 15-min TTL).
-  - `src/background/rate-limiter.ts` & `src/background/capture-orchestrator.ts` — `CaptureRateLimiter` (`>= 550 ms` + `600 ms` retry backoff), context menu setup (`registerContextMenus`), `dataUrlToBlob`, and `captureVisibleViewport`.
+  - `src/background/rate-limiter.ts` & `src/background/capture-orchestrator.ts` — `CaptureRateLimiter` (`>= 550 ms` + `600 ms` retry backoff), context menu setup (`registerContextMenus`), `dataUrlToBlob`, `captureVisibleViewport`, `captureTextSelection`, `captureImageElement`, `captureFullPageScroll`, and `cancelActiveScrollCapture`.
+  - `src/content/capture-injected.ts` — Self-contained on-demand DOM helpers injected via `chrome.scripting.executeScript`: `measureSelectionInDom`, `cleanupSelectionHighlightInDom`, `measureTargetImageInDom`, `computeFullPageFrameOffsets`, `prepareFullPageScrollInDom`, `hideFixedAndStickyElementsInDom`, `stepFullPageScrollInDom`, and `restoreFullPageScrollInDom`.
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "scripting", "storage"]`.
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, active milestone branch `milestone/M01-look-and-feel-and-clickable-prototype`
+- **Git:** base branch `main`, active milestone branch `milestone/M03-core-features-contextual-dom-captures`
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
-- [M03] `[>]` in progress — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (4/5 tasks done)
+- [M03] `[?]` in review — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
 
 ## Decisions and deviations
 - none
@@ -68,3 +69,5 @@
 - [015] [x] 2026-11-21 — Implemented on-demand `<img>` element resolution and bounding box extraction in `src/content/capture-injected.ts`.
 - [016] [x] 2026-11-21 — Implemented full-page scroll DOM controller, `MAX_CANVAS_HEIGHT` cap, and `fixed`/`sticky` header suppression in `src/content/capture-injected.ts`.
 - [017] [x] 2026-11-21 — Orchestrated Selection, Image, and Full-Page Scroll captures in Background Service Worker with `>= 550 ms` throttling and `finally` DOM cleanup.
+- [018] [x] 2026-11-21 — Implemented physical DPI cropping (`cropRectCss * dpr`) and multi-frame scroll stitching (`buildSessionCompositePlacements`) in `src/editor/canvas-stage.ts`, live popup scroll progress/cancel controls, and `README.md` walkthrough.
+- [M03] [?] 2026-11-21 — Milestone M03 completed and ready for operator review.
