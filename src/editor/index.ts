@@ -1,5 +1,6 @@
 import {
   ANNOTATION_COLORS,
+  DEFAULT_TEXT_FONT_SIZE_CSS,
   DEFAULT_USER_SETTINGS,
   HIGHLIGHTER_ALPHA,
   HIGHLIGHTER_STROKE_WIDTH_CSS,
@@ -24,6 +25,7 @@ import type {
   LineSubtype,
   MockCaptureMetadata,
   StrokeWidth,
+  TextAnnotation,
   TextStyleMode,
 } from '../shared/types';
 import {
@@ -35,6 +37,10 @@ import {
   renderCanvasStage,
 } from './canvas-stage';
 import { cloneAnnotationList, UndoHistoryStack } from './history';
+import {
+  type ActiveTextEditorDraft,
+  renderTextOverlayLayer,
+} from './text-overlay';
 import {
   applyShiftHorizontalLock,
   type EndpointHandleRole,
@@ -153,6 +159,7 @@ export function initEditor(
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let copyResetTimeout: ReturnType<typeof setTimeout> | null = null;
   let activeInteraction: ActiveCanvasInteraction | null = null;
+  let activeTextDraft: ActiveTextEditorDraft | null = null;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
@@ -166,6 +173,76 @@ export function initEditor(
   function pushHistorySnapshot(): void {
     historyManager.pushSnapshot(state.annotations);
     syncHistoryState();
+  }
+
+  function commitActiveTextDraft(overrideText?: string): void {
+    if (!activeTextDraft) {
+      return;
+    }
+    const draft = activeTextDraft;
+    const liveInput = container.querySelector<HTMLTextAreaElement>(
+      '#active-text-input',
+    );
+    const rawText =
+      overrideText !== undefined
+        ? overrideText
+        : liveInput
+          ? liveInput.value
+          : draft.text;
+    const trimmed = rawText.trim();
+    activeTextDraft = null;
+
+    if (draft.editingAnnotationId) {
+      const idx = state.annotations.findIndex(
+        (item) => item.id === draft.editingAnnotationId,
+      );
+      const existing = idx >= 0 ? state.annotations[idx] : undefined;
+      if (existing && existing.type === 'text') {
+        if (trimmed.length === 0) {
+          pushHistorySnapshot();
+          state.annotations.splice(idx, 1);
+          state.selectedAnnotationId = state.annotations[0]?.id ?? null;
+        } else if (
+          existing.text !== trimmed ||
+          existing.color !== draft.color ||
+          existing.styleMode !== draft.styleMode
+        ) {
+          pushHistorySnapshot();
+          state.annotations[idx] = {
+            ...existing,
+            text: trimmed,
+            color: draft.color,
+            styleMode: draft.styleMode,
+          };
+          state.selectedAnnotationId = existing.id;
+        }
+      }
+    } else if (trimmed.length > 0) {
+      pushHistorySnapshot();
+      annotationSeq += 1;
+      const newText: TextAnnotation = {
+        id: `ann_text_${Date.now()}_${annotationSeq}`,
+        type: 'text',
+        x: draft.x,
+        y: draft.y,
+        text: trimmed,
+        color: draft.color,
+        fontSize: draft.fontSize,
+        styleMode: draft.styleMode,
+      };
+      state.annotations.push(newText);
+      state.selectedAnnotationId = newText.id;
+    }
+
+    notifyAndRender();
+  }
+
+  function cancelActiveTextDraft(): void {
+    if (!activeTextDraft) {
+      return;
+    }
+    activeTextDraft = null;
+    notifyAndRender();
   }
 
   function redrawCanvasOnly(): void {
@@ -552,10 +629,30 @@ export function initEditor(
       );
     }
 
+    const overlayLayer = container.querySelector<HTMLElement>(
+      '#text-overlay-layer',
+    );
+    renderTextOverlayLayer(overlayLayer, activeTextDraft, {
+      onInput: (text) => {
+        if (activeTextDraft) {
+          activeTextDraft.text = text;
+        }
+      },
+      onCommit: (text) => {
+        commitActiveTextDraft(text);
+      },
+      onCancel: () => {
+        cancelActiveTextDraft();
+      },
+    });
+
     bindToolbarAndStageEvents();
   }
 
   function setTool(tool: EditorTool): void {
+    if (activeTextDraft && tool !== 'text') {
+      commitActiveTextDraft();
+    }
     state.activeTool = tool;
     const matching = state.annotations.find((item) => item.type === tool);
     if (matching) {
@@ -869,11 +966,12 @@ export function initEditor(
         notifyAndRender();
       });
 
-    // Canvas interactive drawing, endpoint handle dragging, and object selection/moving
+    // Canvas interactive drawing, endpoint handle dragging, text overlay, and object selection/moving
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     canvas?.addEventListener('mousedown', handleCanvasMouseDown);
     canvas?.addEventListener('mousemove', handleCanvasMouseMove);
     canvas?.addEventListener('mouseup', handleCanvasMouseUp);
+    canvas?.addEventListener('dblclick', handleCanvasDoubleClick);
     canvas?.addEventListener('click', (event: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const cssX = event.clientX - rect.left;
@@ -885,6 +983,31 @@ export function initEditor(
         notifyAndRender();
       }
     });
+  }
+
+  function handleCanvasDoubleClick(event: MouseEvent): void {
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    const pt = getCanvasCssPoint(canvas, event);
+    const hit = hitTestAnnotations(state.annotations, pt.x, pt.y);
+    if (hit && hit.type === 'text') {
+      if (activeTextDraft) {
+        commitActiveTextDraft();
+      }
+      state.selectedAnnotationId = hit.id;
+      state.activeTool = 'text';
+      state.activeColor = hit.color;
+      state.textStyleMode = hit.styleMode;
+      activeTextDraft = {
+        editingAnnotationId: hit.id,
+        x: hit.x,
+        y: hit.y,
+        text: hit.text,
+        color: hit.color,
+        fontSize: hit.fontSize,
+        styleMode: hit.styleMode,
+      };
+      notifyAndRender();
+    }
   }
 
   function getCanvasCssPoint(
@@ -903,6 +1026,10 @@ export function initEditor(
 
   function handleCanvasMouseDown(event: MouseEvent): void {
     if (event.button !== 0) {
+      return;
+    }
+    if (activeTextDraft) {
+      commitActiveTextDraft();
       return;
     }
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
@@ -940,7 +1067,22 @@ export function initEditor(
       return;
     }
 
-    // 3. Otherwise start drawing a new Arrow or 2-in-1 Line/Highlighter
+    // 3. When Text tool is active, spawn an inline <textarea> overlay at (pt.x, pt.y)
+    if (state.activeTool === 'text') {
+      activeTextDraft = {
+        editingAnnotationId: null,
+        x: pt.x,
+        y: pt.y,
+        text: '',
+        color: state.activeColor,
+        fontSize: DEFAULT_TEXT_FONT_SIZE_CSS,
+        styleMode: state.textStyleMode,
+      };
+      notifyAndRender();
+      return;
+    }
+
+    // 4. Otherwise start drawing a new Arrow or 2-in-1 Line/Highlighter
     if (state.activeTool === 'arrow' || state.activeTool === 'line') {
       annotationSeq += 1;
       activeInteraction = {
