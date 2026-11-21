@@ -27,7 +27,7 @@
 - **Git:** base branch `main`, active milestone branch `milestone/M01-look-and-feel-and-clickable-prototype`
 
 ## Milestones
-- [M01] `[>]` in progress — Look & feel and clickable prototype (3/6 tasks done)
+- [M01] `[>]` in progress — Look & feel and clickable prototype (4/6 tasks done)
 
 ## Decisions and deviations
 - none
@@ -42,3 +42,4 @@
 - [001] [x] 2026-11-21 — Scaffolded TypeScript 5, Vite multi-entry build, Vitest JSDOM test runner, and Manifest V3 baseline.
 - [002] [x] 2026-11-21 — Implemented Dark Studio Utility design tokens and shared UI component primitives in `src/styles/tokens.css`.
 - [003] [x] 2026-11-21 — Created shared TypeScript domain types, default constants, and mock HiDPI capture fixtures.
+- [004] [x] 2026-11-21 — Built clickable 320px extension popup prototype (`popup.html`) with all 4 UI states and unit tests.

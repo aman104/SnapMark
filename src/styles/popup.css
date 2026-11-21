@@ -1,1 +1,238 @@
-/* SnapMark Popup Styles Placeholder (expanded in Task 004) */
+/*
+ * SnapMark Extension Action Popup Styles (320px dark launcher)
+ * Follows .speccraft/docs/03-Design.md & .speccraft/docs/04-Interface-spec.md §5.1
+ */
+
+.popup-shell {
+  width: 320px;
+  min-height: 260px;
+  max-height: 480px;
+  padding: var(--space-md);
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Header Bar (28px height) */
+.popup-header {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.popup-brand-logo {
+  width: 20px;
+  height: 20px;
+}
+
+.popup-privacy-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background-color: var(--color-surface-2);
+  color: var(--color-ink-muted);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.1px;
+}
+
+/* Primary Capture Mode Stack */
+.popup-capture-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.popup-card-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.popup-card-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-ink);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.popup-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.popup-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+
+.popup-card-subtitle {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--color-ink-muted);
+}
+
+.popup-card-subtitle.is-ready {
+  color: var(--color-success);
+}
+
+.popup-card-subtitle.is-muted {
+  color: var(--color-ink-subtle);
+}
+
+/* Contextual Image Hint Strip */
+.image-hint-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: 8px 10px;
+  background-color: var(--color-surface-1);
+  border: 1px dashed var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  line-height: 1.38;
+}
+
+.image-hint-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-ink-muted);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.image-hint-strip strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* Settings Footer */
+.popup-footer {
+  border-top: 1px solid var(--color-hairline);
+  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.popup-setting-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.popup-setting-title {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--color-ink);
+}
+
+.popup-setting-caption {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  line-height: 1.3;
+}
+
+/* Full-Page Scroll Capture Progress Panel (#scroll-progress-panel) */
+.scroll-progress-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background-color: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+}
+
+.scroll-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.scroll-progress-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-ink);
+}
+
+.scroll-progress-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-info);
+}
+
+.scroll-progress-detail {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-ink-muted);
+}
+
+.scroll-progress-track {
+  width: 100%;
+  height: 6px;
+  background-color: var(--color-surface-2);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.scroll-progress-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  border-radius: var(--radius-pill);
+  transition: width 200ms ease;
+}
+
+.scroll-progress-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.scroll-progress-actions .btn-secondary,
+.scroll-progress-actions .btn-primary {
+  width: 100%;
+}
+
+/* Restricted Browser Page Banner (#restricted-banner) */
+.restricted-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.restricted-banner-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.restricted-banner-message {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-ink-muted);
+}
