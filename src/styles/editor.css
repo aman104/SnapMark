@@ -1,1 +1,156 @@
-/* SnapMark Editor Styles Placeholder (expanded in Task 005) */
+/*
+ * SnapMark Vector Annotation Editor Styles (56px Top Toolbar + HiDPI Stage)
+ * Follows .speccraft/docs/03-Design.md & .speccraft/docs/04-Interface-spec.md §5.2–5.3 & §8
+ */
+
+.editor-shell {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  overflow: hidden;
+}
+
+/* Fixed 56px Top Toolbar */
+.editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 56px;
+  flex-shrink: 0;
+  padding: 0 var(--space-lg);
+  background-color: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-hairline);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.toolbar-left-group,
+.toolbar-center-group,
+.toolbar-right-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.toolbar-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.toolbar-cluster-properties {
+  gap: var(--space-md);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--color-hairline);
+  flex-shrink: 0;
+}
+
+/* Cluster 1: Metadata Pill */
+.capture-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 4px 10px;
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.meta-filename {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta-dimensions {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+/* Cluster 3: Shift Hint Badge & Undo Counter */
+.shift-hint-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+.undo-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background-color: var(--color-surface-elevated);
+  color: var(--color-ink-muted);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Scrollable Canvas Workspace (calc(100vh - 56px)) */
+.editor-stage {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: var(--space-xxl);
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.04) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+}
+
+.canvas-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+#editor-canvas {
+  display: block;
+  border-radius: 0px;
+  box-shadow: var(--shadow-xl);
+  cursor: crosshair;
+}
+
+/* Responsive Compact Mode (< 1100px) — 04-Interface-spec.md §8 */
+@media (max-width: 1100px) {
+  .editor-toolbar .kbd-badge {
+    display: none;
+  }
+
+  .meta-filename {
+    max-width: 160px;
+  }
+}
