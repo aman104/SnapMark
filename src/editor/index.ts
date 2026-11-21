@@ -5,11 +5,14 @@ import {
   HIGHLIGHTER_STROKE_WIDTH_CSS,
   STROKE_WIDTHS,
 } from '../shared/constants';
+import { consumeCaptureSession } from '../shared/db';
+import { formatCaptureFilename } from '../shared/filename';
 import {
   getInitialMockAnnotations,
   getMockCaptureMetadata,
   parseEditorStateFromSearch,
 } from '../shared/mock-captures';
+import { loadUserSettings, updateUserSettings } from '../shared/settings';
 import type {
   AnnotationColor,
   AnnotationItem,
@@ -21,7 +24,11 @@ import type {
   StrokeWidth,
   TextStyleMode,
 } from '../shared/types';
-import { hitTestAnnotations, renderCanvasStage } from './canvas-stage';
+import {
+  decodeBlobToDrawable,
+  hitTestAnnotations,
+  renderCanvasStage,
+} from './canvas-stage';
 
 export interface EditorState {
   prototypeState: EditorPrototypeState;
@@ -37,6 +44,7 @@ export interface EditorState {
   selectedAnnotationId: string | null;
   copySuccess: boolean;
   warningDismissed: boolean;
+  isLiveCapture: boolean;
 }
 
 export interface InitEditorOptions {
@@ -56,6 +64,8 @@ export interface EditorController {
   undo: () => void;
   deleteSelected: () => void;
   loadSampleCapture: (mode?: CaptureMode) => void;
+  loadImageBlob: (blob: Blob, sourceLabel?: string) => Promise<void>;
+  ready: Promise<void>;
 }
 
 function cloneAnnotations(items: AnnotationItem[]): AnnotationItem[] {
@@ -70,13 +80,17 @@ export function initEditor(
     options.initialSearch ??
     (typeof window !== 'undefined' ? window.location.search : '');
 
+  const searchParams = new URLSearchParams(initialSearch);
+  const captureIdParam = searchParams.get('captureId');
   const parsed = parseEditorStateFromSearch(initialSearch);
   const initialMetadata = getMockCaptureMetadata(
     parsed.mode,
     parsed.highlightApplied,
   );
   const initialAnnotations =
-    parsed.state === 'empty' ? [] : getInitialMockAnnotations(parsed.mode);
+    parsed.state === 'empty' || Boolean(captureIdParam)
+      ? []
+      : getInitialMockAnnotations(parsed.mode);
 
   const state: EditorState = {
     prototypeState: parsed.state,
@@ -95,8 +109,10 @@ export function initEditor(
     selectedAnnotationId: initialAnnotations[0]?.id ?? null,
     copySuccess: false,
     warningDismissed: false,
+    isLiveCapture: Boolean(captureIdParam),
   };
 
+  let baseDrawable: CanvasImageSource | null = null;
   let copyResetTimeout: ReturnType<typeof setTimeout> | null = null;
 
   function pushHistorySnapshot(): void {
@@ -468,6 +484,7 @@ export function initEditor(
         state.metadata,
         state.annotations,
         state.selectedAnnotationId,
+        baseDrawable,
       );
     }
 
@@ -480,6 +497,7 @@ export function initEditor(
     if (matching) {
       state.selectedAnnotationId = matching.id;
     }
+    void updateUserSettings({ activeTool: tool });
     notifyAndRender();
   }
 
@@ -494,6 +512,7 @@ export function initEditor(
         target.color = color;
       }
     }
+    void updateUserSettings({ activeColor: color });
     notifyAndRender();
   }
 
@@ -508,6 +527,7 @@ export function initEditor(
         target.strokeWidth = width;
       }
     }
+    void updateUserSettings({ strokeWidth: width });
     notifyAndRender();
   }
 
@@ -541,6 +561,7 @@ export function initEditor(
         target.styleMode = styleMode;
       }
     }
+    void updateUserSettings({ textStyleMode: styleMode });
     notifyAndRender();
   }
 
@@ -578,12 +599,42 @@ export function initEditor(
   }
 
   function loadSampleCapture(mode: CaptureMode = 'viewport'): void {
+    baseDrawable = null;
+    state.isLiveCapture = false;
     state.prototypeState = 'default';
     state.captureMode = mode;
     state.metadata = getMockCaptureMetadata(mode);
     state.annotations = cloneAnnotations(getInitialMockAnnotations(mode));
     state.historyStack = [cloneAnnotations(state.annotations.slice(0, -1))];
     state.selectedAnnotationId = state.annotations[0]?.id ?? null;
+    notifyAndRender();
+  }
+
+  async function loadImageBlob(
+    blob: Blob,
+    sourceLabel = 'schowek',
+  ): Promise<void> {
+    const decoded = await decodeBlobToDrawable(blob, 1280, 800);
+    baseDrawable = decoded.drawable;
+    const dpr = 1;
+    const now = new Date();
+    state.isLiveCapture = true;
+    state.prototypeState = 'default';
+    state.metadata = {
+      id: `cap_local_${now.getTime()}`,
+      mode: 'viewport',
+      sourceUrl: `https://${sourceLabel}`,
+      sourceDomain: sourceLabel,
+      capturedAt: now.toISOString(),
+      filename: formatCaptureFilename(sourceLabel, now),
+      cssWidth: decoded.physicalWidth,
+      cssHeight: decoded.physicalHeight,
+      dpr,
+      highlightApplied: false,
+    };
+    state.annotations = [];
+    state.historyStack = [];
+    state.selectedAnnotationId = null;
     notifyAndRender();
   }
 
@@ -688,18 +739,58 @@ export function initEditor(
         }, 2000);
       });
 
-    // Empty state actions
+    // Empty state actions: Clipboard paste & File picker
     container
       .querySelector<HTMLButtonElement>('#btn-paste-clipboard')
       ?.addEventListener('click', () => {
+        if (
+          typeof navigator !== 'undefined' &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.read === 'function'
+        ) {
+          void navigator.clipboard
+            .read()
+            .then(async (items) => {
+              for (const item of items) {
+                const imgType = item.types.find((t) => t.startsWith('image/'));
+                if (imgType) {
+                  const blob = await item.getType(imgType);
+                  await loadImageBlob(blob, 'schowek');
+                  return;
+                }
+              }
+              loadSampleCapture(state.captureMode);
+            })
+            .catch(() => {
+              loadSampleCapture(state.captureMode);
+            });
+          return;
+        }
         loadSampleCapture(state.captureMode);
       });
+
+    const fileInput =
+      container.querySelector<HTMLInputElement>('#input-open-file');
 
     container
       .querySelector<HTMLButtonElement>('#btn-open-file')
       ?.addEventListener('click', () => {
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+          const file = fileInput.files[0];
+          if (file) {
+            void loadImageBlob(file, file.name.replace(/\.[^.]+$/, ''));
+            return;
+          }
+        }
         loadSampleCapture(state.captureMode);
       });
+
+    fileInput?.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (file) {
+        void loadImageBlob(file, file.name.replace(/\.[^.]+$/, ''));
+      }
+    });
 
     // Max canvas height warning dismissal
     container
@@ -722,6 +813,62 @@ export function initEditor(
         notifyAndRender();
       }
     });
+  }
+
+  async function hydrateFromStorageAndIndexedDb(): Promise<void> {
+    if (captureIdParam) {
+      const savedSettings = await loadUserSettings();
+      state.activeTool = savedSettings.activeTool;
+      state.activeColor = savedSettings.activeColor;
+      state.strokeWidth = savedSettings.strokeWidth;
+      state.textStyleMode = savedSettings.textStyleMode;
+
+      const session = await consumeCaptureSession(captureIdParam);
+      if (!session || session.frames.length === 0) {
+        state.prototypeState = 'empty';
+        notifyAndRender();
+        return;
+      }
+
+      const firstFrame = session.frames[0];
+      const physicalW = Math.round(session.totalWidthCss * session.dpr);
+      const physicalH = Math.round(session.totalHeightCss * session.dpr);
+
+      if (firstFrame) {
+        const decoded = await decodeBlobToDrawable(
+          firstFrame.blob,
+          physicalW,
+          physicalH,
+        );
+        baseDrawable = decoded.drawable;
+      }
+
+      const capturedDate = new Date(session.capturedAt);
+      const validDate = Number.isNaN(capturedDate.getTime())
+        ? new Date()
+        : capturedDate;
+
+      state.prototypeState = session.exceededMaxHeight
+        ? 'max-height-warning'
+        : 'default';
+      state.captureMode = session.mode;
+      state.metadata = {
+        id: session.id,
+        mode: session.mode,
+        sourceUrl: session.sourceUrl,
+        sourceDomain: session.sourceDomain,
+        capturedAt: session.capturedAt,
+        filename: formatCaptureFilename(session.sourceUrl, validDate),
+        cssWidth: session.totalWidthCss,
+        cssHeight: session.totalHeightCss,
+        dpr: session.dpr,
+        highlightApplied: false,
+      };
+      state.annotations = [];
+      state.historyStack = [];
+      state.selectedAnnotationId = null;
+      notifyAndRender();
+    }
   }
 
   const handleKeyDown = (event: KeyboardEvent): void => {
@@ -770,9 +917,24 @@ export function initEditor(
 
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('paste', (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i];
+        if (item && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            void loadImageBlob(file, 'schowek');
+            break;
+          }
+        }
+      }
+    });
   }
 
   notifyAndRender();
+  const ready = hydrateFromStorageAndIndexedDb();
 
   return {
     getState: () => state,
@@ -789,6 +951,8 @@ export function initEditor(
     undo,
     deleteSelected,
     loadSampleCapture,
+    loadImageBlob,
+    ready,
   };
 }
 
