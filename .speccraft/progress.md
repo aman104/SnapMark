@@ -34,7 +34,7 @@
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "scripting", "storage"]`.
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, active milestone branch none (all v1 milestones accepted and merged to `main`)
+- **Git:** base branch `main`, active milestone branch `milestone/M06-feature-interactive-screen-area-selection-overlay`
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
@@ -42,6 +42,7 @@
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
 - [M04] `[x]` accepted (2026-11-21) — Complete features: Vector annotation editor, undo history and export (4/4 tasks done)
 - [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
+- [M06] `[>]` in progress — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (0/3 tasks done)
 
 ## Decisions and deviations
 - none

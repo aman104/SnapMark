@@ -11,7 +11,7 @@
 | 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | done |
 | 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | done |
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | done |
-| 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | planned |
+| 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | in progress |
 
 ## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
@@ -176,7 +176,7 @@
 - **Depends on:** M04
 - **Estimated size:** 5–7 tasks
 
-## [ ] M06 - Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu)
+## [>] M06 - Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu)
 - **Phase:** 8+ — Evolution
 - **Type:** feature
 - **What you will see:** Przed: trzecia karta w popupie (*„Zaznaczony fragment tekstu”*) wymagała wcześniejszego zaznaczenia tekstu na stronie i nie pozwalała zaznaczyć dowolnego kawałka ekranu myszą. Po: trzecia karta w popupie (**„Zaznacz fragment ekranu”**, `Alt+Shift+S`) jest zawsze aktywna — po jej kliknięciu popup zamyka się, na stronie pojawia się celownik (`crosshair`), przeciągasz myszą dowolny prostokątny obszar strony (z czerwoną ramką `#FF3B30`, przyciemnieniem tła wokół wycinka i wymiarami `W × H px`), a po puszczeniu przycisku myszy zaznaczony kawałek ekranu natychmiast otwiera się w pełnej rozdzielczości Retina w `editor.html` (przy zachowaniu wycinania zaznaczonego tekstu spod PPM).
