@@ -303,6 +303,7 @@ export async function captureTextSelection(
       | undefined;
 
     if (!measurement || !measurement.hasSelection || !measurement.cropRectCss) {
+      updateExtensionBadge('!');
       throw new Error('Najpierw zaznacz fragment tekstu na stronie.');
     }
 
