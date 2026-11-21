@@ -1,11 +1,132 @@
+import { multiplyRectByDpr, normalizeDpr } from '../shared/dpi';
 import { renderMockScreenshotBackdrop } from '../shared/mock-captures';
 import type {
   AnnotationItem,
   ArrowAnnotation,
+  CaptureSession,
   LineAnnotation,
   MockCaptureMetadata,
   TextAnnotation,
 } from '../shared/types';
+
+export interface FramePlacementPlan {
+  frameIndex: number;
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+  dx: number;
+  dy: number;
+  dw: number;
+  dh: number;
+}
+
+/**
+ * Computes physical pixel source (sx, sy, sw, sh) and destination (dx, dy, dw, dh) rectangles
+ * for cropping Selection / Image captures (multiplying cropRectCss by devicePixelRatio)
+ * or seamlessly stitching multi-frame Full-Page Scroll captures onto the composite canvas.
+ */
+export function buildSessionCompositePlacements(
+  session: CaptureSession,
+): FramePlacementPlan[] {
+  const dpr = normalizeDpr(session.dpr);
+  if (session.frames.length === 0) {
+    return [];
+  }
+
+  // Selection or Image element capture: crop the single frame using cropRectCss * dpr
+  if (
+    (session.mode === 'selection' || session.mode === 'image') &&
+    session.cropRectCss
+  ) {
+    const physicalCrop = multiplyRectByDpr(session.cropRectCss, dpr);
+    return [
+      {
+        frameIndex: 0,
+        sx: physicalCrop.x,
+        sy: physicalCrop.y,
+        sw: physicalCrop.width,
+        sh: physicalCrop.height,
+        dx: 0,
+        dy: 0,
+        dw: physicalCrop.width,
+        dh: physicalCrop.height,
+      },
+    ];
+  }
+
+  // Single-frame Viewport capture
+  if (session.frames.length === 1) {
+    const first = session.frames[0];
+    if (!first) return [];
+    const pw = Math.max(1, Math.round(first.viewportWidthCss * dpr));
+    const ph = Math.max(1, Math.round(first.viewportHeightCss * dpr));
+    return [
+      {
+        frameIndex: 0,
+        sx: 0,
+        sy: 0,
+        sw: pw,
+        sh: ph,
+        dx: 0,
+        dy: 0,
+        dw: pw,
+        dh: ph,
+      },
+    ];
+  }
+
+  // Multi-frame Full-Page Scroll capture: stitch frames without seam duplication on partial final steps
+  const placements: FramePlacementPlan[] = [];
+  let coveredBottomCss = 0;
+
+  for (let i = 0; i < session.frames.length; i += 1) {
+    const frame = session.frames[i];
+    if (!frame) continue;
+
+    const frameTopCss = frame.scrollYCss;
+    const frameBottomCss = frameTopCss + frame.viewportHeightCss;
+    const pw = Math.max(1, Math.round(frame.viewportWidthCss * dpr));
+
+    if (i === 0 || frameTopCss >= coveredBottomCss) {
+      const ph = Math.max(1, Math.round(frame.viewportHeightCss * dpr));
+      const dy = Math.round(frameTopCss * dpr);
+      placements.push({
+        frameIndex: i,
+        sx: 0,
+        sy: 0,
+        sw: pw,
+        sh: ph,
+        dx: 0,
+        dy,
+        dw: pw,
+        dh: ph,
+      });
+      coveredBottomCss = Math.max(coveredBottomCss, frameBottomCss);
+    } else if (frameBottomCss > coveredBottomCss) {
+      // Partial scroll step (e.g. final frame): slice only the newly exposed bottom region
+      const overlapCss = coveredBottomCss - frameTopCss;
+      const newSliceHeightCss = frame.viewportHeightCss - overlapCss;
+      const sy = Math.round(overlapCss * dpr);
+      const sh = Math.max(1, Math.round(newSliceHeightCss * dpr));
+      const dy = Math.round(coveredBottomCss * dpr);
+      placements.push({
+        frameIndex: i,
+        sx: 0,
+        sy,
+        sw: pw,
+        sh,
+        dx: 0,
+        dy,
+        dw: pw,
+        dh: sh,
+      });
+      coveredBottomCss = frameBottomCss;
+    }
+  }
+
+  return placements;
+}
 
 function createFallback2DContext(): CanvasRenderingContext2D {
   const noop = (): void => {};
@@ -315,12 +436,18 @@ export async function decodeBlobToDrawable(
   };
 }
 
+export interface PlacedFrameDrawable {
+  drawable: CanvasImageSource | null;
+  placement: FramePlacementPlan;
+}
+
 export function renderCanvasStage(
   canvas: HTMLCanvasElement,
   metadata: MockCaptureMetadata,
   annotations: AnnotationItem[],
   selectedId: string | null,
   baseImage: CanvasImageSource | null = null,
+  placedFrames: PlacedFrameDrawable[] = [],
 ): void {
   const physicalWidth = Math.round(metadata.cssWidth * metadata.dpr);
   const physicalHeight = Math.round(metadata.cssHeight * metadata.dpr);
@@ -334,7 +461,27 @@ export function renderCanvasStage(
   const ctx = get2DContext(canvas);
   ctx.clearRect(0, 0, physicalWidth, physicalHeight);
 
-  if (baseImage) {
+  const hasValidPlacedDrawables = placedFrames.some(
+    (pf) => pf.drawable !== null,
+  );
+
+  if (hasValidPlacedDrawables) {
+    for (const pf of placedFrames) {
+      if (!pf.drawable) continue;
+      const p = pf.placement;
+      ctx.drawImage(
+        pf.drawable,
+        p.sx,
+        p.sy,
+        p.sw,
+        p.sh,
+        p.dx,
+        p.dy,
+        p.dw,
+        p.dh,
+      );
+    }
+  } else if (baseImage) {
     ctx.drawImage(baseImage, 0, 0, physicalWidth, physicalHeight);
   } else {
     // Base screenshot bitmap fallback (prototype / JSDOM test environments)
