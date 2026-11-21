@@ -37,7 +37,7 @@
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
-- [M04] `[>]` in progress — Complete features: Vector annotation editor, undo history and export (0/4 tasks done)
+- [M04] `[>]` in progress — Complete features: Vector annotation editor, undo history and export (1/4 tasks done)
 
 ## Decisions and deviations
 - none
@@ -73,3 +73,4 @@
 - [018] [x] 2026-11-21 — Implemented physical DPI cropping (`cropRectCss * dpr`) and multi-frame scroll stitching (`buildSessionCompositePlacements`) in `src/editor/canvas-stage.ts`, live popup scroll progress/cancel controls, and `README.md` walkthrough.
 - [M03] [?] 2026-11-21 — Milestone M03 completed and ready for operator review.
 - [M03] [x] 2026-11-21 — Milestone M03 accepted by operator and merged into `main`.
+- [019] [x] 2026-11-21 — Implemented vector geometry, endpoint handle hit-testing, `Shift` horizontal lock, and `UndoHistoryStack` (`src/editor/vector-engine.ts`, `src/editor/history.ts`).
