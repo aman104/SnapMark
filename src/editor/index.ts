@@ -16,9 +16,11 @@ import { loadUserSettings, updateUserSettings } from '../shared/settings';
 import type {
   AnnotationColor,
   AnnotationItem,
+  ArrowAnnotation,
   CaptureMode,
   EditorPrototypeState,
   EditorTool,
+  LineAnnotation,
   LineSubtype,
   MockCaptureMetadata,
   StrokeWidth,
@@ -32,6 +34,15 @@ import {
   type PlacedFrameDrawable,
   renderCanvasStage,
 } from './canvas-stage';
+import { cloneAnnotationList, UndoHistoryStack } from './history';
+import {
+  applyShiftHorizontalLock,
+  type EndpointHandleRole,
+  hitTestEndpointHandle,
+  moveAnnotationByDelta,
+  type Point2D,
+  updateAnnotationEndpoint,
+} from './vector-engine';
 
 export interface EditorState {
   prototypeState: EditorPrototypeState;
@@ -73,8 +84,29 @@ export interface EditorController {
 }
 
 function cloneAnnotations(items: AnnotationItem[]): AnnotationItem[] {
-  return items.map((item) => ({ ...item }));
+  return cloneAnnotationList(items);
 }
+
+type ActiveCanvasInteraction =
+  | {
+      kind: 'handle';
+      itemId: string;
+      handle: EndpointHandleRole;
+      snapshotPushed: boolean;
+    }
+  | {
+      kind: 'move';
+      itemId: string;
+      lastPoint: Point2D;
+      snapshotPushed: boolean;
+    }
+  | {
+      kind: 'draw';
+      tool: 'arrow' | 'line';
+      newId: string;
+      startPoint: Point2D;
+      snapshotPushed: boolean;
+    };
 
 export function initEditor(
   container: HTMLElement,
@@ -120,9 +152,34 @@ export function initEditor(
   let baseDrawable: CanvasImageSource | null = null;
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let copyResetTimeout: ReturnType<typeof setTimeout> | null = null;
+  let activeInteraction: ActiveCanvasInteraction | null = null;
+  let lastProcessedMoveEvent: MouseEvent | null = null;
+  let lastProcessedUpEvent: MouseEvent | null = null;
+  let annotationSeq = 0;
+
+  const historyManager = new UndoHistoryStack(state.historyStack);
+
+  function syncHistoryState(): void {
+    state.historyStack = historyManager.getSnapshots();
+  }
 
   function pushHistorySnapshot(): void {
-    state.historyStack.push(cloneAnnotations(state.annotations));
+    historyManager.pushSnapshot(state.annotations);
+    syncHistoryState();
+  }
+
+  function redrawCanvasOnly(): void {
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    if (canvas) {
+      renderCanvasStage(
+        canvas,
+        state.metadata,
+        state.annotations,
+        state.selectedAnnotationId,
+        baseDrawable,
+        placedFrameDrawables,
+      );
+    }
   }
 
   function syncToolbarWithSelectedAnnotation(): void {
@@ -573,10 +630,11 @@ export function initEditor(
   }
 
   function undo(): void {
-    const previous = state.historyStack.pop();
+    const previous = historyManager.undo();
     if (!previous) {
       return;
     }
+    syncHistoryState();
     state.annotations = previous;
     if (
       state.selectedAnnotationId &&
@@ -614,7 +672,8 @@ export function initEditor(
     state.captureMode = mode;
     state.metadata = getMockCaptureMetadata(mode);
     state.annotations = cloneAnnotations(getInitialMockAnnotations(mode));
-    state.historyStack = [cloneAnnotations(state.annotations.slice(0, -1))];
+    historyManager.reset([cloneAnnotations(state.annotations.slice(0, -1))]);
+    syncHistoryState();
     state.selectedAnnotationId = state.annotations[0]?.id ?? null;
     notifyAndRender();
   }
@@ -642,7 +701,8 @@ export function initEditor(
       highlightApplied: false,
     };
     state.annotations = [];
-    state.historyStack = [];
+    historyManager.reset([]);
+    syncHistoryState();
     state.selectedAnnotationId = null;
     notifyAndRender();
   }
@@ -809,19 +869,227 @@ export function initEditor(
         notifyAndRender();
       });
 
-    // Canvas click hit-testing to select vector annotations
+    // Canvas interactive drawing, endpoint handle dragging, and object selection/moving
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    canvas?.addEventListener('mousedown', handleCanvasMouseDown);
+    canvas?.addEventListener('mousemove', handleCanvasMouseMove);
+    canvas?.addEventListener('mouseup', handleCanvasMouseUp);
     canvas?.addEventListener('click', (event: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const cssX = event.clientX - rect.left;
       const cssY = event.clientY - rect.top;
       const hit = hitTestAnnotations(state.annotations, cssX, cssY);
-      if (hit) {
+      if (hit && hit.id !== state.selectedAnnotationId) {
         state.selectedAnnotationId = hit.id;
         syncToolbarWithSelectedAnnotation();
         notifyAndRender();
       }
     });
+  }
+
+  function getCanvasCssPoint(
+    canvas: HTMLCanvasElement | null,
+    event: MouseEvent,
+  ): Point2D {
+    if (!canvas) {
+      return { x: event.clientX, y: event.clientY };
+    }
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+  }
+
+  function handleCanvasMouseDown(event: MouseEvent): void {
+    if (event.button !== 0) {
+      return;
+    }
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    const pt = getCanvasCssPoint(canvas, event);
+
+    // 1. Check if user grabbed an endpoint handle (x1, y1) or (x2, y2) of the selected arrow/line
+    if (state.selectedAnnotationId) {
+      const selectedItem = state.annotations.find(
+        (item) => item.id === state.selectedAnnotationId,
+      );
+      const hitHandle = hitTestEndpointHandle(selectedItem, pt.x, pt.y);
+      if (hitHandle && selectedItem) {
+        activeInteraction = {
+          kind: 'handle',
+          itemId: selectedItem.id,
+          handle: hitHandle,
+          snapshotPushed: false,
+        };
+        return;
+      }
+    }
+
+    // 2. Check if user clicked on an existing annotation body to select or drag it
+    const hitBody = hitTestAnnotations(state.annotations, pt.x, pt.y);
+    if (hitBody) {
+      state.selectedAnnotationId = hitBody.id;
+      syncToolbarWithSelectedAnnotation();
+      activeInteraction = {
+        kind: 'move',
+        itemId: hitBody.id,
+        lastPoint: pt,
+        snapshotPushed: false,
+      };
+      redrawCanvasOnly();
+      return;
+    }
+
+    // 3. Otherwise start drawing a new Arrow or 2-in-1 Line/Highlighter
+    if (state.activeTool === 'arrow' || state.activeTool === 'line') {
+      annotationSeq += 1;
+      activeInteraction = {
+        kind: 'draw',
+        tool: state.activeTool,
+        newId: `ann_${state.activeTool}_${Date.now()}_${annotationSeq}`,
+        startPoint: pt,
+        snapshotPushed: false,
+      };
+    }
+  }
+
+  function handleCanvasMouseMove(event: MouseEvent): void {
+    if (!activeInteraction || event === lastProcessedMoveEvent) {
+      return;
+    }
+    lastProcessedMoveEvent = event;
+
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    const pt = getCanvasCssPoint(canvas, event);
+
+    if (activeInteraction.kind === 'handle') {
+      const targetId = activeInteraction.itemId;
+      const idx = state.annotations.findIndex(
+        (item) => item.id === targetId,
+      );
+      const target = idx >= 0 ? state.annotations[idx] : undefined;
+      if (
+        target &&
+        (target.type === 'arrow' || target.type === 'line')
+      ) {
+        if (!activeInteraction.snapshotPushed) {
+          pushHistorySnapshot();
+          activeInteraction.snapshotPushed = true;
+        }
+        state.annotations[idx] = updateAnnotationEndpoint(
+          target,
+          activeInteraction.handle,
+          pt,
+          event.shiftKey,
+        );
+        redrawCanvasOnly();
+      }
+      return;
+    }
+
+    if (activeInteraction.kind === 'move') {
+      const dx = pt.x - activeInteraction.lastPoint.x;
+      const dy = pt.y - activeInteraction.lastPoint.y;
+      if (!activeInteraction.snapshotPushed && Math.hypot(dx, dy) < 2) {
+        return;
+      }
+      const targetId = activeInteraction.itemId;
+      const idx = state.annotations.findIndex(
+        (item) => item.id === targetId,
+      );
+      const target = idx >= 0 ? state.annotations[idx] : undefined;
+      if (target) {
+        if (!activeInteraction.snapshotPushed) {
+          pushHistorySnapshot();
+          activeInteraction.snapshotPushed = true;
+        }
+        state.annotations[idx] = moveAnnotationByDelta(target, dx, dy);
+        activeInteraction.lastPoint = pt;
+        redrawCanvasOnly();
+      }
+      return;
+    }
+
+    if (activeInteraction.kind === 'draw') {
+      const dist = Math.hypot(
+        pt.x - activeInteraction.startPoint.x,
+        pt.y - activeInteraction.startPoint.y,
+      );
+      if (!activeInteraction.snapshotPushed && dist < 2) {
+        return;
+      }
+
+      const endPt = applyShiftHorizontalLock(
+        activeInteraction.startPoint,
+        pt,
+        event.shiftKey,
+      );
+
+      if (!activeInteraction.snapshotPushed) {
+        pushHistorySnapshot();
+        activeInteraction.snapshotPushed = true;
+
+        if (activeInteraction.tool === 'arrow') {
+          const newArrow: ArrowAnnotation = {
+            id: activeInteraction.newId,
+            type: 'arrow',
+            x1: activeInteraction.startPoint.x,
+            y1: activeInteraction.startPoint.y,
+            x2: endPt.x,
+            y2: endPt.y,
+            color: state.activeColor,
+            strokeWidth: state.strokeWidth,
+          };
+          state.annotations.push(newArrow);
+        } else {
+          const newLine: LineAnnotation = {
+            id: activeInteraction.newId,
+            type: 'line',
+            subtype: state.lineSubtype,
+            x1: activeInteraction.startPoint.x,
+            y1: activeInteraction.startPoint.y,
+            x2: endPt.x,
+            y2: endPt.y,
+            color: state.activeColor,
+            strokeWidth:
+              state.lineSubtype === 'highlighter'
+                ? HIGHLIGHTER_STROKE_WIDTH_CSS
+                : state.strokeWidth,
+            alpha:
+              state.lineSubtype === 'highlighter' ? HIGHLIGHTER_ALPHA : 1.0,
+          };
+          state.annotations.push(newLine);
+        }
+        state.selectedAnnotationId = activeInteraction.newId;
+      } else {
+        const idx = state.annotations.findIndex(
+          (item) =>
+            activeInteraction?.kind === 'draw' &&
+            item.id === activeInteraction.newId,
+        );
+        const existing = idx >= 0 ? state.annotations[idx] : undefined;
+        if (
+          existing &&
+          (existing.type === 'arrow' || existing.type === 'line')
+        ) {
+          state.annotations[idx] = {
+            ...existing,
+            x2: endPt.x,
+            y2: endPt.y,
+          };
+        }
+      }
+      redrawCanvasOnly();
+    }
+  }
+
+  function handleCanvasMouseUp(event: MouseEvent): void {
+    if (!activeInteraction || event === lastProcessedUpEvent) {
+      return;
+    }
+    lastProcessedUpEvent = event;
+    activeInteraction = null;
+    notifyAndRender();
   }
 
   async function hydrateFromStorageAndIndexedDb(): Promise<void> {
@@ -879,7 +1147,8 @@ export function initEditor(
         highlightApplied: false,
       };
       state.annotations = [];
-      state.historyStack = [];
+      historyManager.reset([]);
+      syncHistoryState();
       state.selectedAnnotationId = null;
       notifyAndRender();
     }
@@ -931,6 +1200,8 @@ export function initEditor(
 
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('mousemove', handleCanvasMouseMove);
+    window.addEventListener('mouseup', handleCanvasMouseUp);
     window.addEventListener('paste', (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
       if (!items) return;
