@@ -22,6 +22,7 @@
   - `src/editor/index.ts` & `src/editor/canvas-stage.ts` — `initEditor()` 56px 4-cluster toolbar controller and `renderCanvasStage()` HiDPI Retina `<canvas>` renderer + `hitTestAnnotations()`.
   - `src/shared/dpi.ts`, `src/shared/filename.ts`, `src/shared/url-guard.ts` — DPR scaling & 20px viewport clamping (`clampRectWithPaddingToViewport`, `multiplyRectByDpr`, `computePhysicalCropRect`), `<domain>_YYYY-MM-DD_HH-mm.png` formatter (`formatCaptureFilename`), and restricted URL detector (`isRestrictedBrowserUrl`).
   - `src/shared/settings.ts` — Typed `chrome.storage.local` settings manager (`loadUserSettings`, `saveUserSettings`, `updateUserSettings`, `sanitizeUserSettings`).
+  - `src/shared/db.ts` — IndexedDB (`SnapMarkDB.captures`) `Blob` session store (`saveCaptureSession`, `getCaptureSession`, `consumeCaptureSession` immediate purge, `cleanupStaleCaptures` 15-min TTL).
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
@@ -32,7 +33,7 @@
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
-- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (2/7 tasks done)
+- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (3/7 tasks done)
 
 ## Decisions and deviations
 - none
@@ -54,3 +55,4 @@
 - [M01] [x] 2026-11-21 — Milestone M01 accepted by operator and merged into `main`.
 - [007] [x] 2026-11-21 — Implemented DPI crop math (`src/shared/dpi.ts`), filename formatter (`src/shared/filename.ts`), and restricted browser URL guard (`src/shared/url-guard.ts`).
 - [008] [x] 2026-11-21 — Implemented persistent user settings wrapper for `chrome.storage.local` (`src/shared/settings.ts`).
+- [009] [x] 2026-11-21 — Implemented IndexedDB `Blob` capture session store with immediate purge and 15-minute TTL cleanup (`src/shared/db.ts`).
