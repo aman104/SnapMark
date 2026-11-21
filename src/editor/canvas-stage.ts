@@ -16,6 +16,7 @@ function createFallback2DContext(): CanvasRenderingContext2D {
     clearRect: noop,
     fillRect: noop,
     strokeRect: noop,
+    drawImage: noop,
     beginPath: noop,
     closePath: noop,
     moveTo: noop,
@@ -244,11 +245,82 @@ export function hitTestAnnotations(
   return null;
 }
 
+export async function decodeBlobToDrawable(
+  blob: Blob,
+  fallbackPhysicalWidth = 1280,
+  fallbackPhysicalHeight = 800,
+): Promise<{
+  drawable: CanvasImageSource | null;
+  physicalWidth: number;
+  physicalHeight: number;
+}> {
+  if (
+    typeof navigator !== 'undefined' &&
+    /jsdom/i.test(navigator.userAgent ?? '')
+  ) {
+    return {
+      drawable: null,
+      physicalWidth: fallbackPhysicalWidth,
+      physicalHeight: fallbackPhysicalHeight,
+    };
+  }
+
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      return {
+        drawable: bitmap,
+        physicalWidth: bitmap.width || fallbackPhysicalWidth,
+        physicalHeight: bitmap.height || fallbackPhysicalHeight,
+      };
+    } catch {
+      // Fallback to HTMLImageElement decoding
+    }
+  }
+
+  if (
+    typeof URL !== 'undefined' &&
+    typeof URL.createObjectURL === 'function' &&
+    typeof Image !== 'undefined'
+  ) {
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () =>
+          reject(new Error('Failed to decode Blob into HTMLImageElement'));
+        element.src = objectUrl;
+      });
+      return {
+        drawable: img,
+        physicalWidth: img.naturalWidth || fallbackPhysicalWidth,
+        physicalHeight: img.naturalHeight || fallbackPhysicalHeight,
+      };
+    } catch {
+      return {
+        drawable: null,
+        physicalWidth: fallbackPhysicalWidth,
+        physicalHeight: fallbackPhysicalHeight,
+      };
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  return {
+    drawable: null,
+    physicalWidth: fallbackPhysicalWidth,
+    physicalHeight: fallbackPhysicalHeight,
+  };
+}
+
 export function renderCanvasStage(
   canvas: HTMLCanvasElement,
   metadata: MockCaptureMetadata,
   annotations: AnnotationItem[],
   selectedId: string | null,
+  baseImage: CanvasImageSource | null = null,
 ): void {
   const physicalWidth = Math.round(metadata.cssWidth * metadata.dpr);
   const physicalHeight = Math.round(metadata.cssHeight * metadata.dpr);
@@ -262,15 +334,19 @@ export function renderCanvasStage(
   const ctx = get2DContext(canvas);
   ctx.clearRect(0, 0, physicalWidth, physicalHeight);
 
-  // Base screenshot bitmap
-  renderMockScreenshotBackdrop(
-    ctx,
-    metadata.cssWidth,
-    metadata.cssHeight,
-    metadata.dpr,
-    metadata.mode,
-    metadata.highlightApplied,
-  );
+  if (baseImage) {
+    ctx.drawImage(baseImage, 0, 0, physicalWidth, physicalHeight);
+  } else {
+    // Base screenshot bitmap fallback (prototype / JSDOM test environments)
+    renderMockScreenshotBackdrop(
+      ctx,
+      metadata.cssWidth,
+      metadata.cssHeight,
+      metadata.dpr,
+      metadata.mode,
+      metadata.highlightApplied,
+    );
+  }
 
   // Vector overlay pass scaled by devicePixelRatio
   ctx.save();

@@ -27,6 +27,9 @@ const VALID_TEXT_STYLES: ReadonlySet<TextStyleMode> = new Set([
 ]);
 
 let inMemoryFallbackSettings: UserSettings = { ...DEFAULT_USER_SETTINGS };
+let settingsMutationQueue: Promise<UserSettings> = Promise.resolve({
+  ...DEFAULT_USER_SETTINGS,
+});
 
 export function sanitizeUserSettings(raw: unknown): UserSettings {
   if (!raw || typeof raw !== 'object') {
@@ -149,10 +152,15 @@ export async function saveUserSettings(
 export async function updateUserSettings(
   patch: Partial<UserSettings>,
 ): Promise<UserSettings> {
-  const current = await loadUserSettings();
-  const merged = sanitizeUserSettings({ ...current, ...patch });
-  await writeRawToStorage(merged);
-  return merged;
+  const run = async (): Promise<UserSettings> => {
+    const current = await loadUserSettings();
+    const merged = sanitizeUserSettings({ ...current, ...patch });
+    await writeRawToStorage(merged);
+    return merged;
+  };
+  const next = settingsMutationQueue.then(run, run);
+  settingsMutationQueue = next;
+  return await next;
 }
 
 export async function resetUserSettings(): Promise<UserSettings> {

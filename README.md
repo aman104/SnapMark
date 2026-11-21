@@ -72,13 +72,23 @@ Po uruchomieniu serwera deweloperskiego Vite (`http://localhost:5173`) możesz p
   - Stan pusty / awaryjny (Empty State z wklejaniem `Ctrl+V`): `http://localhost:5173/editor.html?state=empty`
   - Ostrzeżenie o maksymalnej bezpiecznej wysokości `<canvas>`: `http://localhost:5173/editor.html?state=max-height-warning`
 
-### Build
+### Build & Load Unpacked Chrome Extension (Milestone M02)
 
 ```bash
 npm run build
 ```
 
-Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/`.
+Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/` (`manifest.json`, `background.js`, `popup.html`, `editor.html`, `icons/icon-16..128.png`).
+
+**Jak załadować wtyczkę w Google Chrome / Brave / Edge:**
+1. Otwórz w przeglądarce adres `chrome://extensions`.
+2. Włącz przełącznik **Tryb dewelopera** (*Developer mode*) w prawym górnym rogu.
+3. Kliknij **Załaduj rozpakowane** (*Load unpacked*) i wskaż katalog `dist/` w tym repozytorium.
+4. Otwórz dowolną stronę WWW (np. `https://example.com`) i wywołaj **Tryb 3: Widoczny ekran (Viewport)** na jeden z 3 sposobów:
+   - Kliknij ikonę **SnapMark** na pasku przeglądarki → **„Widoczny ekran”**,
+   - Wciśnij skrót klawiszowy `Alt + Shift + V`,
+   - Kliknij prawym przyciskiem myszy na stronie → **„Zrób zrzut widocznego ekranu”**.
+5. Zrzut w natywnej rozdzielczości Retina trafia jako surowy obiekt `Blob` do bazy **IndexedDB** (`SnapMarkDB.captures`), otwiera kartę `editor.html?captureId=<id>` i **natychmiast usuwa dane tymczasowe z IndexedDB** zaraz po wczytaniu na płótno `<canvas>`.
 
 ## Available Scripts
 
