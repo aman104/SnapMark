@@ -9,6 +9,13 @@ export default defineConfig({
       input: {
         popup: resolve(__dirname, 'popup.html'),
         editor: resolve(__dirname, 'editor.html'),
+        background: resolve(__dirname, 'src/background/index.ts'),
+      },
+      output: {
+        entryFileNames: (chunkInfo) =>
+          chunkInfo.name === 'background'
+            ? 'background.js'
+            : 'assets/[name]-[hash].js',
       },
     },
   },

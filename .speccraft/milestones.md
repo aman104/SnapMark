@@ -7,7 +7,7 @@
 | Phase | Milestones | What you will see at the end | Status |
 |---|---|---|---|
 | 1–2. Look & feel & Clickable prototype | M01 | The real TypeScript + Vite project running both `popup.html` and `editor.html` in the Dark Studio Utility design system (`03-Design.md`), with every UI state switchable (`?state=default\|progress\|restricted\|empty`) and a clickable mock capture flow loading a sample Retina screenshot onto the editor stage | done |
-| 3. Foundations | M02 | A loadable Chrome Extension Manifest V3 package (`dist/`) with minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`), IndexedDB `Blob` transfer store (`SnapMarkDB`) with automatic cleanup, persistent settings in `chrome.storage.local`, and **Tryb 3: Widoczny ekran (Viewport)** working end-to-end from popup, context menu, and `Alt+Shift+V` | planned |
+| 3. Foundations | M02 | A loadable Chrome Extension Manifest V3 package (`dist/`) with minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`), IndexedDB `Blob` transfer store (`SnapMarkDB`) with automatic cleanup, persistent settings in `chrome.storage.local`, and **Tryb 3: Widoczny ekran (Viewport)** working end-to-end from popup, context menu, and `Alt+Shift+V` | done |
 | 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | planned |
 | 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | planned |
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | planned |
@@ -38,7 +38,7 @@
 - **Depends on:** none
 - **Estimated size:** 6–8 tasks
 
-## [ ] M02 - Foundations: Manifest V3, IndexedDB transfer and Viewport capture
+## [x] M02 - Foundations: Manifest V3, IndexedDB transfer and Viewport capture
 - **Phase:** 3 — Foundations
 - **Type:** foundation
 - **What you will see:** Przed: klikalny prototyp w karcie deweloperskiej z przykładowym obrazkiem. Po: prawdziwa, gotowa do załadowania w Chrome wtyczka Manifest V3 (`dist/`), która nie żąda uprawnienia `<all_urls>`, rejestruje menu kontekstowe i skróty klawiszowe, zapisuje ustawienia w `chrome.storage.local`, wykonuje prawdziwy **Zrzut widocznego ekranu (Viewport)** w natywnej rozdzielczości Retina, przesyła surowy `Blob` przez bazę **IndexedDB** (`SnapMarkDB`) do nowej karty `editor.html` i natychmiast czyści dane tymczasowe po wczytaniu na płótno.

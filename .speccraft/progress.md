@@ -20,6 +20,10 @@
   - `src/shared/mock-captures.ts` — Prototype URL state parsers (`parsePopupStateFromSearch`, `parseEditorStateFromSearch`), mock HiDPI metadata (`getMockCaptureMetadata`), sample vector objects (`getInitialMockAnnotations`), and 2D backdrop drawer (`renderMockScreenshotBackdrop`).
   - `src/popup/index.ts` — `renderPopup()` controller for `popup.html` (all 4 states: `default`, `no-selection`, `progress`, `restricted`).
   - `src/editor/index.ts` & `src/editor/canvas-stage.ts` — `initEditor()` 56px 4-cluster toolbar controller and `renderCanvasStage()` HiDPI Retina `<canvas>` renderer + `hitTestAnnotations()`.
+  - `src/shared/dpi.ts`, `src/shared/filename.ts`, `src/shared/url-guard.ts` — DPR scaling & 20px viewport clamping (`clampRectWithPaddingToViewport`, `multiplyRectByDpr`, `computePhysicalCropRect`), `<domain>_YYYY-MM-DD_HH-mm.png` formatter (`formatCaptureFilename`), and restricted URL detector (`isRestrictedBrowserUrl`).
+  - `src/shared/settings.ts` — Typed `chrome.storage.local` settings manager (`loadUserSettings`, `saveUserSettings`, `updateUserSettings`, `sanitizeUserSettings`).
+  - `src/shared/db.ts` — IndexedDB (`SnapMarkDB.captures`) `Blob` session store (`saveCaptureSession`, `getCaptureSession`, `consumeCaptureSession` immediate purge, `cleanupStaleCaptures` 15-min TTL).
+  - `src/background/rate-limiter.ts` & `src/background/capture-orchestrator.ts` — `CaptureRateLimiter` (`>= 550 ms` + `600 ms` retry backoff), context menu setup (`registerContextMenus`), `dataUrlToBlob`, and `captureVisibleViewport`.
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
@@ -30,7 +34,8 @@
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
-- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture
+- [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
+- [M03] `[>]` in progress — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll)
 
 ## Decisions and deviations
 - none
@@ -50,3 +55,12 @@
 - [006] [x] 2026-11-21 — Built HiDPI Retina canvas stage (`src/editor/canvas-stage.ts`), sample vector annotation renderer, `?state=empty` and `?state=max-height-warning` views, and `README.md`.
 - [M01] [?] 2026-11-21 — Milestone M01 completed and ready for operator review.
 - [M01] [x] 2026-11-21 — Milestone M01 accepted by operator and merged into `main`.
+- [007] [x] 2026-11-21 — Implemented DPI crop math (`src/shared/dpi.ts`), filename formatter (`src/shared/filename.ts`), and restricted browser URL guard (`src/shared/url-guard.ts`).
+- [008] [x] 2026-11-21 — Implemented persistent user settings wrapper for `chrome.storage.local` (`src/shared/settings.ts`).
+- [009] [x] 2026-11-21 — Implemented IndexedDB `Blob` capture session store with immediate purge and 15-minute TTL cleanup (`src/shared/db.ts`).
+- [010] [x] 2026-11-21 — Completed Manifest V3 package (`public/manifest.json`), extension icons (`16/32/48/128 px`), and multi-entry Vite build emitting `dist/background.js`.
+- [011] [x] 2026-11-21 — Built MV3 Background Service Worker, `CaptureRateLimiter` (`>= 550 ms`), context menus, and end-to-end Visible Viewport Capture.
+- [012] [x] 2026-11-21 — Connected `popup.html` to live `chrome.tabs.query`, `chrome.storage.local` settings, and `chrome.runtime.sendMessage` Viewport trigger.
+- [013] [x] 2026-11-21 — Connected `editor.html` to IndexedDB `Blob` consumption (`consumeCaptureSession`) with immediate purge, settings persistence, and clipboard/file input.
+- [M02] [?] 2026-11-21 — Milestone M02 completed and ready for operator review.
+- [M02] [x] 2026-11-21 — Milestone M02 accepted by operator and merged into `main`.
