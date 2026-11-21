@@ -35,7 +35,7 @@
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
-- [M03] `[>]` in progress — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll)
+- [M03] `[>]` in progress — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (1/5 tasks done)
 
 ## Decisions and deviations
 - none
@@ -64,3 +64,4 @@
 - [013] [x] 2026-11-21 — Connected `editor.html` to IndexedDB `Blob` consumption (`consumeCaptureSession`) with immediate purge, settings persistence, and clipboard/file input.
 - [M02] [?] 2026-11-21 — Milestone M02 completed and ready for operator review.
 - [M02] [x] 2026-11-21 — Milestone M02 accepted by operator and merged into `main`.
+- [014] [x] 2026-11-21 — Implemented on-demand DOM text selection measurement (+20 px margin) and temporary yellow highlight in `src/content/capture-injected.ts`.
