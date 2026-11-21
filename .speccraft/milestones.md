@@ -9,7 +9,7 @@
 | 1–2. Look & feel & Clickable prototype | M01 | The real TypeScript + Vite project running both `popup.html` and `editor.html` in the Dark Studio Utility design system (`03-Design.md`), with every UI state switchable (`?state=default\|progress\|restricted\|empty`) and a clickable mock capture flow loading a sample Retina screenshot onto the editor stage | done |
 | 3. Foundations | M02 | A loadable Chrome Extension Manifest V3 package (`dist/`) with minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`), IndexedDB `Blob` transfer store (`SnapMarkDB`) with automatic cleanup, persistent settings in `chrome.storage.local`, and **Tryb 3: Widoczny ekran (Viewport)** working end-to-end from popup, context menu, and `Alt+Shift+V` | done |
 | 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | done |
-| 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | in progress |
+| 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | in review |
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | planned |
 
 ## [x] M01 - Look & feel and clickable prototype
@@ -102,7 +102,7 @@
 - **Depends on:** M02
 - **Estimated size:** 8–10 tasks
 
-## [>] M04 - Complete features: Vector annotation editor, undo history and export
+## [?] M04 - Complete features: Vector annotation editor, undo history and export
 - **Phase:** 5 — Complete features
 - **Type:** feature
 - **What you will see:** Przed: wszystkie 4 tryby zrzutu otwierały przechwycony obraz na płótnie w `editor.html`, ale narzędzia rysowania były tylko makietą z prototypu. Po: pełny, płynny (60 FPS) wektorowy edytor adnotacji — jednym przeciągnięciem myszy rysujesz czerwoną **Strzałkę** (`#FF3B30`) i po narysowaniu możesz chwycić jej grot lub początek, by skorygować kierunek; przełączasz na **Podkreślenie i zakreślacz** i z przytrzymanym `Shift` rysujesz idealnie proste linie lub półprzezroczysty marker (`globalAlpha = 0.35`); klikasz **Tekst** i wpisujesz komentarz z kontrastowym tłem lub białym obrysem wokół liter; cofasz dowolny ruch przez `Ctrl+Z` (`Cmd+Z`) lub usuwasz wybrany obiekt klawiszem `Delete`, a na końcu jednym kliknięciem **„Kopiuj do schowka”** lub **„Pobierz PNG”** eksportujesz spłaszczony obraz w pełnej rozdzielczości.
@@ -134,13 +134,13 @@
     4. Wciśnij `Ctrl+Z` (lub `Cmd+Z`), aby cofnąć ostatnie zmiany, zaznacz obiekt i wciśnij `Delete`.
     5. Kliknij **„Kopiuj do schowka”** (przycisk zmieni się na `✓ Skopiowano!`) i wklej obraz przez `Ctrl+V` / `Cmd+V` bezpośrednio do Slacka, dokumentu lub nowej karty; kliknij **„Pobierz PNG”** i sprawdź pobrany plik `domena_YYYY-MM-DD_HH-mm.png`.
 - **Exit criteria:**
-  - [ ] Wszystkie obiekty rysowane w edytorze są przechowywane w tablicy wektorowej `annotations[]`, a nie wypalane od razu na źródłowej bitmapie
-  - [ ] Strzałka posiada domyślny kolor `#FF3B30`, obsługuje zmianę koloru i grubości oraz pozwala po narysowaniu przesuwać oba swoje końce `(x1, y1)` i `(x2, y2)` za pomocą uchwytów
-  - [ ] Narzędzie Podkreślenie i zakreślacz obsługuje oba podtryby, stosuje `globalAlpha = 0.35` dla zakreślacza i wymusza idealny poziom (`y2 = y1`) przy przytrzymaniu `Shift`
-  - [ ] Narzędzie Tekst pozwala umieścić, przesunąć i edytować pole tekstowe oraz przełączać kontrastowe tło i biały/kontrastowy obrys wokół liter
-  - [ ] `Ctrl+Z` / `Cmd+Z` cofa kolejne operacje z historii, a `Delete` / `Backspace` usuwa zaznaczony obiekt
-  - [ ] „Pobierz PNG” pobiera spłaszczony obraz z nazwą `<domena>_YYYY-MM-DD_HH-mm.png`, a „Kopiuj do schowka” kopiuje `image/png` do schowka systemowego
-  - [ ] Testy jednostkowe silnika wektorowego, hit-testingu, historii `Ctrl+Z` i eksportera przechodzą (`npm test && npm run build`)
+  - [x] Wszystkie obiekty rysowane w edytorze są przechowywane w tablicy wektorowej `annotations[]`, a nie wypalane od razu na źródłowej bitmapie
+  - [x] Strzałka posiada domyślny kolor `#FF3B30`, obsługuje zmianę koloru i grubości oraz pozwala po narysowaniu przesuwać oba swoje końce `(x1, y1)` i `(x2, y2)` za pomocą uchwytów
+  - [x] Narzędzie Podkreślenie i zakreślacz obsługuje oba podtryby, stosuje `globalAlpha = 0.35` dla zakreślacza i wymusza idealny poziom (`y2 = y1`) przy przytrzymaniu `Shift`
+  - [x] Narzędzie Tekst pozwala umieścić, przesunąć i edytować pole tekstowe oraz przełączać kontrastowe tło i biały/kontrastowy obrys wokół liter
+  - [x] `Ctrl+Z` / `Cmd+Z` cofa kolejne operacje z historii, a `Delete` / `Backspace` usuwa zaznaczony obiekt
+  - [x] „Pobierz PNG” pobiera spłaszczony obraz z nazwą `<domena>_YYYY-MM-DD_HH-mm.png`, a „Kopiuj do schowka” kopiuje `image/png` do schowka systemowego
+  - [x] Testy jednostkowe silnika wektorowego, hit-testingu, historii `Ctrl+Z` i eksportera przechodzą (`npm test && npm run build`)
 - **Depends on:** M03
 - **Estimated size:** 8–10 tasks
 
