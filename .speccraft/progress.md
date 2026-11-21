@@ -34,7 +34,8 @@
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
-- [M02] `[?]` awaiting review — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done, all exit criteria met)
+- [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
+- [M03] `[>]` in progress — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll)
 
 ## Decisions and deviations
 - none
@@ -62,3 +63,4 @@
 - [012] [x] 2026-11-21 — Connected `popup.html` to live `chrome.tabs.query`, `chrome.storage.local` settings, and `chrome.runtime.sendMessage` Viewport trigger.
 - [013] [x] 2026-11-21 — Connected `editor.html` to IndexedDB `Blob` consumption (`consumeCaptureSession`) with immediate purge, settings persistence, and clipboard/file input.
 - [M02] [?] 2026-11-21 — Milestone M02 completed and ready for operator review.
+- [M02] [x] 2026-11-21 — Milestone M02 accepted by operator and merged into `main`.

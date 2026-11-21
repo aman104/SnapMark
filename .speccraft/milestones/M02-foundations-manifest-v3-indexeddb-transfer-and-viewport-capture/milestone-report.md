@@ -58,8 +58,8 @@ none
 - Infrastruktura `CaptureRateLimiter` (`>= 550 ms`), `computePhysicalCropRect` (`coord * dpr` + `20 px` marginesu) oraz `SnapMarkDB` (`frames: CaptureFrame[]` + `cropRectCss`) jest już gotowa do bezpośredniego użycia w kamieniu milowym **M03 (Contextual DOM captures: Selection, Image, Full-Page Scroll)**.
 
 ## Operator decision
-- [ ] Accept: tell `08-planning-tasks` "accept M02". It merges `milestone/M02-foundations-manifest-v3-indexeddb-transfer-and-viewport-capture` into the base branch and plans the next milestone
+- [x] Accept: tell `08-planning-tasks` "accept M02". It merges `milestone/M02-foundations-manifest-v3-indexeddb-transfer-and-viewport-capture` into the base branch and plans the next milestone
 - [ ] Request changes: describe them below and run `08-planning-tasks`
 
 ### Feedback
-(for the operator)
+Zaakceptowano przez operatora (2026-11-21).
