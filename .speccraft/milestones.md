@@ -10,7 +10,7 @@
 | 3. Foundations | M02 | A loadable Chrome Extension Manifest V3 package (`dist/`) with minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`), IndexedDB `Blob` transfer store (`SnapMarkDB`) with automatic cleanup, persistent settings in `chrome.storage.local`, and **Tryb 3: Widoczny ekran (Viewport)** working end-to-end from popup, context menu, and `Alt+Shift+V` | done |
 | 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | done |
 | 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | done |
-| 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | planned |
+| 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | in progress |
 
 ## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
@@ -144,7 +144,7 @@
 - **Depends on:** M03
 - **Estimated size:** 8–10 tasks
 
-## [ ] M05 - Quality and release: Playwright E2E tests, edge-case hardening and Web Store package
+## [>] M05 - Quality and release: Playwright E2E tests, edge-case hardening and Web Store package
 - **Phase:** 6–7 — Quality & release
 - **Type:** release
 - **What you will see:** Przed: funkcjonalna wtyczka przetestowana jednostkowo i manualnie. Po: zautomatyzowany zestaw testów End-to-End w **Playwright**, który uruchamia prawdziwą przeglądarkę Chromium z załadowaną wtyczką `--load-extension=./dist` i automatycznie weryfikuje popup, zrzuty, edytor wektorowy i eksport; pełna odporność na sytuacje brzegowe (ekstremalnie długie strony > `MAX_CANVAS_HEIGHT`, strony bez zaznaczenia, błędy limitu zapytań API Chrome); zielony pipeline CI GitHub Actions oraz gotowa do publikacji w Chrome Web Store paczka `snapmark-extension.zip` wraz z dokumentacją `README.md`.
