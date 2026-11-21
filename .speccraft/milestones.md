@@ -8,7 +8,7 @@
 |---|---|---|---|
 | 1–2. Look & feel & Clickable prototype | M01 | The real TypeScript + Vite project running both `popup.html` and `editor.html` in the Dark Studio Utility design system (`03-Design.md`), with every UI state switchable (`?state=default\|progress\|restricted\|empty`) and a clickable mock capture flow loading a sample Retina screenshot onto the editor stage | done |
 | 3. Foundations | M02 | A loadable Chrome Extension Manifest V3 package (`dist/`) with minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`), IndexedDB `Blob` transfer store (`SnapMarkDB`) with automatic cleanup, persistent settings in `chrome.storage.local`, and **Tryb 3: Widoczny ekran (Viewport)** working end-to-end from popup, context menu, and `Alt+Shift+V` | done |
-| 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | in review |
+| 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | done |
 | 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | planned |
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | planned |
 
@@ -67,7 +67,7 @@
 - **Depends on:** M01
 - **Estimated size:** 7–9 tasks
 
-## [?] M03 - Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll)
+## [x] M03 - Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll)
 - **Phase:** 4 — Core features
 - **Type:** feature
 - **What you will see:** Przed: działał tylko prosty zrzut aktualnie widocznego okna (Viewport). Po: działają wszystkie 4 tryby przechwytywania z PRD — możesz zaznaczyć dowolny akapit tekstu i kliknąć PPM *„Zrób screena zaznaczenia”* (otrzymując idealnie przycięty wycinek z marginesem 20 px i opcjonalnym żółtym podświetleniem), kliknąć PPM na dowolne zdjęcie `<img>` *„Edytuj i pobierz obrazek”* (nawet na stronach z blokadą CORS lub formatami AVIF/WebP) albo uruchomić *„Cała strona ze scrollem”* (strona sama przewinie się krok po kroku z odstępem ~550 ms, ukryje po pierwszej klatce pływające nagłówki `fixed`/`sticky` i sklei wszystko w jeden długi obraz w `editor.html`).

@@ -36,7 +36,7 @@
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
-- [M03] `[?]` in review — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
+- [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
 
 ## Decisions and deviations
 - none
@@ -71,3 +71,4 @@
 - [017] [x] 2026-11-21 — Orchestrated Selection, Image, and Full-Page Scroll captures in Background Service Worker with `>= 550 ms` throttling and `finally` DOM cleanup.
 - [018] [x] 2026-11-21 — Implemented physical DPI cropping (`cropRectCss * dpr`) and multi-frame scroll stitching (`buildSessionCompositePlacements`) in `src/editor/canvas-stage.ts`, live popup scroll progress/cancel controls, and `README.md` walkthrough.
 - [M03] [?] 2026-11-21 — Milestone M03 completed and ready for operator review.
+- [M03] [x] 2026-11-21 — Milestone M03 accepted by operator and merged into `main`.
