@@ -19,7 +19,8 @@
   - `src/shared/types.ts` & `src/shared/constants.ts` — Shared contracts (`CaptureSession`, `AnnotationItem`, `UserSettings`, `ANNOTATION_COLORS`, `STROKE_WIDTHS`, `DEFAULT_USER_SETTINGS`).
   - `src/shared/mock-captures.ts` — Prototype URL state parsers (`parsePopupStateFromSearch`, `parseEditorStateFromSearch`), mock HiDPI metadata (`getMockCaptureMetadata`), sample vector objects (`getInitialMockAnnotations`), and 2D backdrop drawer (`renderMockScreenshotBackdrop`).
   - `src/popup/index.ts` — `renderPopup()` controller for `popup.html` (all 4 states: `default`, `no-selection`, `progress`, `restricted`).
-  - `src/editor/index.ts` & `src/editor/canvas-stage.ts` — `initEditor()` 56px 4-cluster toolbar controller and `renderCanvasStage()` HiDPI Retina `<canvas>` renderer + `hitTestAnnotations()`.
+  - `src/editor/index.ts` & `src/editor/canvas-stage.ts` — `initEditor()` 56px 4-cluster toolbar controller and `renderCanvasStage()` HiDPI Retina `<canvas>` renderer + `buildSessionCompositePlacements()`.
+  - `src/editor/vector-engine.ts`, `src/editor/history.ts`, `src/editor/text-overlay.ts` & `src/editor/exporter.ts` — Vector hit-testing (`hitTestEndpointHandle`, `hitTestAnnotationBody`), `Shift` horizontal lock (`applyShiftHorizontalLock`), immutable `UndoHistoryStack`, inline `<textarea>` overlay (`renderTextOverlayLayer`), and flattened HiDPI PNG / `ClipboardItem` exporter (`createFlattenedExportCanvas`, `exportFlattenedPngDownload`, `exportFlattenedToClipboard`).
   - `src/shared/dpi.ts`, `src/shared/filename.ts`, `src/shared/url-guard.ts` — DPR scaling & 20px viewport clamping (`clampRectWithPaddingToViewport`, `multiplyRectByDpr`, `computePhysicalCropRect`), `<domain>_YYYY-MM-DD_HH-mm.png` formatter (`formatCaptureFilename`), and restricted URL detector (`isRestrictedBrowserUrl`).
   - `src/shared/settings.ts` — Typed `chrome.storage.local` settings manager (`loadUserSettings`, `saveUserSettings`, `updateUserSettings`, `sanitizeUserSettings`).
   - `src/shared/db.ts` — IndexedDB (`SnapMarkDB.captures`) `Blob` session store (`saveCaptureSession`, `getCaptureSession`, `consumeCaptureSession` immediate purge, `cleanupStaleCaptures` 15-min TTL).
@@ -31,12 +32,13 @@
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "scripting", "storage"]`.
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, active milestone branch `milestone/M03-core-features-contextual-dom-captures`
+- **Git:** base branch `main`, active milestone branch `milestone/M04-complete-features-vector-annotation-editor-undo-history-and-export`
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
+- [M04] `[x]` accepted (2026-11-21) — Complete features: Vector annotation editor, undo history and export (4/4 tasks done)
 
 ## Decisions and deviations
 - none
@@ -72,3 +74,9 @@
 - [018] [x] 2026-11-21 — Implemented physical DPI cropping (`cropRectCss * dpr`) and multi-frame scroll stitching (`buildSessionCompositePlacements`) in `src/editor/canvas-stage.ts`, live popup scroll progress/cancel controls, and `README.md` walkthrough.
 - [M03] [?] 2026-11-21 — Milestone M03 completed and ready for operator review.
 - [M03] [x] 2026-11-21 — Milestone M03 accepted by operator and merged into `main`.
+- [019] [x] 2026-11-21 — Implemented vector geometry, endpoint handle hit-testing, `Shift` horizontal lock, and `UndoHistoryStack` (`src/editor/vector-engine.ts`, `src/editor/history.ts`).
+- [020] [x] 2026-11-21 — Implemented interactive Arrow and 2-in-1 Line/Highlighter drawing, `Shift` horizontal locking, post-draw endpoint handle dragging, and body moving on `#editor-canvas`.
+- [021] [x] 2026-11-21 — Implemented interactive in-canvas `<textarea>` overlay (`src/editor/text-overlay.ts`), `dblclick` editing, dragging, and 3 readability modes (`background`, `outline`, `plain`).
+- [022] [x] 2026-11-21 — Implemented flattened HiDPI PNG download and `ClipboardItem` exporter (`src/editor/exporter.ts`) stripping selection handles (`selectedId = null`), and updated `README.md`.
+- [M04] [?] 2026-11-21 — Milestone M04 completed and ready for operator review.
+- [M04] [x] 2026-11-21 — Milestone M04 accepted by operator and merged into `main`.

@@ -8,6 +8,7 @@ import type {
   MockCaptureMetadata,
   TextAnnotation,
 } from '../shared/types';
+import { hitTestAnnotationBody } from './vector-engine';
 
 export interface FramePlacementPlan {
   frameIndex: number;
@@ -328,42 +329,7 @@ export function hitTestAnnotations(
   cssX: number,
   cssY: number,
 ): AnnotationItem | null {
-  for (let i = annotations.length - 1; i >= 0; i -= 1) {
-    const item = annotations[i];
-    if (!item) continue;
-
-    if (item.type === 'arrow' || item.type === 'line') {
-      const dx = item.x2 - item.x1;
-      const dy = item.y2 - item.y1;
-      const lenSq = dx * dx + dy * dy;
-      const t =
-        lenSq === 0
-          ? 0
-          : Math.max(
-              0,
-              Math.min(1, ((cssX - item.x1) * dx + (cssY - item.y1) * dy) / lenSq),
-            );
-      const projX = item.x1 + t * dx;
-      const projY = item.y1 + t * dy;
-      const dist = Math.hypot(cssX - projX, cssY - projY);
-      const threshold = Math.max(10, item.strokeWidth / 2 + 6);
-      if (dist <= threshold) {
-        return item;
-      }
-    } else if (item.type === 'text') {
-      const approxWidth = Math.max(80, item.text.length * (item.fontSize * 0.55)) + 24;
-      const approxHeight = item.fontSize * 1.4 + 16;
-      if (
-        cssX >= item.x - 12 &&
-        cssX <= item.x + approxWidth &&
-        cssY >= item.y - 8 &&
-        cssY <= item.y + approxHeight
-      ) {
-        return item;
-      }
-    }
-  }
-  return null;
+  return hitTestAnnotationBody(annotations, cssX, cssY);
 }
 
 export async function decodeBlobToDrawable(
