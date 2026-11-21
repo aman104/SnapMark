@@ -33,7 +33,7 @@
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
-- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (3/7 tasks done)
+- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (4/7 tasks done)
 
 ## Decisions and deviations
 - none
@@ -56,3 +56,4 @@
 - [007] [x] 2026-11-21 — Implemented DPI crop math (`src/shared/dpi.ts`), filename formatter (`src/shared/filename.ts`), and restricted browser URL guard (`src/shared/url-guard.ts`).
 - [008] [x] 2026-11-21 — Implemented persistent user settings wrapper for `chrome.storage.local` (`src/shared/settings.ts`).
 - [009] [x] 2026-11-21 — Implemented IndexedDB `Blob` capture session store with immediate purge and 15-minute TTL cleanup (`src/shared/db.ts`).
+- [010] [x] 2026-11-21 — Completed Manifest V3 package (`public/manifest.json`), extension icons (`16/32/48/128 px`), and multi-entry Vite build emitting `dist/background.js`.
