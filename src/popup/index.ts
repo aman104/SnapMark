@@ -1,6 +1,12 @@
 import { DEFAULT_USER_SETTINGS } from '../shared/constants';
 import { parsePopupStateFromSearch } from '../shared/mock-captures';
-import type { PopupPrototypeState } from '../shared/types';
+import { loadUserSettings, updateUserSettings } from '../shared/settings';
+import type {
+  PopupPrototypeState,
+  RuntimeCaptureRequest,
+  RuntimeCaptureResponse,
+} from '../shared/types';
+import { isRestrictedBrowserUrl } from '../shared/url-guard';
 
 export interface RenderPopupOptions {
   initialSearch?: string;
@@ -11,6 +17,12 @@ export interface PopupController {
   getState: () => PopupPrototypeState;
   setState: (nextState: PopupPrototypeState) => void;
   isHighlightEnabled: () => boolean;
+  ready: Promise<void>;
+}
+
+function hasExplicitStateParam(search: string): boolean {
+  const params = new URLSearchParams(search);
+  return params.has('state');
 }
 
 export function renderPopup(
@@ -20,6 +32,8 @@ export function renderPopup(
   const initialSearch =
     options.initialSearch ??
     (typeof window !== 'undefined' ? window.location.search : '');
+
+  const explicitStateOverride = hasExplicitStateParam(initialSearch);
 
   const navigate =
     options.onNavigate ??
@@ -180,6 +194,15 @@ export function renderPopup(
     bindEvents();
   }
 
+  function hasLiveRuntimeMessaging(): boolean {
+    return (
+      !options.onNavigate &&
+      typeof chrome !== 'undefined' &&
+      typeof chrome.runtime !== 'undefined' &&
+      typeof chrome.runtime.sendMessage === 'function'
+    );
+  }
+
   function bindEvents(): void {
     const viewportBtn = container.querySelector<HTMLButtonElement>(
       '#btn-capture-viewport',
@@ -202,6 +225,28 @@ export function renderPopup(
     );
 
     viewportBtn?.addEventListener('click', () => {
+      if (hasLiveRuntimeMessaging()) {
+        const message: RuntimeCaptureRequest = {
+          type: 'SNAPMARK_TRIGGER_CAPTURE',
+          mode: 'viewport',
+        };
+        void Promise.resolve(
+          chrome.runtime.sendMessage(message) as unknown as
+            | Promise<RuntimeCaptureResponse>
+            | RuntimeCaptureResponse,
+        )
+          .then((res) => {
+            if (res && typeof res === 'object' && 'ok' in res && res.ok) {
+              if (typeof window !== 'undefined' && typeof window.close === 'function') {
+                window.close();
+              }
+            }
+          })
+          .catch(() => {
+            navigate('editor.html?mode=viewport');
+          });
+        return;
+      }
       navigate('editor.html?mode=viewport');
     });
 
@@ -224,6 +269,9 @@ export function renderPopup(
         'aria-checked',
         highlightSelectionBeforeCapture ? 'true' : 'false',
       );
+      void updateUserSettings({
+        highlightSelectionBeforeCapture,
+      });
     };
 
     toggleHighlightBtn?.addEventListener('click', toggleHighlight);
@@ -239,6 +287,52 @@ export function renderPopup(
     });
   }
 
+  async function hydrateSettingsAndActiveTab(): Promise<void> {
+    const savedSettings = await loadUserSettings();
+    highlightSelectionBeforeCapture =
+      savedSettings.highlightSelectionBeforeCapture;
+
+    if (
+      !explicitStateOverride &&
+      typeof chrome !== 'undefined' &&
+      chrome.tabs &&
+      typeof chrome.tabs.query === 'function'
+    ) {
+      try {
+        const tabs = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
+        const activeTab = tabs?.[0];
+        if (activeTab) {
+          if (isRestrictedBrowserUrl(activeTab.url)) {
+            currentState = 'restricted';
+          } else if (
+            typeof activeTab.id === 'number' &&
+            chrome.scripting &&
+            typeof chrome.scripting.executeScript === 'function'
+          ) {
+            try {
+              const results = await chrome.scripting.executeScript({
+                target: { tabId: activeTab.id },
+                func: () =>
+                  (window.getSelection()?.toString().trim().length ?? 0) > 0,
+              });
+              const hasSel = Boolean(results?.[0]?.result);
+              currentState = hasSel ? 'default' : 'no-selection';
+            } catch {
+              // Keep currentState as default when script check is unavailable
+            }
+          }
+        }
+      } catch {
+        // Ignore tab query errors outside extension runtime
+      }
+    }
+
+    render();
+  }
+
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && currentState === 'progress') {
@@ -249,6 +343,7 @@ export function renderPopup(
   }
 
   render();
+  const ready = hydrateSettingsAndActiveTab();
 
   return {
     getState: () => currentState,
@@ -257,6 +352,7 @@ export function renderPopup(
       render();
     },
     isHighlightEnabled: () => highlightSelectionBeforeCapture,
+    ready,
   };
 }
 
