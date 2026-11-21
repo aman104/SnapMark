@@ -95,8 +95,24 @@ Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/` (`manifes
 
 - `npm run dev`: uruchamia lokalny serwer Vite dla `popup.html` i `editor.html`
 - `npm run typecheck`: weryfikuje typy TypeScript (`tsc --noEmit`)
-- `npm test`: uruchamia zestaw testów jednostkowych Vitest (`vitest run`)
+- `npm test`: uruchamia zestaw testów jednostkowych i integracyjnych Vitest (`vitest run`)
 - `npm run build`: wykonuje `typecheck` oraz buduje produkcyjną paczkę rozszerzenia do `dist/`
+- `npm run test:e2e`: uruchamia zestaw testów End-to-End (`tests/e2e/extension.spec.ts`) na zbudowanej paczce `./dist`
+- `npm run package`: buduje `./dist`, weryfikuje kompletność plików Manifest V3 i tworzy archiwum wydaniowe Chrome Web Store `snapmark-extension.zip`
+
+## Keyboard Shortcuts
+
+| Skrót klawiszowy | Kontekst | Działanie |
+|---|---|---|
+| `Alt + Shift + V` | Globalny (Chrome) | Zrzut widocznego ekranu (**Tryb 3: Viewport**) |
+| `Alt + Shift + F` | Globalny (Chrome) | Zrzut całej strony ze scrollem (**Tryb 4: Full-Page Scroll**) |
+| `Alt + Shift + S` | Globalny (Chrome) | Zrzut zaznaczonego fragmentu tekstu (**Tryb 1: Selection**) |
+| `Esc` | Popup (podczas scrolla) | Natychmiast anuluje zrzut całej strony i przywraca DOM |
+| `1` / `2` / `3` | Edytor (`editor.html`) | Przełącza narzędzie: **1 = Strzałka**, **2 = Linia / Marker**, **3 = Tekst** |
+| `Shift` (przytrzymany) | Edytor (`editor.html`) | Wymusza idealnie poziomą linię (`y2 = y1`) przy rysowaniu i edycji uchwytów |
+| `Ctrl + Z` / `Cmd + Z` | Edytor (`editor.html`) | Cofa ostatnią operację z historii (`UndoHistoryStack`) |
+| `Delete` / `Backspace` | Edytor (`editor.html`) | Usuwa zaznaczony obiekt wektorowy z płótna |
+| `Ctrl + V` / `Cmd + V` | Edytor (`editor.html`) | Wkleja obraz bezpośrednio ze schowka systemowego na płótno |
 
 ## Project Structure
 
@@ -130,16 +146,16 @@ SnapMark/
 
 ## Testing and Quality
 
-Uruchomienie pełnej weryfikacji typów, testów jednostkowych i produkcyjnego buildu:
+Uruchomienie pełnej weryfikacji typów, testów jednostkowych, produkcyjnego buildu, testów E2E oraz pakowania `.zip` do Chrome Web Store:
 
 ```bash
-npm run typecheck && npm test && npm run build
+npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package
 ```
 
-## Assumptions and Deferred Scope
+## Delivered Milestones (v1 Complete)
 
 - **M01 (Look & Feel and Clickable Prototype — Zrealizowano)**: System projektowy Dark Studio Utility (`src/styles/tokens.css`) oraz widoki `popup.html` i `editor.html`.
 - **M02 (Foundations — Zrealizowano)**: Background Service Worker Manifest V3, baza IndexedDB (`SnapMarkDB`) do transferu surowych obiektów `Blob` z natychmiastowym czyszczeniem po wczytaniu, ustawienia w `chrome.storage.local` oraz zrzut widocznego ekranu (`chrome.tabs.captureVisibleTab`).
 - **M03 (Core Features — Zrealizowano)**: Wstrzykiwany na żądanie skrypt DOM (`src/content/capture-injected.ts`) dla zrzutu zaznaczenia (+20 px marginesu i opcjonalne żółte podświetlenie), wycinania `<img>` z pominięciem CORS/AVIF/WebP oraz pętli zrzutu całej strony ze scrollem (`>= 550 ms` throttling, ukrywanie `fixed`/`sticky` po klatce #1 i bezszwowe sklejanie na `<canvas>`).
 - **M04 (Complete Features — Zrealizowano)**: Pełny interaktywny silnik warstwy wektorowej (`src/editor/vector-engine.ts`, `src/editor/history.ts`, `src/editor/text-overlay.ts`, `src/editor/exporter.ts`): rysowanie i przeciąganie uchwytów końcowych `(x1, y1)` i `(x2, y2)` strzałki, podkreślenie i zakreślacz (`globalAlpha = 0.35`) z blokadą poziomu `Shift`, pole tekstowe `<textarea>` z edycją po dwukliku i 3 trybami czytelności (**Tło / Obrys / Czysty**), wielopoziomowe `Ctrl+Z` / `Delete` oraz spłaszczony eksport HiDPI do pliku PNG (`<domena>_YYYY-MM-DD_HH-mm.png`) i schowka systemowego (`ClipboardItem`).
-- **M05 (Quality and Release)**: Zestaw testów E2E Playwright w Chromium (`--load-extension=./dist`), testy brzegowe, CI GitHub Actions oraz paczka wydaniowa `snapmark-extension.zip`.
+- **M05 (Quality and Release — Zrealizowano)**: Zestaw testów E2E (`tests/e2e/extension.spec.ts`, `npm run test:e2e`), audyt bezpieczeństwa, prywatności i uprawnień (`tests/unit/security-privacy-audit.test.ts`), pipeline CI GitHub Actions (`.github/workflows/ci.yml`) oraz skrypt pakujący `snapmark-extension.zip` (`npm run package`).
