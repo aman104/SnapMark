@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "SnapMark",
+  "version": "0.1.0",
+  "description": "Szybkie zrzuty kontekstowe z lekkim edytorem adnotacji",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "scripting",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SnapMark"
+  }
+}
