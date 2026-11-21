@@ -23,6 +23,7 @@
   - `src/shared/dpi.ts`, `src/shared/filename.ts`, `src/shared/url-guard.ts` — DPR scaling & 20px viewport clamping (`clampRectWithPaddingToViewport`, `multiplyRectByDpr`, `computePhysicalCropRect`), `<domain>_YYYY-MM-DD_HH-mm.png` formatter (`formatCaptureFilename`), and restricted URL detector (`isRestrictedBrowserUrl`).
   - `src/shared/settings.ts` — Typed `chrome.storage.local` settings manager (`loadUserSettings`, `saveUserSettings`, `updateUserSettings`, `sanitizeUserSettings`).
   - `src/shared/db.ts` — IndexedDB (`SnapMarkDB.captures`) `Blob` session store (`saveCaptureSession`, `getCaptureSession`, `consumeCaptureSession` immediate purge, `cleanupStaleCaptures` 15-min TTL).
+  - `src/background/rate-limiter.ts` & `src/background/capture-orchestrator.ts` — `CaptureRateLimiter` (`>= 550 ms` + `600 ms` retry backoff), context menu setup (`registerContextMenus`), `dataUrlToBlob`, and `captureVisibleViewport`.
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
@@ -33,7 +34,7 @@
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
-- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (4/7 tasks done)
+- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (5/7 tasks done)
 
 ## Decisions and deviations
 - none
@@ -57,3 +58,4 @@
 - [008] [x] 2026-11-21 — Implemented persistent user settings wrapper for `chrome.storage.local` (`src/shared/settings.ts`).
 - [009] [x] 2026-11-21 — Implemented IndexedDB `Blob` capture session store with immediate purge and 15-minute TTL cleanup (`src/shared/db.ts`).
 - [010] [x] 2026-11-21 — Completed Manifest V3 package (`public/manifest.json`), extension icons (`16/32/48/128 px`), and multi-entry Vite build emitting `dist/background.js`.
+- [011] [x] 2026-11-21 — Built MV3 Background Service Worker, `CaptureRateLimiter` (`>= 550 ms`), context menus, and end-to-end Visible Viewport Capture.

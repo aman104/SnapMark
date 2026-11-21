@@ -120,3 +120,19 @@ export interface MockCaptureMetadata {
   dpr: number;
   highlightApplied: boolean;
 }
+
+export interface RuntimeCaptureRequest {
+  type: 'SNAPMARK_TRIGGER_CAPTURE';
+  mode: CaptureMode;
+}
+
+export type RuntimeCaptureResponse =
+  | {
+      ok: true;
+      captureId: string;
+      mode: CaptureMode;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
