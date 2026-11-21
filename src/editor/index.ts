@@ -36,6 +36,10 @@ import {
   type PlacedFrameDrawable,
   renderCanvasStage,
 } from './canvas-stage';
+import {
+  exportFlattenedPngDownload,
+  exportFlattenedToClipboard,
+} from './exporter';
 import { cloneAnnotationList, UndoHistoryStack } from './history';
 import {
   type ActiveTextEditorDraft,
@@ -872,32 +876,38 @@ export function initEditor(
     container
       .querySelector<HTMLButtonElement>('#btn-download-png')
       ?.addEventListener('click', () => {
+        if (activeTextDraft) {
+          commitActiveTextDraft();
+        }
         if (options.onDownloadPng) {
           options.onDownloadPng(state.metadata.filename, state);
-          return;
         }
-        const canvas =
-          container.querySelector<HTMLCanvasElement>('#editor-canvas');
-        if (canvas && typeof canvas.toDataURL === 'function') {
-          try {
-            const link = document.createElement('a');
-            link.download = state.metadata.filename;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-          } catch {
-            // Ignored in non-canvas environments
-          }
-        }
+        void exportFlattenedPngDownload(
+          state.metadata,
+          state.annotations,
+          baseDrawable,
+          placedFrameDrawables,
+        );
       });
 
     container
       .querySelector<HTMLButtonElement>('#btn-copy-clipboard')
       ?.addEventListener('click', () => {
+        if (activeTextDraft) {
+          commitActiveTextDraft();
+        }
         if (copyResetTimeout) {
           clearTimeout(copyResetTimeout);
         }
         state.copySuccess = true;
         notifyAndRender();
+
+        void exportFlattenedToClipboard(
+          state.metadata,
+          state.annotations,
+          baseDrawable,
+          placedFrameDrawables,
+        ).catch(() => {});
 
         copyResetTimeout = setTimeout(() => {
           state.copySuccess = false;
