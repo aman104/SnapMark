@@ -42,13 +42,19 @@ function createFallback2DContext(): CanvasRenderingContext2D {
 export function get2DContext(
   canvas: HTMLCanvasElement,
 ): CanvasRenderingContext2D {
+  if (
+    typeof navigator !== 'undefined' &&
+    /jsdom/i.test(navigator.userAgent ?? '')
+  ) {
+    return createFallback2DContext();
+  }
   try {
     const ctx = canvas.getContext('2d');
     if (ctx) {
       return ctx;
     }
   } catch {
-    // JSDOM without canvas package throws or returns null
+    // Fallback when 2D context is unavailable
   }
   return createFallback2DContext();
 }
