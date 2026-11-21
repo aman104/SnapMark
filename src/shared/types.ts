@@ -124,6 +124,18 @@ export interface MockCaptureMetadata {
 export interface RuntimeCaptureRequest {
   type: 'SNAPMARK_TRIGGER_CAPTURE';
   mode: CaptureMode;
+  srcUrl?: string;
+}
+
+export interface CancelScrollCaptureRequest {
+  type: 'SNAPMARK_CANCEL_SCROLL_CAPTURE';
+}
+
+export interface ScrollCaptureProgressMessage {
+  type: 'SNAPMARK_SCROLL_PROGRESS';
+  currentFrame: number;
+  totalFrames: number;
+  statusText: string;
 }
 
 export type RuntimeCaptureResponse =

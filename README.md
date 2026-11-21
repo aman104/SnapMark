@@ -72,7 +72,7 @@ Po uruchomieniu serwera deweloperskiego Vite (`http://localhost:5173`) możesz p
   - Stan pusty / awaryjny (Empty State z wklejaniem `Ctrl+V`): `http://localhost:5173/editor.html?state=empty`
   - Ostrzeżenie o maksymalnej bezpiecznej wysokości `<canvas>`: `http://localhost:5173/editor.html?state=max-height-warning`
 
-### Build & Load Unpacked Chrome Extension (Milestone M02)
+### Build & Load Unpacked Chrome Extension (Milestones M02 & M03)
 
 ```bash
 npm run build
@@ -80,15 +80,16 @@ npm run build
 
 Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/` (`manifest.json`, `background.js`, `popup.html`, `editor.html`, `icons/icon-16..128.png`).
 
-**Jak załadować wtyczkę w Google Chrome / Brave / Edge:**
+**Jak załadować wtyczkę w Google Chrome / Brave / Edge i przetestować wszystkie 4 tryby przechwytywania (M03):**
 1. Otwórz w przeglądarce adres `chrome://extensions`.
 2. Włącz przełącznik **Tryb dewelopera** (*Developer mode*) w prawym górnym rogu.
 3. Kliknij **Załaduj rozpakowane** (*Load unpacked*) i wskaż katalog `dist/` w tym repozytorium.
-4. Otwórz dowolną stronę WWW (np. `https://example.com`) i wywołaj **Tryb 3: Widoczny ekran (Viewport)** na jeden z 3 sposobów:
-   - Kliknij ikonę **SnapMark** na pasku przeglądarki → **„Widoczny ekran”**,
-   - Wciśnij skrót klawiszowy `Alt + Shift + V`,
-   - Kliknij prawym przyciskiem myszy na stronie → **„Zrób zrzut widocznego ekranu”**.
-5. Zrzut w natywnej rozdzielczości Retina trafia jako surowy obiekt `Blob` do bazy **IndexedDB** (`SnapMarkDB.captures`), otwiera kartę `editor.html?captureId=<id>` i **natychmiast usuwa dane tymczasowe z IndexedDB** zaraz po wczytaniu na płótno `<canvas>`.
+4. Otwórz dowolną stronę WWW i przetestuj **4 tryby przechwytywania kontekstowego**:
+   - **Tryb 1: Zaznaczony fragment tekstu (`selection`)** — Zaznacz akapit tekstu na stronie i kliknij PPM → **„Zrób zrzut zaznaczenia”** (lub użyj przycisku w popupie / `Alt + Shift + S`). Wstrzykiwany na żądanie skrypt mierzy `Range.getBoundingClientRect()`, dodaje **20 px marginesu bezpieczeństwa** przyciętego do granic widoku, opcjonalnie nakłada żółte podświetlenie `rgba(255, 235, 59, 0.45)` na czas zrzutu i otwiera wycięty fragment w fizycznej rozdzielczości Retina (`cropRectCss * devicePixelRatio`).
+   - **Tryb 2: Wybrany obrazek `<img>` (`image`)** — Kliknij PPM na dowolnym obrazku na stronie → **„Edytuj i pobierz obrazek”**. Skrypt mierzy rzeczywiste współrzędne `img.getBoundingClientRect()` (dopasowując element po `srcUrl` / `currentSrc` / środku widoku) i wycina go bezpośrednio z bufora ekranu (`captureVisibleTab`), **całkowicie omijając blokady CORS/Hotlink oraz formaty WebP/AVIF**.
+   - **Tryb 3: Widoczny ekran (`viewport`)** — Kliknij ikonę **SnapMark** → **„Widoczny ekran”** (lub `Alt + Shift + V` / PPM → **„Zrób zrzut widocznego ekranu”**).
+   - **Tryb 4: Cała strona ze scrollem (`fullpage`)** — Kliknij w popupie **„Cała strona ze scrollem”** (lub `Alt + Shift + F`). Wtyczka przewija stronę w pętli z bezpiecznym throttlingiem **`>= 550 ms`** (respektując limit `MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND` w Chrome), ukrywa pływające elementy `position: fixed` i `sticky` po pierwszej klatce (aby nagłówki i banery cookie nie powtarzały się na złączeniach), przywraca oryginalny stan DOM i pozycję przewinięcia w bloku `finally`, a w `editor.html` bezszwowo skleja klatki na płótnie `<canvas>` (z kontrolą limitu `MAX_CANVAS_HEIGHT_PHYSICAL_PX = 16384`).
+5. Każdy zrzut w natywnej rozdzielczości Retina trafia jako surowy obiekt `Blob` do bazy **IndexedDB** (`SnapMarkDB.captures`), otwiera kartę `editor.html?captureId=<id>` i **natychmiast usuwa dane tymczasowe z IndexedDB** zaraz po wczytaniu na płótno `<canvas>`.
 
 ## Available Scripts
 

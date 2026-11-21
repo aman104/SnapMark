@@ -2,9 +2,11 @@ import { DEFAULT_USER_SETTINGS } from '../shared/constants';
 import { parsePopupStateFromSearch } from '../shared/mock-captures';
 import { loadUserSettings, updateUserSettings } from '../shared/settings';
 import type {
+  CancelScrollCaptureRequest,
   PopupPrototypeState,
   RuntimeCaptureRequest,
   RuntimeCaptureResponse,
+  ScrollCaptureProgressMessage,
 } from '../shared/types';
 import { isRestrictedBrowserUrl } from '../shared/url-guard';
 
@@ -47,12 +49,16 @@ export function renderPopup(
     parsePopupStateFromSearch(initialSearch);
   let highlightSelectionBeforeCapture: boolean =
     DEFAULT_USER_SETTINGS.highlightSelectionBeforeCapture;
-  const currentFrame = 3;
-  const totalFrames = 8;
+  let currentFrame = 3;
+  let totalFrames = 8;
+  let progressStatusText =
+    'Klatka 3 z 8 • Ukrywanie pływających nagłówków (fixed/sticky)...';
 
   function render(): void {
     const hasTextSelection = currentState !== 'no-selection';
-    const progressPercent = Math.round((currentFrame / totalFrames) * 100);
+    const progressPercent = Math.round(
+      (currentFrame / Math.max(1, totalFrames)) * 100,
+    );
 
     container.innerHTML = `
       <div class="popup-shell" data-popup-state="${currentState}">
@@ -89,7 +95,7 @@ export function renderPopup(
               <span class="scroll-progress-badge">${currentFrame}/${totalFrames}</span>
             </div>
             <p id="scroll-progress-text" class="scroll-progress-detail">
-              Klatka ${currentFrame} z ${totalFrames} • Ukrywanie pływających nagłówków (fixed/sticky)...
+              ${progressStatusText}
             </p>
             <div class="scroll-progress-track" role="progressbar" aria-valuenow="${progressPercent}" aria-valuemin="0" aria-valuemax="100">
               <div class="scroll-progress-fill" style="width: ${progressPercent}%;"></div>
@@ -253,10 +259,54 @@ export function renderPopup(
     fullpageBtn?.addEventListener('click', () => {
       currentState = 'progress';
       render();
+      if (hasLiveRuntimeMessaging()) {
+        const message: RuntimeCaptureRequest = {
+          type: 'SNAPMARK_TRIGGER_CAPTURE',
+          mode: 'fullpage',
+        };
+        void Promise.resolve(
+          chrome.runtime.sendMessage(message) as unknown as
+            | Promise<RuntimeCaptureResponse>
+            | RuntimeCaptureResponse,
+        )
+          .then((res) => {
+            if (res && typeof res === 'object' && 'ok' in res && res.ok) {
+              if (typeof window !== 'undefined' && typeof window.close === 'function') {
+                window.close();
+              }
+            }
+          })
+          .catch(() => {
+            // Keep progress panel visible in dev/fallback mode
+          });
+      }
     });
 
     selectionBtn?.addEventListener('click', () => {
       if (selectionBtn.getAttribute('aria-disabled') === 'true') {
+        return;
+      }
+      if (hasLiveRuntimeMessaging()) {
+        const message: RuntimeCaptureRequest = {
+          type: 'SNAPMARK_TRIGGER_CAPTURE',
+          mode: 'selection',
+        };
+        void Promise.resolve(
+          chrome.runtime.sendMessage(message) as unknown as
+            | Promise<RuntimeCaptureResponse>
+            | RuntimeCaptureResponse,
+        )
+          .then((res) => {
+            if (res && typeof res === 'object' && 'ok' in res && res.ok) {
+              if (typeof window !== 'undefined' && typeof window.close === 'function') {
+                window.close();
+              }
+            }
+          })
+          .catch(() => {
+            const highlightFlag = highlightSelectionBeforeCapture ? '1' : '0';
+            navigate(`editor.html?mode=selection&highlight=${highlightFlag}`);
+          });
         return;
       }
       const highlightFlag = highlightSelectionBeforeCapture ? '1' : '0';
@@ -278,6 +328,18 @@ export function renderPopup(
     toggleHighlightLabel?.addEventListener('click', toggleHighlight);
 
     cancelScrollBtn?.addEventListener('click', () => {
+      if (
+        typeof chrome !== 'undefined' &&
+        chrome.runtime &&
+        typeof chrome.runtime.sendMessage === 'function'
+      ) {
+        const cancelMsg: CancelScrollCaptureRequest = {
+          type: 'SNAPMARK_CANCEL_SCROLL_CAPTURE',
+        };
+        void Promise.resolve(chrome.runtime.sendMessage(cancelMsg)).catch(
+          () => {},
+        );
+      }
       currentState = 'default';
       render();
     });
@@ -336,7 +398,47 @@ export function renderPopup(
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && currentState === 'progress') {
+        if (
+          typeof chrome !== 'undefined' &&
+          chrome.runtime &&
+          typeof chrome.runtime.sendMessage === 'function'
+        ) {
+          const cancelMsg: CancelScrollCaptureRequest = {
+            type: 'SNAPMARK_CANCEL_SCROLL_CAPTURE',
+          };
+          void Promise.resolve(chrome.runtime.sendMessage(cancelMsg)).catch(
+            () => {},
+          );
+        }
         currentState = 'default';
+        render();
+      }
+    });
+  }
+
+  if (
+    typeof chrome !== 'undefined' &&
+    chrome.runtime &&
+    chrome.runtime.onMessage &&
+    typeof chrome.runtime.onMessage.addListener === 'function'
+  ) {
+    chrome.runtime.onMessage.addListener((rawMessage: unknown) => {
+      if (!rawMessage || typeof rawMessage !== 'object') {
+        return;
+      }
+      const msg = rawMessage as Partial<ScrollCaptureProgressMessage>;
+      if (
+        msg.type === 'SNAPMARK_SCROLL_PROGRESS' &&
+        typeof msg.currentFrame === 'number' &&
+        typeof msg.totalFrames === 'number'
+      ) {
+        currentFrame = msg.currentFrame;
+        totalFrames = Math.max(1, msg.totalFrames);
+        progressStatusText =
+          typeof msg.statusText === 'string' && msg.statusText.length > 0
+            ? msg.statusText
+            : `Klatka ${currentFrame} z ${totalFrames} • Ukrywanie pływających nagłówków (fixed/sticky)...`;
+        currentState = 'progress';
         render();
       }
     });

@@ -1,9 +1,12 @@
 import { cleanupStaleCaptures } from '../shared/db';
 import type { CaptureMode } from '../shared/types';
 import {
+  cancelActiveScrollCapture,
   CONTEXT_MENU_IDS,
+  defaultCaptureRateLimiter,
   handleCaptureTrigger,
   initializeBackgroundService,
+  isCancelScrollCaptureRequest,
   isRuntimeCaptureRequest,
 } from './capture-orchestrator';
 
@@ -26,7 +29,9 @@ export function setupBackgroundListeners(): void {
     } else if (info.menuItemId === CONTEXT_MENU_IDS.SELECTION) {
       void handleCaptureTrigger('selection', tab);
     } else if (info.menuItemId === CONTEXT_MENU_IDS.IMAGE) {
-      void handleCaptureTrigger('image', tab);
+      void handleCaptureTrigger('image', tab, defaultCaptureRateLimiter, {
+        srcUrl: info.srcUrl,
+      });
     }
   });
 
@@ -43,8 +48,19 @@ export function setupBackgroundListeners(): void {
   });
 
   chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+    if (isCancelScrollCaptureRequest(message)) {
+      cancelActiveScrollCapture();
+      sendResponse({ ok: true });
+      return false;
+    }
+
     if (isRuntimeCaptureRequest(message)) {
-      void handleCaptureTrigger(message.mode, sender.tab).then((response) => {
+      void handleCaptureTrigger(
+        message.mode,
+        sender.tab,
+        defaultCaptureRateLimiter,
+        { srcUrl: message.srcUrl },
+      ).then((response) => {
         sendResponse(response);
       });
       return true;
