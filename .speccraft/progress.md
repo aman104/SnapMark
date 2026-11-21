@@ -39,7 +39,7 @@
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
 - [M04] `[x]` accepted (2026-11-21) — Complete features: Vector annotation editor, undo history and export (4/4 tasks done)
-- [M05] `[>]` in progress — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (1/3 tasks done)
+- [M05] `[>]` in progress — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (2/3 tasks done)
 
 ## Decisions and deviations
 - none
@@ -82,3 +82,4 @@
 - [M04] [?] 2026-11-21 — Milestone M04 completed and ready for operator review.
 - [M04] [x] 2026-11-21 — Milestone M04 accepted by operator and merged into `main`.
 - [023] [x] 2026-11-21 — Hardened PRD §7 edge cases (empty selection `'!'` warning badge, inner-container scroll termination) and added `tests/unit/security-privacy-audit.test.ts`.
+- [024] [x] 2026-11-21 — Implemented end-to-end extension verification suite (`npm run test:e2e`, `tests/e2e/extension.spec.ts`, `playwright.config.ts`, `scripts/run-e2e.mjs`).
