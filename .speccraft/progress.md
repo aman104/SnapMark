@@ -18,6 +18,8 @@
   - `src/styles/tokens.css` — Dark Studio Utility CSS custom properties and shared UI component primitives (`.btn-primary`, `.btn-secondary`, `.btn-danger-ghost`, `.toolbar-tool-btn`, `.popup-action-card`, `.kbd-badge`, `.segmented-control`, `.color-swatch-tray`, `.toggle-switch`, `.status-banner`).
   - `src/shared/types.ts` & `src/shared/constants.ts` — Shared contracts (`CaptureSession`, `AnnotationItem`, `UserSettings`, `ANNOTATION_COLORS`, `STROKE_WIDTHS`, `DEFAULT_USER_SETTINGS`).
   - `src/shared/mock-captures.ts` — Prototype URL state parsers (`parsePopupStateFromSearch`, `parseEditorStateFromSearch`), mock HiDPI metadata (`getMockCaptureMetadata`), sample vector objects (`getInitialMockAnnotations`), and 2D backdrop drawer (`renderMockScreenshotBackdrop`).
+  - `src/popup/index.ts` — `renderPopup()` controller for `popup.html` (all 4 states: `default`, `no-selection`, `progress`, `restricted`).
+  - `src/editor/index.ts` & `src/editor/canvas-stage.ts` — `initEditor()` 56px 4-cluster toolbar controller and `renderCanvasStage()` HiDPI Retina `<canvas>` renderer + `hitTestAnnotations()`.
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
@@ -27,7 +29,7 @@
 - **Git:** base branch `main`, active milestone branch `milestone/M01-look-and-feel-and-clickable-prototype`
 
 ## Milestones
-- [M01] `[>]` in progress — Look & feel and clickable prototype (5/6 tasks done)
+- [M01] `[>]` in progress — Look & feel and clickable prototype (6/6 tasks done)
 
 ## Decisions and deviations
 - none
@@ -44,3 +46,4 @@
 - [003] [x] 2026-11-21 — Created shared TypeScript domain types, default constants, and mock HiDPI capture fixtures.
 - [004] [x] 2026-11-21 — Built clickable 320px extension popup prototype (`popup.html`) with all 4 UI states and unit tests.
 - [005] [x] 2026-11-21 — Built 56px 4-cluster top toolbar in `editor.html` with contextual tool properties, keyboard shortcuts, and 2-second clipboard feedback.
+- [006] [x] 2026-11-21 — Built HiDPI Retina canvas stage (`src/editor/canvas-stage.ts`), sample vector annotation renderer, `?state=empty` and `?state=max-height-warning` views, and `README.md`.
