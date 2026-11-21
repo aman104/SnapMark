@@ -29,7 +29,8 @@
 - **Git:** base branch `main`, active milestone branch `milestone/M01-look-and-feel-and-clickable-prototype`
 
 ## Milestones
-- [M01] `[?]` awaiting review — Look & feel and clickable prototype (6/6 tasks done, all exit criteria met)
+- [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
+- [M02] `[>]` in progress — Foundations: Manifest V3, IndexedDB transfer and Viewport capture
 
 ## Decisions and deviations
 - none
@@ -48,3 +49,4 @@
 - [005] [x] 2026-11-21 — Built 56px 4-cluster top toolbar in `editor.html` with contextual tool properties, keyboard shortcuts, and 2-second clipboard feedback.
 - [006] [x] 2026-11-21 — Built HiDPI Retina canvas stage (`src/editor/canvas-stage.ts`), sample vector annotation renderer, `?state=empty` and `?state=max-height-warning` views, and `README.md`.
 - [M01] [?] 2026-11-21 — Milestone M01 completed and ready for operator review.
+- [M01] [x] 2026-11-21 — Milestone M01 accepted by operator and merged into `main`.
