@@ -144,6 +144,29 @@
   cursor: crosshair;
 }
 
+#text-overlay-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.canvas-text-input {
+  position: absolute;
+  pointer-events: auto;
+  min-width: 160px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1.5px dashed #3B82F6;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.25;
+  outline: none;
+  resize: both;
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+}
+
 /* Max Canvas Height Warning Banner (#max-height-banner) */
 .editor-banner-region {
   width: 100%;

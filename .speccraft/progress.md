@@ -37,7 +37,7 @@
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
-- [M04] `[>]` in progress — Complete features: Vector annotation editor, undo history and export (2/4 tasks done)
+- [M04] `[>]` in progress — Complete features: Vector annotation editor, undo history and export (3/4 tasks done)
 
 ## Decisions and deviations
 - none
@@ -75,3 +75,4 @@
 - [M03] [x] 2026-11-21 — Milestone M03 accepted by operator and merged into `main`.
 - [019] [x] 2026-11-21 — Implemented vector geometry, endpoint handle hit-testing, `Shift` horizontal lock, and `UndoHistoryStack` (`src/editor/vector-engine.ts`, `src/editor/history.ts`).
 - [020] [x] 2026-11-21 — Implemented interactive Arrow and 2-in-1 Line/Highlighter drawing, `Shift` horizontal locking, post-draw endpoint handle dragging, and body moving on `#editor-canvas`.
+- [021] [x] 2026-11-21 — Implemented interactive in-canvas `<textarea>` overlay (`src/editor/text-overlay.ts`), `dblclick` editing, dragging, and 3 readability modes (`background`, `outline`, `plain`).
