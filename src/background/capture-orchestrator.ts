@@ -1,11 +1,28 @@
+import {
+  cleanupSelectionHighlightInDom,
+  type FullPageScrollPlan,
+  hideFixedAndStickyElementsInDom,
+  type ImageMeasurementResult,
+  measureSelectionInDom,
+  measureTargetImageInDom,
+  prepareFullPageScrollInDom,
+  restoreFullPageScrollInDom,
+  type SelectionMeasurementResult,
+  stepFullPageScrollInDom,
+} from '../content/capture-injected';
+import { MAX_CANVAS_HEIGHT } from '../shared/constants';
 import { cleanupStaleCaptures, saveCaptureSession } from '../shared/db';
 import { normalizeDpr } from '../shared/dpi';
 import { normalizeDomainForFilename } from '../shared/filename';
+import { loadUserSettings } from '../shared/settings';
 import type {
+  CancelScrollCaptureRequest,
+  CaptureFrame,
   CaptureMode,
   CaptureSession,
   RuntimeCaptureRequest,
   RuntimeCaptureResponse,
+  ScrollCaptureProgressMessage,
 } from '../shared/types';
 import { isRestrictedBrowserUrl } from '../shared/url-guard';
 import { CaptureRateLimiter } from './rate-limiter';
@@ -17,6 +34,12 @@ export const CONTEXT_MENU_IDS = {
 } as const;
 
 export const defaultCaptureRateLimiter = new CaptureRateLimiter();
+
+let activeScrollCaptureCancelled = false;
+
+export function cancelActiveScrollCapture(): void {
+  activeScrollCaptureCancelled = true;
+}
 
 export function dataUrlToBlob(dataUrl: string): Blob {
   const commaIdx = dataUrl.indexOf(',');
@@ -137,20 +160,78 @@ async function resolveActiveTab(
   return activeTab;
 }
 
+function assertTabUrlAllowed(tab: chrome.tabs.Tab): string {
+  if (isRestrictedBrowserUrl(tab.url)) {
+    throw new Error(
+      'Przeglądarka Chrome ze względów bezpieczeństwa blokuje wykonywanie zrzutów na stronach systemowych i w Chrome Web Store.',
+    );
+  }
+  return tab.url ?? 'https://strona.local';
+}
+
+async function openEditorForSession(session: CaptureSession): Promise<void> {
+  const editorPath = `editor.html?captureId=${encodeURIComponent(session.id)}&mode=${session.mode}`;
+  const editorUrl =
+    typeof chrome !== 'undefined' &&
+    chrome.runtime &&
+    typeof chrome.runtime.getURL === 'function'
+      ? chrome.runtime.getURL(editorPath)
+      : editorPath;
+
+  await chrome.tabs.create({ url: editorUrl });
+}
+
+function updateExtensionBadge(text: string): void {
+  if (typeof chrome === 'undefined' || !chrome.action) {
+    return;
+  }
+  try {
+    if (text && typeof chrome.action.setBadgeBackgroundColor === 'function') {
+      void chrome.action.setBadgeBackgroundColor({ color: '#FF3B30' });
+    }
+    if (typeof chrome.action.setBadgeText === 'function') {
+      void chrome.action.setBadgeText({ text });
+    }
+  } catch {
+    // Ignore badge errors in headless/test contexts
+  }
+}
+
+function broadcastScrollProgress(
+  currentFrame: number,
+  totalFrames: number,
+  statusText: string,
+): void {
+  if (
+    typeof chrome === 'undefined' ||
+    !chrome.runtime ||
+    typeof chrome.runtime.sendMessage !== 'function'
+  ) {
+    return;
+  }
+  const msg: ScrollCaptureProgressMessage = {
+    type: 'SNAPMARK_SCROLL_PROGRESS',
+    currentFrame,
+    totalFrames,
+    statusText,
+  };
+  try {
+    void Promise.resolve(chrome.runtime.sendMessage(msg)).catch(() => {});
+  } catch {
+    // Ignore when no popup receiver is open
+  }
+}
+
+/**
+ * Tryb 3: Zrzut widocznego ekranu (Visible Viewport Capture — 02-General-PRD.md §4.3)
+ */
 export async function captureVisibleViewport(
   providedTab?: chrome.tabs.Tab,
   rateLimiter: CaptureRateLimiter = defaultCaptureRateLimiter,
   now: Date = new Date(),
 ): Promise<CaptureSession> {
   const tab = await resolveActiveTab(providedTab);
-
-  if (isRestrictedBrowserUrl(tab.url)) {
-    throw new Error(
-      'Przeglądarka Chrome ze względów bezpieczeństwa blokuje wykonywanie zrzutów na stronach systemowych i w Chrome Web Store.',
-    );
-  }
-
-  const sourceUrl = tab.url ?? 'https://strona.local';
+  const sourceUrl = assertTabUrlAllowed(tab);
   const metrics = await readTabViewportMetrics(tab);
 
   const dataUrl = await rateLimiter.schedule(async () => {
@@ -182,28 +263,333 @@ export async function captureVisibleViewport(
   };
 
   await saveCaptureSession(session);
-
-  const editorPath = `editor.html?captureId=${encodeURIComponent(session.id)}&mode=viewport`;
-  const editorUrl =
-    typeof chrome !== 'undefined' &&
-    chrome.runtime &&
-    typeof chrome.runtime.getURL === 'function'
-      ? chrome.runtime.getURL(editorPath)
-      : editorPath;
-
-  await chrome.tabs.create({ url: editorUrl });
+  await openEditorForSession(session);
 
   return session;
+}
+
+/**
+ * Tryb 1: Zrzut zaznaczonego fragmentu tekstu (Selection Capture — 02-General-PRD.md §4.1)
+ */
+export async function captureTextSelection(
+  providedTab?: chrome.tabs.Tab,
+  rateLimiter: CaptureRateLimiter = defaultCaptureRateLimiter,
+  now: Date = new Date(),
+): Promise<CaptureSession> {
+  const tab = await resolveActiveTab(providedTab);
+  const sourceUrl = assertTabUrlAllowed(tab);
+
+  if (typeof tab.id !== 'number') {
+    throw new Error('Brak identyfikatora aktywnej karty.');
+  }
+
+  const settings = await loadUserSettings();
+  let highlightWasApplied = false;
+
+  try {
+    const execResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: measureSelectionInDom,
+      args: [
+        {
+          paddingPx: settings.selectionPaddingPx,
+          applyHighlight: settings.highlightSelectionBeforeCapture,
+        },
+      ],
+    });
+
+    const measurement = execResults?.[0]?.result as
+      | SelectionMeasurementResult
+      | undefined;
+
+    if (!measurement || !measurement.hasSelection || !measurement.cropRectCss) {
+      throw new Error('Najpierw zaznacz fragment tekstu na stronie.');
+    }
+
+    highlightWasApplied = measurement.highlightApplied;
+
+    const dataUrl = await rateLimiter.schedule(async () => {
+      return await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: 'png',
+      });
+    });
+
+    const blob = dataUrlToBlob(dataUrl);
+    const id = `cap_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const session: CaptureSession = {
+      id,
+      mode: 'selection',
+      sourceUrl,
+      sourceDomain: normalizeDomainForFilename(sourceUrl),
+      capturedAt: now.toISOString(),
+      dpr: normalizeDpr(measurement.dpr),
+      cropRectCss: measurement.cropRectCss,
+      frames: [
+        {
+          blob,
+          scrollYCss: 0,
+          viewportWidthCss: measurement.viewportWidthCss,
+          viewportHeightCss: measurement.viewportHeightCss,
+        },
+      ],
+      totalWidthCss: measurement.cropRectCss.width,
+      totalHeightCss: measurement.cropRectCss.height,
+    };
+
+    await saveCaptureSession(session);
+    await openEditorForSession(session);
+
+    return session;
+  } finally {
+    if (highlightWasApplied && typeof tab.id === 'number') {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: cleanupSelectionHighlightInDom,
+        });
+      } catch {
+        // Ignore cleanup errors if tab closed
+      }
+    }
+  }
+}
+
+/**
+ * Tryb 2: Zrzut wybranego obrazka <img> (Image Element Capture — 02-General-PRD.md §4.2)
+ */
+export async function captureImageElement(
+  srcUrl?: string,
+  providedTab?: chrome.tabs.Tab,
+  rateLimiter: CaptureRateLimiter = defaultCaptureRateLimiter,
+  now: Date = new Date(),
+): Promise<CaptureSession> {
+  const tab = await resolveActiveTab(providedTab);
+  const sourceUrl = assertTabUrlAllowed(tab);
+
+  if (typeof tab.id !== 'number') {
+    throw new Error('Brak identyfikatora aktywnej karty.');
+  }
+
+  const execResults = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: measureTargetImageInDom,
+    args: [srcUrl ?? ''],
+  });
+
+  const measurement = execResults?.[0]?.result as
+    | ImageMeasurementResult
+    | undefined;
+
+  if (!measurement || !measurement.found || !measurement.cropRectCss) {
+    throw new Error('Nie znaleziono wybranego obrazka na stronie.');
+  }
+
+  const dataUrl = await rateLimiter.schedule(async () => {
+    return await chrome.tabs.captureVisibleTab(tab.windowId, {
+      format: 'png',
+    });
+  });
+
+  const blob = dataUrlToBlob(dataUrl);
+  const id = `cap_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const session: CaptureSession = {
+    id,
+    mode: 'image',
+    sourceUrl,
+    sourceDomain: normalizeDomainForFilename(sourceUrl),
+    capturedAt: now.toISOString(),
+    dpr: normalizeDpr(measurement.dpr),
+    cropRectCss: measurement.cropRectCss,
+    frames: [
+      {
+        blob,
+        scrollYCss: 0,
+        viewportWidthCss: measurement.viewportWidthCss,
+        viewportHeightCss: measurement.viewportHeightCss,
+      },
+    ],
+    totalWidthCss: measurement.cropRectCss.width,
+    totalHeightCss: measurement.cropRectCss.height,
+  };
+
+  await saveCaptureSession(session);
+  await openEditorForSession(session);
+
+  return session;
+}
+
+/**
+ * Tryb 4: Zrzut całej strony ze scrollem (Full-Page Scroll Capture — 02-General-PRD.md §4.4)
+ */
+export async function captureFullPageScroll(
+  providedTab?: chrome.tabs.Tab,
+  rateLimiter: CaptureRateLimiter = defaultCaptureRateLimiter,
+  now: Date = new Date(),
+): Promise<CaptureSession> {
+  const tab = await resolveActiveTab(providedTab);
+  const sourceUrl = assertTabUrlAllowed(tab);
+
+  if (typeof tab.id !== 'number') {
+    throw new Error('Brak identyfikatora aktywnej karty.');
+  }
+
+  activeScrollCaptureCancelled = false;
+  let originalScrollX = 0;
+  let originalScrollY = 0;
+
+  try {
+    const planResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: prepareFullPageScrollInDom,
+      args: [MAX_CANVAS_HEIGHT],
+    });
+
+    const plan = planResults?.[0]?.result as FullPageScrollPlan | undefined;
+    if (!plan || plan.frameOffsetsY.length === 0) {
+      throw new Error('Nie udało się przygotować przewijania strony.');
+    }
+
+    originalScrollX = plan.originalScrollX;
+    originalScrollY = plan.originalScrollY;
+
+    const totalFrames = plan.frameOffsetsY.length;
+    const frames: CaptureFrame[] = [];
+    let fixedHeadersHidden = false;
+    let lastActualScrollY = -1;
+
+    for (let i = 0; i < totalFrames; i += 1) {
+      if (activeScrollCaptureCancelled) {
+        throw new Error('Przechwytywanie całej strony zostało anulowane.');
+      }
+
+      const targetY = plan.frameOffsetsY[i] ?? 0;
+      const frameNum = i + 1;
+
+      updateExtensionBadge(`${frameNum}/${totalFrames}`);
+      broadcastScrollProgress(
+        frameNum,
+        totalFrames,
+        i === 0
+          ? `Klatka ${frameNum} z ${totalFrames} • Przechwytywanie góry strony...`
+          : `Klatka ${frameNum} z ${totalFrames} • Ukrywanie pływających nagłówków (fixed/sticky)...`,
+      );
+
+      let actualScrollY = 0;
+
+      if (i > 0) {
+        if (!fixedHeadersHidden) {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: hideFixedAndStickyElementsInDom,
+          });
+          fixedHeadersHidden = true;
+        }
+
+        const stepResults = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: stepFullPageScrollInDom,
+          args: [targetY],
+        });
+        const stepInfo = stepResults?.[0]?.result as
+          | { actualScrollY: number }
+          | undefined;
+        actualScrollY =
+          typeof stepInfo?.actualScrollY === 'number'
+            ? stepInfo.actualScrollY
+            : targetY;
+
+        // If the page failed to advance scroll (e.g., locked internal SPA container), stop early to avoid duplicate frames
+        if (actualScrollY === lastActualScrollY) {
+          break;
+        }
+      }
+
+      lastActualScrollY = actualScrollY;
+
+      const dataUrl = await rateLimiter.schedule(async () => {
+        if (activeScrollCaptureCancelled) {
+          throw new Error('Przechwytywanie całej strony zostało anulowane.');
+        }
+        return await chrome.tabs.captureVisibleTab(tab.windowId, {
+          format: 'png',
+        });
+      });
+
+      frames.push({
+        blob: dataUrlToBlob(dataUrl),
+        scrollYCss: actualScrollY,
+        viewportWidthCss: plan.viewportWidthCss,
+        viewportHeightCss: plan.viewportHeightCss,
+      });
+    }
+
+    if (activeScrollCaptureCancelled || frames.length === 0) {
+      throw new Error('Przechwytywanie całej strony zostało anulowane.');
+    }
+
+    const lastFrame = frames[frames.length - 1];
+    const effectiveTotalHeightCss = lastFrame
+      ? Math.min(
+          plan.totalHeightCss,
+          lastFrame.scrollYCss + lastFrame.viewportHeightCss,
+        )
+      : plan.viewportHeightCss;
+
+    const id = `cap_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const session: CaptureSession = {
+      id,
+      mode: 'fullpage',
+      sourceUrl,
+      sourceDomain: normalizeDomainForFilename(sourceUrl),
+      capturedAt: now.toISOString(),
+      dpr: normalizeDpr(plan.dpr),
+      frames,
+      totalWidthCss: plan.viewportWidthCss,
+      totalHeightCss: effectiveTotalHeightCss,
+      exceededMaxHeight: plan.exceededMaxHeight,
+    };
+
+    await saveCaptureSession(session);
+    await openEditorForSession(session);
+
+    return session;
+  } finally {
+    updateExtensionBadge('');
+    if (typeof tab.id === 'number') {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: restoreFullPageScrollInDom,
+          args: [originalScrollX, originalScrollY],
+        });
+      } catch {
+        // Ignore cleanup errors if tab closed
+      }
+    }
+  }
 }
 
 export async function handleCaptureTrigger(
   mode: CaptureMode,
   tab?: chrome.tabs.Tab,
   rateLimiter: CaptureRateLimiter = defaultCaptureRateLimiter,
+  options: { srcUrl?: string } = {},
 ): Promise<RuntimeCaptureResponse> {
   try {
-    // In M02, 'viewport' is implemented end-to-end; M03 adds selection, image, and fullpage DOM cropping/scrolling
-    const session = await captureVisibleViewport(tab, rateLimiter);
+    let session: CaptureSession;
+    if (mode === 'selection') {
+      session = await captureTextSelection(tab, rateLimiter);
+    } else if (mode === 'image') {
+      session = await captureImageElement(options.srcUrl, tab, rateLimiter);
+    } else if (mode === 'fullpage') {
+      session = await captureFullPageScroll(tab, rateLimiter);
+    } else {
+      session = await captureVisibleViewport(tab, rateLimiter);
+    }
+
     return {
       ok: true,
       captureId: session.id,
@@ -231,6 +617,18 @@ export function isRuntimeCaptureRequest(
   return (
     candidate.type === 'SNAPMARK_TRIGGER_CAPTURE' &&
     typeof candidate.mode === 'string'
+  );
+}
+
+export function isCancelScrollCaptureRequest(
+  msg: unknown,
+): msg is CancelScrollCaptureRequest {
+  if (!msg || typeof msg !== 'object') {
+    return false;
+  }
+  return (
+    (msg as Partial<CancelScrollCaptureRequest>).type ===
+    'SNAPMARK_CANCEL_SCROLL_CAPTURE'
   );
 }
 

@@ -35,7 +35,7 @@
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
-- [M03] `[>]` in progress — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (3/5 tasks done)
+- [M03] `[>]` in progress — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (4/5 tasks done)
 
 ## Decisions and deviations
 - none
@@ -67,3 +67,4 @@
 - [014] [x] 2026-11-21 — Implemented on-demand DOM text selection measurement (+20 px margin) and temporary yellow highlight in `src/content/capture-injected.ts`.
 - [015] [x] 2026-11-21 — Implemented on-demand `<img>` element resolution and bounding box extraction in `src/content/capture-injected.ts`.
 - [016] [x] 2026-11-21 — Implemented full-page scroll DOM controller, `MAX_CANVAS_HEIGHT` cap, and `fixed`/`sticky` header suppression in `src/content/capture-injected.ts`.
+- [017] [x] 2026-11-21 — Orchestrated Selection, Image, and Full-Page Scroll captures in Background Service Worker with `>= 550 ms` throttling and `finally` DOM cleanup.
