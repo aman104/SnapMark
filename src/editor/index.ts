@@ -25,8 +25,11 @@ import type {
   TextStyleMode,
 } from '../shared/types';
 import {
+  buildSessionCompositePlacements,
   decodeBlobToDrawable,
+  type FramePlacementPlan,
   hitTestAnnotations,
+  type PlacedFrameDrawable,
   renderCanvasStage,
 } from './canvas-stage';
 
@@ -45,6 +48,7 @@ export interface EditorState {
   copySuccess: boolean;
   warningDismissed: boolean;
   isLiveCapture: boolean;
+  framePlacements: FramePlacementPlan[];
 }
 
 export interface InitEditorOptions {
@@ -110,9 +114,11 @@ export function initEditor(
     copySuccess: false,
     warningDismissed: false,
     isLiveCapture: Boolean(captureIdParam),
+    framePlacements: [],
   };
 
   let baseDrawable: CanvasImageSource | null = null;
+  let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let copyResetTimeout: ReturnType<typeof setTimeout> | null = null;
 
   function pushHistorySnapshot(): void {
@@ -485,6 +491,7 @@ export function initEditor(
         state.annotations,
         state.selectedAnnotationId,
         baseDrawable,
+        placedFrameDrawables,
       );
     }
 
@@ -600,6 +607,8 @@ export function initEditor(
 
   function loadSampleCapture(mode: CaptureMode = 'viewport'): void {
     baseDrawable = null;
+    placedFrameDrawables = [];
+    state.framePlacements = [];
     state.isLiveCapture = false;
     state.prototypeState = 'default';
     state.captureMode = mode;
@@ -830,18 +839,23 @@ export function initEditor(
         return;
       }
 
-      const firstFrame = session.frames[0];
-      const physicalW = Math.round(session.totalWidthCss * session.dpr);
-      const physicalH = Math.round(session.totalHeightCss * session.dpr);
+      const placements = buildSessionCompositePlacements(session);
+      state.framePlacements = placements;
 
-      if (firstFrame) {
-        const decoded = await decodeBlobToDrawable(
-          firstFrame.blob,
-          physicalW,
-          physicalH,
-        );
-        baseDrawable = decoded.drawable;
-      }
+      const decodedFrames = await Promise.all(
+        session.frames.map(async (frame) => {
+          const fw = Math.round(frame.viewportWidthCss * session.dpr);
+          const fh = Math.round(frame.viewportHeightCss * session.dpr);
+          const res = await decodeBlobToDrawable(frame.blob, fw, fh);
+          return res.drawable;
+        }),
+      );
+
+      placedFrameDrawables = placements.map((placement) => ({
+        drawable: decodedFrames[placement.frameIndex] ?? null,
+        placement,
+      }));
+      baseDrawable = decodedFrames[0] ?? null;
 
       const capturedDate = new Date(session.capturedAt);
       const validDate = Number.isNaN(capturedDate.getTime())
