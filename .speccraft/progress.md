@@ -15,7 +15,7 @@
   - `src/editor/index.ts` — vector annotation editor controller
   - `tests/unit/` — Vitest unit tests (JSDOM environment)
 - **Key modules and helpers:**
-  - Base entry points initialized; shared types and tokens are added in Tasks 002–003.
+  - `src/styles/tokens.css` — Dark Studio Utility CSS custom properties and shared UI component primitives (`.btn-primary`, `.btn-secondary`, `.btn-danger-ghost`, `.toolbar-tool-btn`, `.popup-action-card`, `.kbd-badge`, `.segmented-control`, `.color-swatch-tray`, `.toggle-switch`, `.status-banner`).
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
@@ -25,7 +25,7 @@
 - **Git:** base branch `main`, active milestone branch `milestone/M01-look-and-feel-and-clickable-prototype`
 
 ## Milestones
-- [M01] `[>]` in progress — Look & feel and clickable prototype (1/6 tasks done)
+- [M01] `[>]` in progress — Look & feel and clickable prototype (2/6 tasks done)
 
 ## Decisions and deviations
 - none
@@ -38,3 +38,4 @@
 
 ## Log
 - [001] [x] 2026-11-21 — Scaffolded TypeScript 5, Vite multi-entry build, Vitest JSDOM test runner, and Manifest V3 baseline.
+- [002] [x] 2026-11-21 — Implemented Dark Studio Utility design tokens and shared UI component primitives in `src/styles/tokens.css`.
