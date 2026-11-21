@@ -31,12 +31,13 @@
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "scripting", "storage"]`.
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, active milestone branch `milestone/M03-core-features-contextual-dom-captures`
+- **Git:** base branch `main`, active milestone branch `milestone/M04-complete-features-vector-annotation-editor-undo-history-and-export`
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
 - [M02] `[x]` accepted (2026-11-21) — Foundations: Manifest V3, IndexedDB transfer and Viewport capture (7/7 tasks done)
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
+- [M04] `[>]` in progress — Complete features: Vector annotation editor, undo history and export (0/4 tasks done)
 
 ## Decisions and deviations
 - none
