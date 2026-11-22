@@ -13,7 +13,7 @@
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | done |
 | 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | done |
 
-| 8+. Evolution | M07 | Reliable full-page capture and a compact, usable annotation editor | in progress |
+| 8+. Evolution | M07 | Reliable full-page capture and a compact, usable annotation editor | in review |
 
 ## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
@@ -204,7 +204,7 @@
 - **Estimated size:** 3 tasks
 
 
-## [>] M07 - Feature: Reliable capture and streamlined editor
+## [?] M07 - Feature: Reliable capture and streamlined editor
 - **Phase:** 8+ — Evolution
 - **Type:** feature
 - **What you will see:** Full-page capture starts at the top; the editor has a compact toolbar, clear arrows, working text and deselection, PNG download with automatic close on completion, and an explicit close button.
