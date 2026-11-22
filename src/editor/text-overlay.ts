@@ -12,7 +12,7 @@ export interface ActiveTextEditorDraft {
 
 export interface TextOverlayCallbacks {
   onInput: (text: string) => void;
-  onCommit: (text: string) => void;
+  onCommit: (text: string, preserveToolbar?: boolean) => void;
   onCancel: () => void;
 }
 
@@ -90,10 +90,11 @@ export function renderTextOverlayLayer(
     }
   });
 
-  textarea.addEventListener('blur', () => {
+  textarea.addEventListener('blur', (event: FocusEvent) => {
     if (!settled) {
       settled = true;
-      callbacks.onCommit(textarea.value);
+      const target = event.relatedTarget;
+      callbacks.onCommit(textarea.value, target instanceof Element && !!target.closest('.editor-toolbar'));
     }
   });
 

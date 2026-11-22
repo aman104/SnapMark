@@ -159,6 +159,7 @@ export function initEditor(
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
+  let selectionRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
@@ -174,7 +175,7 @@ export function initEditor(
     syncHistoryState();
   }
 
-  function commitActiveTextDraft(overrideText?: string): void {
+  function commitActiveTextDraft(overrideText?: string, preserveToolbar = false): void {
     if (!activeTextDraft) {
       return;
     }
@@ -233,7 +234,13 @@ export function initEditor(
       state.selectedAnnotationId = newText.id;
     }
 
-    notifyAndRender();
+    if (preserveToolbar) {
+      liveInput?.remove();
+      redrawCanvasOnly();
+      options.onStateChange?.(state);
+    } else {
+      notifyAndRender();
+    }
   }
 
   function cancelActiveTextDraft(): void {
@@ -287,6 +294,8 @@ export function initEditor(
   }
 
   function notifyAndRender(): void {
+    clearTimeout(selectionRefreshTimer);
+    selectionRefreshTimer = undefined;
     render();
     options.onStateChange?.(state);
   }
@@ -618,8 +627,8 @@ export function initEditor(
           activeTextDraft.text = text;
         }
       },
-      onCommit: (text) => {
-        commitActiveTextDraft(text);
+      onCommit: (text, preserveToolbar) => {
+        commitActiveTextDraft(text, preserveToolbar);
       },
       onCancel: () => {
         cancelActiveTextDraft();
@@ -959,6 +968,7 @@ export function initEditor(
   }
 
   function handleCanvasDoubleClick(event: MouseEvent): void {
+    clearTimeout(selectionRefreshTimer);
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     const pt = getCanvasCssPoint(canvas, event);
     const hit = hitTestAnnotations(state.annotations, pt.x, pt.y);
@@ -998,6 +1008,7 @@ export function initEditor(
   }
 
   function handleCanvasMouseDown(event: MouseEvent): void {
+    clearTimeout(selectionRefreshTimer);
     if (event.button !== 0) {
       return;
     }
@@ -1206,11 +1217,17 @@ export function initEditor(
       return;
     }
     lastProcessedUpEvent = event;
+    const isUnmovedSelection = (activeInteraction.kind === 'move' || activeInteraction.kind === 'handle') && !activeInteraction.snapshotPushed;
     if (activeInteraction.kind === 'draw' && !activeInteraction.snapshotPushed) {
       state.selectedAnnotationId = null;
     }
     activeInteraction = null;
-    notifyAndRender();
+    if (isUnmovedSelection) {
+      // Keep the same canvas through the browser's double-click sequence.
+      selectionRefreshTimer = setTimeout(() => notifyAndRender(), 600);
+    } else {
+      notifyAndRender();
+    }
   }
 
   async function hydrateFromStorageAndIndexedDb(): Promise<void> {

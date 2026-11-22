@@ -20,6 +20,43 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Pierwszy znak')).toBe(true);
     container.remove();
   });
+
+  it('keeps the canvas mounted through two clicks so an existing text can be edited', () => {
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    const text = controller.getState().annotations.find((item) => item.type === 'text') as TextAnnotation;
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    const event = { clientX: text.x + 10, clientY: text.y + 10, button: 0, bubbles: true };
+    for (let detail = 1; detail <= 2; detail++) {
+      canvas.dispatchEvent(new MouseEvent('mousedown', { ...event, detail }));
+      canvas.dispatchEvent(new MouseEvent('mouseup', { ...event, detail }));
+      canvas.dispatchEvent(new MouseEvent('click', { ...event, detail }));
+      expect(container.querySelector('#editor-canvas')).toBe(canvas);
+    }
+    canvas.dispatchEvent(new MouseEvent('dblclick', { ...event, detail: 2 }));
+    expect(container.querySelector<HTMLTextAreaElement>('#active-text-input')?.value).toBe(text.text);
+  });
+
+  it('commits text without removing a toolbar button before its click', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let downloads = 0;
+    const controller = initEditor(container, { initialSearch: '?mode=viewport', onDownloadPng: () => { downloads++; } });
+    controller.setTool('text');
+    container.querySelector<HTMLCanvasElement>('#editor-canvas')!.dispatchEvent(new MouseEvent('mousedown', { clientX: 120, clientY: 85, button: 0, cancelable: true }));
+    const input = container.querySelector<HTMLTextAreaElement>('#active-text-input')!;
+    input.value = 'Tekst przed pobraniem';
+    input.dispatchEvent(new Event('input'));
+    const button = container.querySelector<HTMLButtonElement>('#btn-download-png')!;
+    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    input.dispatchEvent(new FocusEvent('blur', { relatedTarget: button }));
+    expect(container.querySelector('#btn-download-png')).toBe(button);
+    button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+    button.click();
+    expect(downloads).toBe(1);
+    expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Tekst przed pobraniem')).toBe(true);
+    container.remove();
+  });
   it('spawns #active-text-input on canvas click with Text tool, commits on Enter, and cancels on Escape', () => {
     const container = document.createElement('div');
     const controller = initEditor(container, { initialSearch: '?mode=viewport' });
