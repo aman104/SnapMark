@@ -50,13 +50,14 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     const button = container.querySelector<HTMLButtonElement>('#btn-download-png')!;
     const historyBefore = controller.getState().historyStack.length;
     button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-    input.dispatchEvent(new FocusEvent('blur', { relatedTarget: button }));
+    button.focus();
     expect(container.querySelector('#btn-download-png')).toBe(button);
     button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
     button.click();
     expect(downloads).toBe(1);
     expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Tekst przed pobraniem')).toBe(true);
     await vi.waitFor(() => expect(container.querySelector('#undo-count')?.textContent).toBe(String(historyBefore + 1)));
+    expect(document.activeElement?.id).toBe('btn-download-png');
     container.remove();
   });
 

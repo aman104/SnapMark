@@ -832,7 +832,10 @@ export function initEditor(
     const toolbar = container.querySelector<HTMLElement>('.editor-toolbar');
     const scheduleToolbarRefresh = (): void => {
       setTimeout(() => {
-        if (toolbarRefreshPending) notifyAndRender();
+        if (toolbarRefreshPending) {
+          toolbarRefreshPending = false;
+          refreshToolbarOnly();
+        }
       }, 0);
     };
     toolbar?.addEventListener('mousedown', () => {

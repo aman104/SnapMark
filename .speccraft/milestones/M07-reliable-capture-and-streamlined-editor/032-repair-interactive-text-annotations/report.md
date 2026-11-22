@@ -27,3 +27,4 @@
 - Round 3: distinguish keyboard focus from held pointer; after keyboard blur, refresh toolbar and restore focus to the corresponding control. Added focus and history regression coverage.
 - Round 4: preserve pending selection refresh on right-click and double-click outside text; added regression coverage.
 - Round 5: replace delayed full rerender with an immediate toolbar-only refresh that retains the canvas and restores focused actions; added keyboard focus regression.
+- Round 6: refresh only the toolbar after a toolbar-triggered commit, restoring the focused control; regression uses actual focus and completed mouse sequence.
