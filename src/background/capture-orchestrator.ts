@@ -300,6 +300,10 @@ export async function captureInteractiveArea(
   }
 
   const dataUrl = await rateLimiter.schedule(async () => {
+    const [activeTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
+    if (activeTab?.id !== tab.id) {
+      throw new Error('Aktywna karta zmieniła się podczas zaznaczania obszaru.');
+    }
     return await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: 'png',
     });

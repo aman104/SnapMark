@@ -18,5 +18,9 @@
 ## Verification
 
 - `npm run typecheck`: 0 errors
-- `npm test`: 95/95 tests passed, including 3 area capture tests
+- `npm test`: 96/96 tests passed, including 4 area capture tests
 - `npm run build`: passed
+
+## Review fixes
+
+- Verify the source tab remains active for every capture attempt; reject tab changes and cover them with a regression test.

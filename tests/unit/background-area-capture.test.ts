@@ -38,6 +38,7 @@ describe('Task 027: Background Service Worker Interactive Screen Area Selection 
     (globalThis as unknown as { chrome: unknown }).chrome = {
       tabs: {
         captureVisibleTab,
+        query: vi.fn().mockResolvedValue([{ id: 21 }]),
         create: vi.fn(async ({ url }: { url: string }) => {
           createdTabUrl = url;
           return { id: 888 };
@@ -93,6 +94,23 @@ describe('Task 027: Background Service Worker Interactive Screen Area Selection 
       width: 520,
       height: 310,
     });
+  });
+
+  it('does not capture another tab if the active tab changes after selection', async () => {
+    const captureVisibleTab = vi.fn();
+    vi.stubGlobal('chrome', {
+      tabs: { query: vi.fn().mockResolvedValue([{ id: 99 }]), captureVisibleTab },
+      scripting: { executeScript: vi.fn().mockResolvedValue([{ result: {
+        cancelled: false, cropRectCss: { x: 1, y: 1, width: 20, height: 20 },
+        viewportWidthCss: 100, viewportHeightCss: 100, dpr: 1,
+      } }]) },
+    });
+    await expect(captureInteractiveArea(
+      { id: 21, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
+      new CaptureRateLimiter({ minIntervalMs: 0 }),
+    )).rejects.toThrow('Aktywna karta zmieniła się');
+    expect(captureVisibleTab).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it('returns null and does not capture or open editor.html when user cancels area selection with Escape', async () => {
