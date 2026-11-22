@@ -36,10 +36,7 @@ import {
   type PlacedFrameDrawable,
   renderCanvasStage,
 } from './canvas-stage';
-import {
-  exportFlattenedPngDownload,
-  exportFlattenedToClipboard,
-} from './exporter';
+import { exportFlattenedPngDownload } from './exporter';
 import { cloneAnnotationList, UndoHistoryStack } from './history';
 import {
   type ActiveTextEditorDraft,
@@ -66,7 +63,6 @@ export interface EditorState {
   annotations: AnnotationItem[];
   historyStack: AnnotationItem[][];
   selectedAnnotationId: string | null;
-  copySuccess: boolean;
   warningDismissed: boolean;
   isLiveCapture: boolean;
   framePlacements: FramePlacementPlan[];
@@ -76,6 +72,7 @@ export interface InitEditorOptions {
   initialSearch?: string;
   onStateChange?: (state: EditorState) => void;
   onDownloadPng?: (filename: string, state: EditorState) => void;
+  onClose?: () => void;
 }
 
 export interface EditorController {
@@ -153,7 +150,6 @@ export function initEditor(
         ? [cloneAnnotations(initialAnnotations.slice(0, -1))]
         : [],
     selectedAnnotationId: initialAnnotations[0]?.id ?? null,
-    copySuccess: false,
     warningDismissed: false,
     isLiveCapture: Boolean(captureIdParam),
     framePlacements: [],
@@ -161,7 +157,6 @@ export function initEditor(
 
   let baseDrawable: CanvasImageSource | null = null;
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
-  let copyResetTimeout: ReturnType<typeof setTimeout> | null = null;
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
   let lastProcessedMoveEvent: MouseEvent | null = null;
@@ -479,14 +474,7 @@ export function initEditor(
                 </span>
                 <span class="brand-title">SnapMark</span>
               </div>
-              <div class="capture-meta-pill">
-                <span id="meta-filename" class="meta-filename" title="${state.metadata.filename}">
-                  ${state.metadata.filename}
-                </span>
-                <span id="meta-dimensions" class="meta-dimensions">
-                  ${state.metadata.cssWidth}×${state.metadata.cssHeight} • @${state.metadata.dpr}x
-                </span>
-              </div>
+
             </div>
 
             <span class="toolbar-divider" aria-hidden="true"></span>
@@ -496,6 +484,7 @@ export function initEditor(
               <button
                 type="button"
                 id="tool-arrow"
+                aria-label="Strzałka"
                 class="toolbar-tool-btn ${state.activeTool === 'arrow' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'arrow' ? 'true' : 'false'}"
                 title="Strzałka wektorowa (1)"
@@ -510,6 +499,7 @@ export function initEditor(
               <button
                 type="button"
                 id="tool-line"
+                aria-label="Linia / Marker"
                 class="toolbar-tool-btn ${state.activeTool === 'line' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'line' ? 'true' : 'false'}"
                 title="Podkreślenie i zakreślacz (2)"
@@ -524,6 +514,7 @@ export function initEditor(
               <button
                 type="button"
                 id="tool-text"
+                aria-label="Tekst"
                 class="toolbar-tool-btn ${state.activeTool === 'text' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'text' ? 'true' : 'false'}"
                 title="Pole tekstowe (3)"
@@ -582,7 +573,7 @@ export function initEditor(
               <button
                 type="button"
                 id="btn-download-png"
-                class="btn-secondary"
+                class="btn-primary"
                 ${isEmptyState ? 'disabled' : ''}
                 title="Pobierz spłaszczony plik PNG"
               >
@@ -592,24 +583,8 @@ export function initEditor(
                 <span>Pobierz PNG</span>
               </button>
 
-              <button
-                type="button"
-                id="btn-copy-clipboard"
-                class="btn-primary ${state.copySuccess ? 'is-success' : ''}"
-                ${isEmptyState ? 'disabled' : ''}
-                title="Skopiuj obraz do schowka systemowego"
-              >
-                ${
-                  state.copySuccess
-                    ? '<span>✓ Skopiowano!</span>'
-                    : `
-                      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
-                        <path d="M3.5 10.5H3a1.5 1.5 0 0 1-1.5-1.5V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.5" />
-                      </svg>
-                      <span>Kopiuj do schowka</span>
-                    `
-                }
+              <button type="button" id="btn-close-editor" class="btn-secondary" title="Zamknij edytor" aria-label="Zamknij edytor">
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
           </div>
@@ -890,32 +865,19 @@ export function initEditor(
         );
       });
 
-    container
-      .querySelector<HTMLButtonElement>('#btn-copy-clipboard')
-      ?.addEventListener('click', () => {
-        if (activeTextDraft) {
-          commitActiveTextDraft();
-        }
-        if (copyResetTimeout) {
-          clearTimeout(copyResetTimeout);
-        }
-        state.copySuccess = true;
-        notifyAndRender();
+    container.querySelector<HTMLButtonElement>('#btn-close-editor')?.addEventListener('click', () => {
+      if (options.onClose) {
+        options.onClose();
+      } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
+        void chrome.tabs.getCurrent().then((tab) => {
+          if (typeof tab?.id === 'number') return chrome.tabs.remove(tab.id);
+          window.close();
+        }).catch(() => window.close());
+      } else {
+        window.close();
+      }
+    });
 
-        void exportFlattenedToClipboard(
-          state.metadata,
-          state.annotations,
-          baseDrawable,
-          placedFrameDrawables,
-        ).catch(() => {});
-
-        copyResetTimeout = setTimeout(() => {
-          state.copySuccess = false;
-          notifyAndRender();
-        }, 2000);
-      });
-
-    // Empty state actions: Clipboard paste & File picker
     container
       .querySelector<HTMLButtonElement>('#btn-paste-clipboard')
       ?.addEventListener('click', () => {
