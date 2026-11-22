@@ -1000,11 +1000,11 @@ export function initEditor(
   }
 
   function handleCanvasDoubleClick(event: MouseEvent): void {
-    clearTimeout(selectionRefreshTimer);
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     const pt = getCanvasCssPoint(canvas, event);
     const hit = hitTestAnnotations(state.annotations, pt.x, pt.y);
     if (hit && hit.type === 'text') {
+      clearTimeout(selectionRefreshTimer);
       if (activeTextDraft) {
         commitActiveTextDraft();
       }
@@ -1040,10 +1040,10 @@ export function initEditor(
   }
 
   function handleCanvasMouseDown(event: MouseEvent): void {
-    clearTimeout(selectionRefreshTimer);
     if (event.button !== 0) {
       return;
     }
+    clearTimeout(selectionRefreshTimer);
     if (activeTextDraft) {
       commitActiveTextDraft();
       return;

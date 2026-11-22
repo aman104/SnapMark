@@ -81,6 +81,21 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     container.remove();
   });
 
+  it('keeps the selection refresh after right-click or a double-click outside text', () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    const text = controller.getState().annotations.find((item) => item.type === 'text') as TextAnnotation;
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: text.x + 10, clientY: text.y + 10, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: text.x + 10, clientY: text.y + 10, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 10, clientY: 10, button: 2 }));
+    canvas.dispatchEvent(new MouseEvent('dblclick', { clientX: 10, clientY: 10, button: 0 }));
+    vi.advanceTimersByTime(600);
+    expect(container.querySelector('#tool-text')?.classList.contains('is-active')).toBe(true);
+    vi.useRealTimers();
+  });
+
   it('updates toolbar state and retains keyboard focus when Tab leaves the text input', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
