@@ -1203,6 +1203,9 @@ export function initEditor(
       return;
     }
     lastProcessedUpEvent = event;
+    if (activeInteraction.kind === 'draw' && !activeInteraction.snapshotPushed) {
+      state.selectedAnnotationId = null;
+    }
     activeInteraction = null;
     notifyAndRender();
   }

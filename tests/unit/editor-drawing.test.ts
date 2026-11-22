@@ -1,8 +1,52 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { initEditor } from '../../src/editor/index';
+import { drawArrowAnnotation } from '../../src/editor/canvas-stage';
 import type { ArrowAnnotation, LineAnnotation } from '../../src/shared/types';
 
 describe('Interactive Arrow and 2-in-1 Line/Highlighter Canvas Drawing & Handle Dragging (Task 020)', () => {
+  it.each([[10, 110], [110, 10], [10, 18]])('draws a connected arrowhead ending at its tip (%s → %s)', (x1, x2) => {
+    const ctx = { save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(), closePath: vi.fn(), fill: vi.fn() } as unknown as CanvasRenderingContext2D;
+    drawArrowAnnotation(ctx, { id: 'arrow', type: 'arrow', x1, y1: 50, x2, y2: 50, color: '#FF3B30', strokeWidth: 4 }, false);
+    const moves = vi.mocked(ctx.moveTo).mock.calls;
+    const lines = vi.mocked(ctx.lineTo).mock.calls;
+    expect(moves[1]).toEqual([x2, 50]);
+    expect(lines[1][0]).toBeCloseTo(lines[0][0]);
+    expect(lines[2][0]).toBeCloseTo(lines[0][0]);
+    expect((lines[1][1] - 50) * (lines[2][1] - 50)).toBeLessThan(0);
+    expect(Math.abs(lines[0][0] - x1)).toBeLessThanOrEqual(Math.abs(x2 - x1));
+    expect(ctx.fill).toHaveBeenCalledOnce();
+  });
+  it('deselects an existing arrow on an empty click without adding an annotation, and can select it again', () => {
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    const arrow = controller.getState().annotations[0] as ArrowAnnotation;
+    const count = controller.getState().annotations.length;
+    let canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 10, clientY: 10, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 10, clientY: 10, button: 0 }));
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+    expect(controller.getState().annotations).toHaveLength(count);
+    canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: (arrow.x1 + arrow.x2) / 2, clientY: (arrow.y1 + arrow.y2) / 2, button: 0 }));
+    expect(controller.getState().selectedAnnotationId).toBe(arrow.id);
+  });
+
+  it('deselects a selected line with an empty click and still draws on drag', () => {
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    controller.setTool('line');
+    let canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 60, clientY: 500, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 350, clientY: 500 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 350, clientY: 500, button: 0 }));
+    expect(controller.getState().selectedAnnotationId).not.toBeNull();
+    const count = controller.getState().annotations.length;
+    canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 10, clientY: 10, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 10, clientY: 10, button: 0 }));
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+    expect(controller.getState().annotations).toHaveLength(count);
+  });
   it('draws a new vector Arrow (#FF3B30) via mouse drag and drags its arrowhead endpoint handle (x2, y2) after drawing', () => {
     const container = document.createElement('div');
     const controller = initEditor(container, { initialSearch: '?mode=viewport' });
