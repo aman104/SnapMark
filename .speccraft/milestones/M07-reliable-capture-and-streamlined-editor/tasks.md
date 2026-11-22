@@ -8,6 +8,6 @@
 
 [x] 032 - Repair interactive text annotations - Reproduce the reported text entry failure in a real Chromium extension and correct focus, placement and input under PRD FR-05. Verify creating, committing, editing, moving and exporting text and preserve keyboard and other annotation behavior. Add a regression test that exercises the real user interaction.
 
-[~] 033 - Close editor after confirmed PNG download - Implement PRD FR-06 using a browser-supported mechanism to identify and confirm completion of the editor's own PNG download. Close only on success; keep annotations and show feedback on failure or cancellation, documenting any required minimal permission. Verify successful and unsuccessful downloads and preserve automatic naming.
+[x] 033 - Close editor after confirmed PNG download - Implement PRD FR-06 using a browser-supported mechanism to identify and confirm completion of the editor's own PNG download. Close only on success; keep annotations and show feedback on failure or cancellation, documenting any required minimal permission. Verify successful and unsuccessful downloads and preserve automatic naming.
 
 [ ] 034 - Verify integrated Chromium workflow and package - Exercise PRD FR-08 in a real Chromium extension: full-page capture from mid-scroll, annotation and deselection, text entry, PNG completion and both close paths. Verify unchanged capture modes and clipboard paste and update README and release checks. Run typecheck, unit tests, build, E2E and package and record any environment limitations honestly.

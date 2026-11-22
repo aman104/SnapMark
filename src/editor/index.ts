@@ -161,9 +161,27 @@ export function initEditor(
   let activeTextDraft: ActiveTextEditorDraft | null = null;
   let toolbarRefreshPending = false;
   let toolbarPointerDown = false;
+  let downloadInProgress = false;
+  let closingAfterDownload = false;
+  let downloadError: 'download' | 'close' | 'changed' | null = null;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
+
+  for (const eventType of ['mousedown', 'click', 'keydown', 'input', 'paste']) {
+    container.addEventListener(eventType, (event) => {
+      if (closingAfterDownload) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    }, true);
+  }
+
+  function setClosingAfterDownload(closing: boolean): void {
+    closingAfterDownload = closing;
+    container.inert = closing;
+    container.setAttribute('aria-busy', closing ? 'true' : 'false');
+  }
 
   const historyManager = new UndoHistoryStack(state.historyStack);
 
@@ -605,6 +623,7 @@ export function initEditor(
                 id="btn-download-png"
                 class="btn-primary"
                 ${isEmptyState ? 'disabled' : ''}
+                aria-disabled="${isEmptyState || downloadInProgress ? 'true' : 'false'}"
                 title="Pobierz spłaszczony plik PNG"
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -648,11 +667,13 @@ export function initEditor(
         ${renderToolbarHtml()}
 
         <main class="editor-stage" id="editor-stage">
+          <div id="download-status" class="status-banner is-danger" role="alert" hidden></div>
           ${renderStageHtml()}
         </main>
       </div>
     `;
 
+    syncDownloadUi();
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
       renderCanvasStage(
@@ -840,6 +861,38 @@ export function initEditor(
     notifyAndRender();
   }
 
+  function syncDownloadUi(): void {
+    const status = container.querySelector<HTMLElement>('#download-status');
+    if (status) {
+      status.hidden = downloadError === null;
+      status.textContent = downloadError === 'close'
+        ? 'PNG został pobrany, ale nie udało się zamknąć karty.'
+        : downloadError === 'changed'
+          ? 'PNG został pobrany. Nowe zmiany nie są w pliku — pobierz ponownie.'
+          : downloadError === 'download' ? 'Nie udało się pobrać PNG. Spróbuj ponownie.' : '';
+    }
+    container.querySelector<HTMLButtonElement>('#btn-download-png')?.setAttribute('aria-disabled', downloadInProgress || state.prototypeState === 'empty' ? 'true' : 'false');
+  }
+
+  async function closeEditor(canClose: () => boolean = () => true, beforeClose: () => void = () => {}): Promise<boolean> {
+    if (options.onClose) {
+      if (!canClose()) return false;
+      beforeClose();
+      options.onClose();
+    } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
+      const tab = await chrome.tabs.getCurrent();
+      if (!canClose()) return false;
+      beforeClose();
+      if (typeof tab?.id === 'number') await chrome.tabs.remove(tab.id);
+      else window.close();
+    } else {
+      if (!canClose()) return false;
+      beforeClose();
+      window.close();
+    }
+    return true;
+  }
+
   function bindToolbarAndStageEvents(toolbarOnly = false): void {
     const toolbar = container.querySelector<HTMLElement>('.editor-toolbar');
     const scheduleToolbarRefresh = (): void => {
@@ -925,31 +978,44 @@ export function initEditor(
     container
       .querySelector<HTMLButtonElement>('#btn-download-png')
       ?.addEventListener('click', () => {
+        if (downloadInProgress) return;
         if (activeTextDraft) {
           commitActiveTextDraft();
         }
         if (options.onDownloadPng) {
           options.onDownloadPng(state.metadata.filename, state);
         }
+        downloadInProgress = true;
+        downloadError = null;
+        const exportedState = JSON.stringify({ metadata: state.metadata, annotations: state.annotations });
+        syncDownloadUi();
         void exportFlattenedPngDownload(
           state.metadata,
           state.annotations,
           baseDrawable,
           placedFrameDrawables,
-        );
+        ).then(async () => {
+          const canClose = (): boolean => !activeTextDraft && !activeInteraction && JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) === exportedState;
+          if (!canClose()) {
+            downloadError = 'changed';
+            return;
+          }
+          try {
+            if (!await closeEditor(canClose, () => setClosingAfterDownload(true))) downloadError = 'changed';
+          } catch {
+            setClosingAfterDownload(false);
+            downloadError = 'close';
+          }
+        }).catch(() => {
+          downloadError = 'download';
+        }).finally(() => {
+          downloadInProgress = false;
+          syncDownloadUi();
+        });
       });
 
     container.querySelector<HTMLButtonElement>('#btn-close-editor')?.addEventListener('click', () => {
-      if (options.onClose) {
-        options.onClose();
-      } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
-        void chrome.tabs.getCurrent().then((tab) => {
-          if (typeof tab?.id === 'number') return chrome.tabs.remove(tab.id);
-          window.close();
-        }).catch(() => window.close());
-      } else {
-        window.close();
-      }
+      void closeEditor().catch(() => window.close());
     });
 
     if (toolbarOnly) return;
@@ -1357,6 +1423,10 @@ export function initEditor(
   }
 
   const handleKeyDown = (event: KeyboardEvent): void => {
+    if (closingAfterDownload) {
+      event.preventDefault();
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (
       target &&
@@ -1405,6 +1475,10 @@ export function initEditor(
     window.addEventListener('mousemove', handleCanvasMouseMove);
     window.addEventListener('mouseup', handleCanvasMouseUp);
     window.addEventListener('paste', (event: ClipboardEvent) => {
+      if (closingAfterDownload) {
+        event.preventDefault();
+        return;
+      }
       const items = event.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i += 1) {

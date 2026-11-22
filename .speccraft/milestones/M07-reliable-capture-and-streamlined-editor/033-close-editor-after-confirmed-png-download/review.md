@@ -9,3 +9,7 @@ Typecheck, 124 tests and build passed. Edits can occur while waiting for chrome.
 ## Round 3 — changes requested — 2026-11-22
 
 Typecheck, 125 tests and build passed. After the final check, editing is still possible while chrome.tabs.remove is pending; active drawing before creation is also not checked. Block editing during closure, restore it on failure, and test delayed removal and active drawing.
+
+## Round 4 — approved — 2026-11-22
+
+Typecheck, 127 unit tests and build passed. No blocking findings. Actual tab removal remains for task 034; focus after failed removal is a non-blocking note.

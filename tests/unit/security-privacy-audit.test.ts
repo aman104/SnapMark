@@ -31,6 +31,7 @@ describe('Task 023: PRD §7 Edge-Case Hardening & §10-11 Privacy, Permissions a
     expect(manifest.permissions).toEqual([
       'activeTab',
       'contextMenus',
+      'downloads',
       'scripting',
       'storage',
     ]);
