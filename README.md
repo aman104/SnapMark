@@ -97,7 +97,8 @@ Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/` (`manifes
 - `npm run typecheck`: weryfikuje typy TypeScript (`tsc --noEmit`)
 - `npm test`: uruchamia zestaw testów jednostkowych i integracyjnych Vitest (`vitest run`)
 - `npm run build`: wykonuje `typecheck` oraz buduje produkcyjną paczkę rozszerzenia do `dist/`
-- `npm run test:e2e`: uruchamia zestaw testów End-to-End (`tests/e2e/extension.spec.ts`) na zbudowanej paczce `./dist`
+- `npx playwright install chromium`: jednorazowo instaluje Chromium do rzeczywistych testów rozszerzenia (na Linuksie w CI: `npx playwright install --with-deps chromium`).
+- `npm run test:e2e`: buduje bieżący kod, uruchamia symulowane testy Vitest/JSDOM (`tests/e2e/extension.spec.ts`) oraz rzeczywisty przepływ w izolowanym Chromium (`tests/e2e/chromium-workflow.mjs`). Test tworzy tymczasową kopię rozszerzenia z `<all_urls>`, aby headless Chrome mógł wykonać zrzut bez ręcznego kliknięcia ikony; produkcyjny manifest nie dostaje tego uprawnienia. Test wklejania symuluje zdarzenie, nie zmienia systemowego schowka.
 - `npm run package`: buduje `./dist`, weryfikuje kompletność plików Manifest V3 i tworzy archiwum wydaniowe Chrome Web Store `snapmark-extension.zip`
 
 ## Keyboard Shortcuts
