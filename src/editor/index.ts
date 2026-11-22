@@ -305,8 +305,20 @@ export function initEditor(
   }
 
   function notifyAndRender(): void {
+    const active = document.activeElement;
+    const focusedButton = active instanceof HTMLButtonElement && active.closest('.editor-toolbar')
+      ? { id: active.id, data: { ...active.dataset } }
+      : null;
     toolbarRefreshPending = false;
     render();
+    if (focusedButton && !activeTextDraft) {
+      const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button'));
+      const replacement = focusedButton.id
+        ? buttons.find((button) => button.id === focusedButton.id)
+        : buttons.find((button) => Object.keys(focusedButton.data).length > 0 &&
+            Object.entries(focusedButton.data).every(([key, value]) => button.dataset[key] === value));
+      replacement?.focus();
+    }
     options.onStateChange?.(state);
   }
 

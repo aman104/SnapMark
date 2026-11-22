@@ -129,6 +129,28 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Tekst z klawiatury')).toBe(true);
     container.remove();
   });
+
+  it.each([
+    ['tool', '#tool-arrow'],
+    ['color', '[data-color="#34C759"]'],
+  ])('retains focus on a %s control after committing text and activating it', (_kind, selector) => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    controller.setTool('text');
+    container.querySelector<HTMLCanvasElement>('#editor-canvas')!.dispatchEvent(new MouseEvent('mousedown', { clientX: 120, clientY: 85, button: 0, cancelable: true }));
+    const input = container.querySelector<HTMLTextAreaElement>('#active-text-input')!;
+    input.value = 'Adnotacja';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const button = container.querySelector<HTMLButtonElement>(selector)!;
+    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    button.focus();
+    button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+    button.click();
+    expect(document.activeElement).toBe(container.querySelector(selector));
+    expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Adnotacja')).toBe(true);
+    container.remove();
+  });
   it('spawns #active-text-input on canvas click with Text tool, commits on Enter, and cancels on Escape', () => {
     const container = document.createElement('div');
     const controller = initEditor(container, { initialSearch: '?mode=viewport' });
