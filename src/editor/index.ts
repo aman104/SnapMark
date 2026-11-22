@@ -159,6 +159,8 @@ export function initEditor(
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
+  let toolbarRefreshPending = false;
+  let toolbarPointerDown = false;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
@@ -174,7 +176,7 @@ export function initEditor(
     syncHistoryState();
   }
 
-  function commitActiveTextDraft(overrideText?: string): void {
+  function commitActiveTextDraft(overrideText?: string, toolbarTarget: Element | null = null): void {
     if (!activeTextDraft) {
       return;
     }
@@ -233,7 +235,23 @@ export function initEditor(
       state.selectedAnnotationId = newText.id;
     }
 
-    notifyAndRender();
+    if (toolbarTarget) {
+      liveInput?.remove();
+      redrawCanvasOnly();
+      options.onStateChange?.(state);
+      toolbarRefreshPending = true;
+      if (!toolbarPointerDown) {
+        const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button'));
+        const buttonIndex = buttons.indexOf(toolbarTarget.closest('button') as HTMLButtonElement);
+        queueMicrotask(() => {
+          if (!toolbarRefreshPending) return;
+          notifyAndRender();
+          if (buttonIndex >= 0) container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button')[buttonIndex]?.focus();
+        });
+      }
+    } else {
+      notifyAndRender();
+    }
   }
 
   function cancelActiveTextDraft(): void {
@@ -287,7 +305,20 @@ export function initEditor(
   }
 
   function notifyAndRender(): void {
+    const active = document.activeElement;
+    const focusedButton = active instanceof HTMLButtonElement && active.closest('.editor-toolbar')
+      ? { id: active.id, data: { ...active.dataset } }
+      : null;
+    toolbarRefreshPending = false;
     render();
+    if (focusedButton && !activeTextDraft) {
+      const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button'));
+      const replacement = focusedButton.id
+        ? buttons.find((button) => button.id === focusedButton.id)
+        : buttons.find((button) => Object.keys(focusedButton.data).length > 0 &&
+            Object.entries(focusedButton.data).every(([key, value]) => button.dataset[key] === value));
+      replacement?.focus();
+    }
     options.onStateChange?.(state);
   }
 
@@ -454,13 +485,11 @@ export function initEditor(
     `;
   }
 
-  function render(): void {
+  function renderToolbarHtml(): string {
     const canUndo = state.historyStack.length > 0;
     const hasSelection = state.selectedAnnotationId !== null;
     const isEmptyState = state.prototypeState === 'empty';
-
-    container.innerHTML = `
-      <div class="editor-shell" data-editor-state="${state.prototypeState}" data-capture-mode="${state.captureMode}">
+    return `
         <header class="editor-toolbar" role="toolbar" aria-label="Pasek narzędzi edytora SnapMark">
           <div class="toolbar-left-group">
             <!-- Cluster 1: Brand & Capture Metadata -->
@@ -590,6 +619,33 @@ export function initEditor(
             </div>
           </div>
         </header>
+    `;
+  }
+
+  function refreshToolbarOnly(): void {
+    const oldToolbar = container.querySelector<HTMLElement>('.editor-toolbar');
+    if (!oldToolbar) return;
+    const focused = document.activeElement;
+    const buttons = Array.from(oldToolbar.querySelectorAll<HTMLButtonElement>('button'));
+    const focusIndex = focused instanceof HTMLButtonElement ? buttons.indexOf(focused) : -1;
+    const focusId = focusIndex >= 0 && focused instanceof HTMLButtonElement ? focused.id : '';
+    const template = document.createElement('template');
+    template.innerHTML = renderToolbarHtml().trim();
+    const replacement = template.content.firstElementChild;
+    if (!replacement) return;
+    oldToolbar.replaceWith(replacement);
+    bindToolbarAndStageEvents(true);
+    if (focusIndex >= 0) {
+      const replacementButtons = Array.from(replacement.querySelectorAll<HTMLButtonElement>('button'));
+      (replacementButtons.find((button) => focusId && button.id === focusId) ?? replacementButtons[focusIndex])?.focus();
+    }
+    options.onStateChange?.(state);
+  }
+
+  function render(): void {
+    container.innerHTML = `
+      <div class="editor-shell" data-editor-state="${state.prototypeState}" data-capture-mode="${state.captureMode}">
+        ${renderToolbarHtml()}
 
         <main class="editor-stage" id="editor-stage">
           ${renderStageHtml()}
@@ -618,8 +674,8 @@ export function initEditor(
           activeTextDraft.text = text;
         }
       },
-      onCommit: (text) => {
-        commitActiveTextDraft(text);
+      onCommit: (text, toolbarTarget) => {
+        commitActiveTextDraft(text, toolbarTarget);
       },
       onCancel: () => {
         cancelActiveTextDraft();
@@ -784,7 +840,24 @@ export function initEditor(
     notifyAndRender();
   }
 
-  function bindToolbarAndStageEvents(): void {
+  function bindToolbarAndStageEvents(toolbarOnly = false): void {
+    const toolbar = container.querySelector<HTMLElement>('.editor-toolbar');
+    const scheduleToolbarRefresh = (): void => {
+      setTimeout(() => {
+        if (toolbarRefreshPending) {
+          toolbarRefreshPending = false;
+          refreshToolbarOnly();
+        }
+      }, 0);
+    };
+    toolbar?.addEventListener('mousedown', () => {
+      toolbarPointerDown = true;
+      window.addEventListener('mouseup', () => {
+        toolbarPointerDown = false;
+        scheduleToolbarRefresh();
+      }, { once: true });
+    });
+    toolbar?.addEventListener('click', scheduleToolbarRefresh);
     container
       .querySelector<HTMLButtonElement>('#tool-arrow')
       ?.addEventListener('click', () => setTool('arrow'));
@@ -878,6 +951,8 @@ export function initEditor(
         window.close();
       }
     });
+
+    if (toolbarOnly) return;
 
     container
       .querySelector<HTMLButtonElement>('#btn-paste-clipboard')
@@ -1042,6 +1117,9 @@ export function initEditor(
 
     // 3. When Text tool is active, spawn an inline <textarea> overlay at (pt.x, pt.y)
     if (state.activeTool === 'text') {
+      // Keep the browser's default mousedown focus handling from blurring the
+      // newly mounted textarea after it has been focused.
+      event.preventDefault();
       activeTextDraft = {
         editingAnnotationId: null,
         x: pt.x,
@@ -1203,11 +1281,17 @@ export function initEditor(
       return;
     }
     lastProcessedUpEvent = event;
+    const isUnmovedSelection = (activeInteraction.kind === 'move' || activeInteraction.kind === 'handle') && !activeInteraction.snapshotPushed;
     if (activeInteraction.kind === 'draw' && !activeInteraction.snapshotPushed) {
       state.selectedAnnotationId = null;
     }
     activeInteraction = null;
-    notifyAndRender();
+    if (isUnmovedSelection) {
+      // Update selection controls without replacing the canvas between clicks.
+      refreshToolbarOnly();
+    } else {
+      notifyAndRender();
+    }
   }
 
   async function hydrateFromStorageAndIndexedDb(): Promise<void> {

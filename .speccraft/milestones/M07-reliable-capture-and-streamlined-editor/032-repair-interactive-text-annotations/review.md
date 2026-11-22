@@ -25,3 +25,7 @@ Typecheck, 116 tests and build passed. After a text commit via toolbar, delayed 
 ## Round 7 — changes requested — 2026-11-22
 
 Typecheck, 116 tests and build passed. Tool/color click triggers full render and loses focus after a text commit; preserve the activated control and add regression coverage.
+
+## Round 8 — approved — 2026-11-22
+
+Typecheck, 118 tests and build passed. No blocking findings. Operator accepted deferral of real-extension verification to task 034.
