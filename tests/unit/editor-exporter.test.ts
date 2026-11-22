@@ -153,6 +153,55 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     expect(controller.getState().annotations[0].color).toBe('#34C759');
   });
 
+  it('does not close while an unfinished drawing is in progress', async () => {
+    const downloads = mockDownloads();
+    const close = vi.fn();
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport', onClose: close });
+    container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
+    await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 20, clientY: 20, button: 0, bubbles: true }));
+    const count = controller.getState().annotations.length;
+    downloads.emit(41, 'complete');
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nowe zmiany'));
+    expect(close).not.toHaveBeenCalled();
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 80, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 80, button: 0, bubbles: true }));
+    expect(controller.getState().annotations).toHaveLength(count + 1);
+  });
+
+  it('prevents edits during tab removal and unlocks the editor if removal fails', async () => {
+    const downloads = mockDownloads();
+    let failRemoval!: (reason: Error) => void;
+    const remove = vi.fn(() => new Promise<void>((_, reject) => { failRemoval = reject; }));
+    vi.stubGlobal('chrome', { downloads: chrome.downloads, tabs: { getCurrent: vi.fn().mockResolvedValue({ id: 37 }), remove } });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    const count = controller.getState().annotations.length;
+    container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
+    await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
+    downloads.emit(41, 'complete');
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledWith(37));
+    expect(container.inert).toBe(true);
+    let canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 20, clientY: 20, button: 0, bubbles: true, cancelable: true }));
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 80, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 80, button: 0, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+    expect(controller.getState().annotations).toHaveLength(count);
+    failRemoval(new Error('cannot close'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('nie udało się zamknąć karty'));
+    expect(container.inert).toBe(false);
+    canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 20, clientY: 20, button: 0, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 80, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 80, button: 0, bubbles: true }));
+    expect(controller.getState().annotations).toHaveLength(count + 1);
+    container.remove();
+  });
+
   it('retains the active text input and selection when a pending download fails', async () => {
     const downloads = mockDownloads();
     const container = document.createElement('div');

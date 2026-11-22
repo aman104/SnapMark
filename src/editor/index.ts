@@ -162,10 +162,26 @@ export function initEditor(
   let toolbarRefreshPending = false;
   let toolbarPointerDown = false;
   let downloadInProgress = false;
+  let closingAfterDownload = false;
   let downloadError: 'download' | 'close' | 'changed' | null = null;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
+
+  for (const eventType of ['mousedown', 'click', 'keydown', 'input', 'paste']) {
+    container.addEventListener(eventType, (event) => {
+      if (closingAfterDownload) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    }, true);
+  }
+
+  function setClosingAfterDownload(closing: boolean): void {
+    closingAfterDownload = closing;
+    container.inert = closing;
+    container.setAttribute('aria-busy', closing ? 'true' : 'false');
+  }
 
   const historyManager = new UndoHistoryStack(state.historyStack);
 
@@ -858,17 +874,20 @@ export function initEditor(
     container.querySelector<HTMLButtonElement>('#btn-download-png')?.setAttribute('aria-disabled', downloadInProgress || state.prototypeState === 'empty' ? 'true' : 'false');
   }
 
-  async function closeEditor(canClose: () => boolean = () => true): Promise<boolean> {
+  async function closeEditor(canClose: () => boolean = () => true, beforeClose: () => void = () => {}): Promise<boolean> {
     if (options.onClose) {
       if (!canClose()) return false;
+      beforeClose();
       options.onClose();
     } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
       const tab = await chrome.tabs.getCurrent();
       if (!canClose()) return false;
+      beforeClose();
       if (typeof tab?.id === 'number') await chrome.tabs.remove(tab.id);
       else window.close();
     } else {
       if (!canClose()) return false;
+      beforeClose();
       window.close();
     }
     return true;
@@ -976,14 +995,15 @@ export function initEditor(
           baseDrawable,
           placedFrameDrawables,
         ).then(async () => {
-          const canClose = (): boolean => !activeTextDraft && JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) === exportedState;
+          const canClose = (): boolean => !activeTextDraft && !activeInteraction && JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) === exportedState;
           if (!canClose()) {
             downloadError = 'changed';
             return;
           }
           try {
-            if (!await closeEditor(canClose)) downloadError = 'changed';
+            if (!await closeEditor(canClose, () => setClosingAfterDownload(true))) downloadError = 'changed';
           } catch {
+            setClosingAfterDownload(false);
             downloadError = 'close';
           }
         }).catch(() => {
@@ -1403,6 +1423,10 @@ export function initEditor(
   }
 
   const handleKeyDown = (event: KeyboardEvent): void => {
+    if (closingAfterDownload) {
+      event.preventDefault();
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (
       target &&
@@ -1451,6 +1475,10 @@ export function initEditor(
     window.addEventListener('mousemove', handleCanvasMouseMove);
     window.addEventListener('mouseup', handleCanvasMouseUp);
     window.addEventListener('paste', (event: ClipboardEvent) => {
+      if (closingAfterDownload) {
+        event.preventDefault();
+        return;
+      }
       const items = event.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i += 1) {
