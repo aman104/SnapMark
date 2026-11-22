@@ -1042,6 +1042,9 @@ export function initEditor(
 
     // 3. When Text tool is active, spawn an inline <textarea> overlay at (pt.x, pt.y)
     if (state.activeTool === 'text') {
+      // Keep the browser's default mousedown focus handling from blurring the
+      // newly mounted textarea after it has been focused.
+      event.preventDefault();
       activeTextDraft = {
         editingAnnotationId: null,
         x: pt.x,

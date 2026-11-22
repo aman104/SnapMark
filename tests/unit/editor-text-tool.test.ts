@@ -3,6 +3,23 @@ import { initEditor } from '../../src/editor/index';
 import type { TextAnnotation } from '../../src/shared/types';
 
 describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging & Readability Modes (Task 021)', () => {
+  it('prevents canvas mousedown from stealing focus from the new text input', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    controller.setTool('text');
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    const down = new MouseEvent('mousedown', { clientX: 120, clientY: 85, button: 0, bubbles: true, cancelable: true });
+    canvas.dispatchEvent(down);
+    const input = container.querySelector<HTMLTextAreaElement>('#active-text-input')!;
+    expect(down.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+    input.value = 'Pierwszy znak';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Pierwszy znak')).toBe(true);
+    container.remove();
+  });
   it('spawns #active-text-input on canvas click with Text tool, commits on Enter, and cancels on Escape', () => {
     const container = document.createElement('div');
     const controller = initEditor(container, { initialSearch: '?mode=viewport' });
