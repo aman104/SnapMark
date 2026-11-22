@@ -160,6 +160,7 @@ export function initEditor(
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
   let selectionRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  let toolbarRefreshPending = false;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
@@ -238,6 +239,7 @@ export function initEditor(
       liveInput?.remove();
       redrawCanvasOnly();
       options.onStateChange?.(state);
+      toolbarRefreshPending = true;
     } else {
       notifyAndRender();
     }
@@ -296,6 +298,7 @@ export function initEditor(
   function notifyAndRender(): void {
     clearTimeout(selectionRefreshTimer);
     selectionRefreshTimer = undefined;
+    toolbarRefreshPending = false;
     render();
     options.onStateChange?.(state);
   }
@@ -794,6 +797,21 @@ export function initEditor(
   }
 
   function bindToolbarAndStageEvents(): void {
+    const toolbar = container.querySelector<HTMLElement>('.editor-toolbar');
+    const scheduleToolbarRefresh = (): void => {
+      setTimeout(() => {
+        if (toolbarRefreshPending) notifyAndRender();
+      }, 0);
+    };
+    toolbar?.addEventListener('mousedown', () => {
+      if (selectionRefreshTimer !== undefined) {
+        clearTimeout(selectionRefreshTimer);
+        selectionRefreshTimer = undefined;
+        toolbarRefreshPending = true;
+      }
+      window.addEventListener('mouseup', scheduleToolbarRefresh, { once: true });
+    });
+    toolbar?.addEventListener('click', scheduleToolbarRefresh);
     container
       .querySelector<HTMLButtonElement>('#tool-arrow')
       ?.addEventListener('click', () => setTool('arrow'));

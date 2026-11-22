@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { initEditor } from '../../src/editor/index';
 import type { TextAnnotation } from '../../src/shared/types';
 
@@ -37,7 +37,7 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     expect(container.querySelector<HTMLTextAreaElement>('#active-text-input')?.value).toBe(text.text);
   });
 
-  it('commits text without removing a toolbar button before its click', () => {
+  it('commits text without removing a toolbar button before its click and refreshes history afterward', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     let downloads = 0;
@@ -48,6 +48,7 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     input.value = 'Tekst przed pobraniem';
     input.dispatchEvent(new Event('input'));
     const button = container.querySelector<HTMLButtonElement>('#btn-download-png')!;
+    const historyBefore = controller.getState().historyStack.length;
     button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
     input.dispatchEvent(new FocusEvent('blur', { relatedTarget: button }));
     expect(container.querySelector('#btn-download-png')).toBe(button);
@@ -55,6 +56,28 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     button.click();
     expect(downloads).toBe(1);
     expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Tekst przed pobraniem')).toBe(true);
+    await vi.waitFor(() => expect(container.querySelector('#undo-count')?.textContent).toBe(String(historyBefore + 1)));
+    container.remove();
+  });
+
+  it('does not replace a held toolbar button when selection refresh is pending', () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    const text = controller.getState().annotations.find((item) => item.type === 'text') as TextAnnotation;
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: text.x + 10, clientY: text.y + 10, button: 0, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: text.x + 10, clientY: text.y + 10, button: 0, bubbles: true }));
+    const button = container.querySelector<HTMLButtonElement>('#tool-arrow')!;
+    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    vi.advanceTimersByTime(700);
+    expect(container.querySelector('#tool-arrow')).toBe(button);
+    button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+    button.click();
+    expect(controller.getState().activeTool).toBe('arrow');
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     container.remove();
   });
   it('spawns #active-text-input on canvas click with Text tool, commits on Enter, and cancels on Escape', () => {
