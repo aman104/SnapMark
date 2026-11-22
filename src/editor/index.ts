@@ -36,10 +36,7 @@ import {
   type PlacedFrameDrawable,
   renderCanvasStage,
 } from './canvas-stage';
-import {
-  exportFlattenedPngDownload,
-  exportFlattenedToClipboard,
-} from './exporter';
+import { exportFlattenedPngDownload } from './exporter';
 import { cloneAnnotationList, UndoHistoryStack } from './history';
 import {
   type ActiveTextEditorDraft,
@@ -66,7 +63,6 @@ export interface EditorState {
   annotations: AnnotationItem[];
   historyStack: AnnotationItem[][];
   selectedAnnotationId: string | null;
-  copySuccess: boolean;
   warningDismissed: boolean;
   isLiveCapture: boolean;
   framePlacements: FramePlacementPlan[];
@@ -76,6 +72,7 @@ export interface InitEditorOptions {
   initialSearch?: string;
   onStateChange?: (state: EditorState) => void;
   onDownloadPng?: (filename: string, state: EditorState) => void;
+  onClose?: () => void;
 }
 
 export interface EditorController {
@@ -153,7 +150,6 @@ export function initEditor(
         ? [cloneAnnotations(initialAnnotations.slice(0, -1))]
         : [],
     selectedAnnotationId: initialAnnotations[0]?.id ?? null,
-    copySuccess: false,
     warningDismissed: false,
     isLiveCapture: Boolean(captureIdParam),
     framePlacements: [],
@@ -161,12 +157,31 @@ export function initEditor(
 
   let baseDrawable: CanvasImageSource | null = null;
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
-  let copyResetTimeout: ReturnType<typeof setTimeout> | null = null;
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
+  let toolbarRefreshPending = false;
+  let toolbarPointerDown = false;
+  let downloadInProgress = false;
+  let closingAfterDownload = false;
+  let downloadError: 'download' | 'close' | 'changed' | null = null;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
+
+  for (const eventType of ['mousedown', 'click', 'keydown', 'input', 'paste']) {
+    container.addEventListener(eventType, (event) => {
+      if (closingAfterDownload) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    }, true);
+  }
+
+  function setClosingAfterDownload(closing: boolean): void {
+    closingAfterDownload = closing;
+    container.inert = closing;
+    container.setAttribute('aria-busy', closing ? 'true' : 'false');
+  }
 
   const historyManager = new UndoHistoryStack(state.historyStack);
 
@@ -179,7 +194,7 @@ export function initEditor(
     syncHistoryState();
   }
 
-  function commitActiveTextDraft(overrideText?: string): void {
+  function commitActiveTextDraft(overrideText?: string, toolbarTarget: Element | null = null): void {
     if (!activeTextDraft) {
       return;
     }
@@ -238,7 +253,23 @@ export function initEditor(
       state.selectedAnnotationId = newText.id;
     }
 
-    notifyAndRender();
+    if (toolbarTarget) {
+      liveInput?.remove();
+      redrawCanvasOnly();
+      options.onStateChange?.(state);
+      toolbarRefreshPending = true;
+      if (!toolbarPointerDown) {
+        const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button'));
+        const buttonIndex = buttons.indexOf(toolbarTarget.closest('button') as HTMLButtonElement);
+        queueMicrotask(() => {
+          if (!toolbarRefreshPending) return;
+          notifyAndRender();
+          if (buttonIndex >= 0) container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button')[buttonIndex]?.focus();
+        });
+      }
+    } else {
+      notifyAndRender();
+    }
   }
 
   function cancelActiveTextDraft(): void {
@@ -292,7 +323,20 @@ export function initEditor(
   }
 
   function notifyAndRender(): void {
+    const active = document.activeElement;
+    const focusedButton = active instanceof HTMLButtonElement && active.closest('.editor-toolbar')
+      ? { id: active.id, data: { ...active.dataset } }
+      : null;
+    toolbarRefreshPending = false;
     render();
+    if (focusedButton && !activeTextDraft) {
+      const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button'));
+      const replacement = focusedButton.id
+        ? buttons.find((button) => button.id === focusedButton.id)
+        : buttons.find((button) => Object.keys(focusedButton.data).length > 0 &&
+            Object.entries(focusedButton.data).every(([key, value]) => button.dataset[key] === value));
+      replacement?.focus();
+    }
     options.onStateChange?.(state);
   }
 
@@ -459,13 +503,11 @@ export function initEditor(
     `;
   }
 
-  function render(): void {
+  function renderToolbarHtml(): string {
     const canUndo = state.historyStack.length > 0;
     const hasSelection = state.selectedAnnotationId !== null;
     const isEmptyState = state.prototypeState === 'empty';
-
-    container.innerHTML = `
-      <div class="editor-shell" data-editor-state="${state.prototypeState}" data-capture-mode="${state.captureMode}">
+    return `
         <header class="editor-toolbar" role="toolbar" aria-label="Pasek narzędzi edytora SnapMark">
           <div class="toolbar-left-group">
             <!-- Cluster 1: Brand & Capture Metadata -->
@@ -479,14 +521,7 @@ export function initEditor(
                 </span>
                 <span class="brand-title">SnapMark</span>
               </div>
-              <div class="capture-meta-pill">
-                <span id="meta-filename" class="meta-filename" title="${state.metadata.filename}">
-                  ${state.metadata.filename}
-                </span>
-                <span id="meta-dimensions" class="meta-dimensions">
-                  ${state.metadata.cssWidth}×${state.metadata.cssHeight} • @${state.metadata.dpr}x
-                </span>
-              </div>
+
             </div>
 
             <span class="toolbar-divider" aria-hidden="true"></span>
@@ -496,6 +531,7 @@ export function initEditor(
               <button
                 type="button"
                 id="tool-arrow"
+                aria-label="Strzałka"
                 class="toolbar-tool-btn ${state.activeTool === 'arrow' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'arrow' ? 'true' : 'false'}"
                 title="Strzałka wektorowa (1)"
@@ -510,6 +546,7 @@ export function initEditor(
               <button
                 type="button"
                 id="tool-line"
+                aria-label="Linia / Marker"
                 class="toolbar-tool-btn ${state.activeTool === 'line' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'line' ? 'true' : 'false'}"
                 title="Podkreślenie i zakreślacz (2)"
@@ -524,6 +561,7 @@ export function initEditor(
               <button
                 type="button"
                 id="tool-text"
+                aria-label="Tekst"
                 class="toolbar-tool-btn ${state.activeTool === 'text' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'text' ? 'true' : 'false'}"
                 title="Pole tekstowe (3)"
@@ -554,6 +592,7 @@ export function initEditor(
               <button
                 type="button"
                 id="btn-undo"
+                aria-label="Cofnij ostatnią zmianę"
                 class="btn-secondary"
                 ${canUndo ? '' : 'disabled'}
                 title="Cofnij ostatnią zmianę (Ctrl+Z)"
@@ -582,8 +621,9 @@ export function initEditor(
               <button
                 type="button"
                 id="btn-download-png"
-                class="btn-secondary"
+                class="btn-primary"
                 ${isEmptyState ? 'disabled' : ''}
+                aria-disabled="${isEmptyState || downloadInProgress ? 'true' : 'false'}"
                 title="Pobierz spłaszczony plik PNG"
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -592,35 +632,48 @@ export function initEditor(
                 <span>Pobierz PNG</span>
               </button>
 
-              <button
-                type="button"
-                id="btn-copy-clipboard"
-                class="btn-primary ${state.copySuccess ? 'is-success' : ''}"
-                ${isEmptyState ? 'disabled' : ''}
-                title="Skopiuj obraz do schowka systemowego"
-              >
-                ${
-                  state.copySuccess
-                    ? '<span>✓ Skopiowano!</span>'
-                    : `
-                      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
-                        <path d="M3.5 10.5H3a1.5 1.5 0 0 1-1.5-1.5V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.5" />
-                      </svg>
-                      <span>Kopiuj do schowka</span>
-                    `
-                }
+              <button type="button" id="btn-close-editor" class="btn-secondary" title="Zamknij edytor" aria-label="Zamknij edytor">
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
           </div>
         </header>
+    `;
+  }
+
+  function refreshToolbarOnly(): void {
+    const oldToolbar = container.querySelector<HTMLElement>('.editor-toolbar');
+    if (!oldToolbar) return;
+    const focused = document.activeElement;
+    const buttons = Array.from(oldToolbar.querySelectorAll<HTMLButtonElement>('button'));
+    const focusIndex = focused instanceof HTMLButtonElement ? buttons.indexOf(focused) : -1;
+    const focusId = focusIndex >= 0 && focused instanceof HTMLButtonElement ? focused.id : '';
+    const template = document.createElement('template');
+    template.innerHTML = renderToolbarHtml().trim();
+    const replacement = template.content.firstElementChild;
+    if (!replacement) return;
+    oldToolbar.replaceWith(replacement);
+    bindToolbarAndStageEvents(true);
+    if (focusIndex >= 0) {
+      const replacementButtons = Array.from(replacement.querySelectorAll<HTMLButtonElement>('button'));
+      (replacementButtons.find((button) => focusId && button.id === focusId) ?? replacementButtons[focusIndex])?.focus();
+    }
+    options.onStateChange?.(state);
+  }
+
+  function render(): void {
+    container.innerHTML = `
+      <div class="editor-shell" data-editor-state="${state.prototypeState}" data-capture-mode="${state.captureMode}">
+        ${renderToolbarHtml()}
 
         <main class="editor-stage" id="editor-stage">
+          <div id="download-status" class="status-banner is-danger" role="alert" hidden></div>
           ${renderStageHtml()}
         </main>
       </div>
     `;
 
+    syncDownloadUi();
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
       renderCanvasStage(
@@ -642,8 +695,8 @@ export function initEditor(
           activeTextDraft.text = text;
         }
       },
-      onCommit: (text) => {
-        commitActiveTextDraft(text);
+      onCommit: (text, toolbarTarget) => {
+        commitActiveTextDraft(text, toolbarTarget);
       },
       onCancel: () => {
         cancelActiveTextDraft();
@@ -808,7 +861,56 @@ export function initEditor(
     notifyAndRender();
   }
 
-  function bindToolbarAndStageEvents(): void {
+  function syncDownloadUi(): void {
+    const status = container.querySelector<HTMLElement>('#download-status');
+    if (status) {
+      status.hidden = downloadError === null;
+      status.textContent = downloadError === 'close'
+        ? 'PNG został pobrany, ale nie udało się zamknąć karty.'
+        : downloadError === 'changed'
+          ? 'PNG został pobrany. Nowe zmiany nie są w pliku — pobierz ponownie.'
+          : downloadError === 'download' ? 'Nie udało się pobrać PNG. Spróbuj ponownie.' : '';
+    }
+    container.querySelector<HTMLButtonElement>('#btn-download-png')?.setAttribute('aria-disabled', downloadInProgress || state.prototypeState === 'empty' ? 'true' : 'false');
+  }
+
+  async function closeEditor(canClose: () => boolean = () => true, beforeClose: () => void = () => {}): Promise<boolean> {
+    if (options.onClose) {
+      if (!canClose()) return false;
+      beforeClose();
+      options.onClose();
+    } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
+      const tab = await chrome.tabs.getCurrent();
+      if (!canClose()) return false;
+      beforeClose();
+      if (typeof tab?.id === 'number') await chrome.tabs.remove(tab.id);
+      else window.close();
+    } else {
+      if (!canClose()) return false;
+      beforeClose();
+      window.close();
+    }
+    return true;
+  }
+
+  function bindToolbarAndStageEvents(toolbarOnly = false): void {
+    const toolbar = container.querySelector<HTMLElement>('.editor-toolbar');
+    const scheduleToolbarRefresh = (): void => {
+      setTimeout(() => {
+        if (toolbarRefreshPending) {
+          toolbarRefreshPending = false;
+          refreshToolbarOnly();
+        }
+      }, 0);
+    };
+    toolbar?.addEventListener('mousedown', () => {
+      toolbarPointerDown = true;
+      window.addEventListener('mouseup', () => {
+        toolbarPointerDown = false;
+        scheduleToolbarRefresh();
+      }, { once: true });
+    });
+    toolbar?.addEventListener('click', scheduleToolbarRefresh);
     container
       .querySelector<HTMLButtonElement>('#tool-arrow')
       ?.addEventListener('click', () => setTool('arrow'));
@@ -876,46 +978,48 @@ export function initEditor(
     container
       .querySelector<HTMLButtonElement>('#btn-download-png')
       ?.addEventListener('click', () => {
+        if (downloadInProgress) return;
         if (activeTextDraft) {
           commitActiveTextDraft();
         }
         if (options.onDownloadPng) {
           options.onDownloadPng(state.metadata.filename, state);
         }
+        downloadInProgress = true;
+        downloadError = null;
+        const exportedState = JSON.stringify({ metadata: state.metadata, annotations: state.annotations });
+        syncDownloadUi();
         void exportFlattenedPngDownload(
           state.metadata,
           state.annotations,
           baseDrawable,
           placedFrameDrawables,
-        );
+        ).then(async () => {
+          const canClose = (): boolean => !activeTextDraft && !activeInteraction && JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) === exportedState;
+          if (!canClose()) {
+            downloadError = 'changed';
+            return;
+          }
+          try {
+            if (!await closeEditor(canClose, () => setClosingAfterDownload(true))) downloadError = 'changed';
+          } catch {
+            setClosingAfterDownload(false);
+            downloadError = 'close';
+          }
+        }).catch(() => {
+          downloadError = 'download';
+        }).finally(() => {
+          downloadInProgress = false;
+          syncDownloadUi();
+        });
       });
 
-    container
-      .querySelector<HTMLButtonElement>('#btn-copy-clipboard')
-      ?.addEventListener('click', () => {
-        if (activeTextDraft) {
-          commitActiveTextDraft();
-        }
-        if (copyResetTimeout) {
-          clearTimeout(copyResetTimeout);
-        }
-        state.copySuccess = true;
-        notifyAndRender();
+    container.querySelector<HTMLButtonElement>('#btn-close-editor')?.addEventListener('click', () => {
+      void closeEditor().catch(() => window.close());
+    });
 
-        void exportFlattenedToClipboard(
-          state.metadata,
-          state.annotations,
-          baseDrawable,
-          placedFrameDrawables,
-        ).catch(() => {});
+    if (toolbarOnly) return;
 
-        copyResetTimeout = setTimeout(() => {
-          state.copySuccess = false;
-          notifyAndRender();
-        }, 2000);
-      });
-
-    // Empty state actions: Clipboard paste & File picker
     container
       .querySelector<HTMLButtonElement>('#btn-paste-clipboard')
       ?.addEventListener('click', () => {
@@ -1079,6 +1183,9 @@ export function initEditor(
 
     // 3. When Text tool is active, spawn an inline <textarea> overlay at (pt.x, pt.y)
     if (state.activeTool === 'text') {
+      // Keep the browser's default mousedown focus handling from blurring the
+      // newly mounted textarea after it has been focused.
+      event.preventDefault();
       activeTextDraft = {
         editingAnnotationId: null,
         x: pt.x,
@@ -1240,8 +1347,17 @@ export function initEditor(
       return;
     }
     lastProcessedUpEvent = event;
+    const isUnmovedSelection = (activeInteraction.kind === 'move' || activeInteraction.kind === 'handle') && !activeInteraction.snapshotPushed;
+    if (activeInteraction.kind === 'draw' && !activeInteraction.snapshotPushed) {
+      state.selectedAnnotationId = null;
+    }
     activeInteraction = null;
-    notifyAndRender();
+    if (isUnmovedSelection) {
+      // Update selection controls without replacing the canvas between clicks.
+      refreshToolbarOnly();
+    } else {
+      notifyAndRender();
+    }
   }
 
   async function hydrateFromStorageAndIndexedDb(): Promise<void> {
@@ -1307,6 +1423,10 @@ export function initEditor(
   }
 
   const handleKeyDown = (event: KeyboardEvent): void => {
+    if (closingAfterDownload) {
+      event.preventDefault();
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (
       target &&
@@ -1355,6 +1475,10 @@ export function initEditor(
     window.addEventListener('mousemove', handleCanvasMouseMove);
     window.addEventListener('mouseup', handleCanvasMouseUp);
     window.addEventListener('paste', (event: ClipboardEvent) => {
+      if (closingAfterDownload) {
+        event.preventDefault();
+        return;
+      }
       const items = event.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i += 1) {

@@ -98,7 +98,7 @@ Poniższe wymagania zastępują sprzeczne wcześniejsze opisy paska i eksportu d
 - **FR-03:** Strzałka ma połączony trzon i czytelny wypełniony grot w kierunku przeciągania, z poprawnym wyglądem w edytorze i eksporcie.
 - **FR-04:** Kliknięcie pustego miejsca odznacza strzałkę lub linię; przeciąganie rysuje nowy obiekt, a ponowne zaznaczanie, uchwyty i przesuwanie działają.
 - **FR-05:** Narzędzie Tekst umożliwia wpisywanie, zatwierdzanie, ponowną edycję i eksport tekstu w rzeczywistej wtyczce.
-- **FR-06:** Pobranie PNG zamyka kartę edytora dopiero po potwierdzonym zakończeniu pobierania; błąd lub anulowanie pozostawia kartę i adnotacje oraz pokazuje błąd.
+- **FR-06:** Pobranie PNG zamyka kartę edytora dopiero po potwierdzonym zakończeniu pobierania, obserwowanym przez stan pobrania Chrome (uprawnienie `downloads`); błąd, przerwanie lub anulowanie pozostawia kartę i adnotacje oraz pokazuje błąd. Jeżeli w trakcie trwającego pobierania zmieni się zawartość płótna (nowa adnotacja, edycja, aktywny gest), karta pozostaje otwarta z komunikatem o konieczności ponownego eksportu — zmiany użytkownika nigdy nie są tracone.
 - **FR-07:** Dostępny i opisany przycisk na pasku zamyka kartę edytora.
 - **FR-08:** Testy regresji i rzeczywistego rozszerzenia Chromium obejmują powyższe oraz istniejące tryby zrzutu, adnotacje i eksport.
 
@@ -171,7 +171,8 @@ Wtyczka dzieli się na 4 współpracujące moduły zgodne z Manifest V3:
 
 - **Platforma**: Chrome Extension Manifest V3 (Chromium 114+).
 - **Uprawnienia (`manifest.json`)**:
-  - `"permissions": ["activeTab", "contextMenus", "scripting", "storage"]` (oraz `"clipboardWrite"` jeśli wymagane dla kompatybilności schowka w starszych wersjach Chromium, choć w aktywnej karcie `editor.html` po kliknięciu użytkownika `navigator.clipboard.write` działa natywnie).
+  - `"permissions": ["activeTab", "contextMenus", "downloads", "scripting", "storage"]`. Uprawnienie `downloads` (dodane w M07) służy wyłącznie do obserwowania stanu własnego pobrania PNG (`chrome.downloads.onChanged`), aby edytor zamykał się dopiero po potwierdzonym zakończeniu zapisu pliku — zob. FR-06.
+  - `"clipboardWrite"` nie jest deklarowane: wklejanie ze schowka w pustym edytorze korzysta ze zdarzenia `paste`, a eksport do schowka został usunięty w M07 (FR-02).
   - **Brak `host_permissions: ["<all_urls>"]`**.
 - **Skalowanie DPI (Retina / 4K)**:
   - `chrome.tabs.captureVisibleTab()` zwraca bitmapę w fizycznych pikselach urządzenia, natomiast `getBoundingClientRect()` zwraca piksele CSS.

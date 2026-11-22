@@ -4,18 +4,17 @@ import { initEditor } from '../../src/editor/index';
 describe('Task 005: Vector editor 56px top toolbar and contextual controls', () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it('renders Cluster 1 metadata, defaults to Strzałka (#FF3B30, 4px) in Cluster 2 & 3, and shows Cluster 4 export actions', () => {
     const container = document.createElement('div');
     const controller = initEditor(container, { initialSearch: '?mode=viewport' });
 
-    expect(container.querySelector('#meta-filename')?.textContent?.trim()).toBe(
-      'domena-pl_2026-11-21_14-10.png',
-    );
-    expect(
-      container.querySelector('#meta-dimensions')?.textContent?.trim(),
-    ).toBe('960×580 • @2x');
+    expect(container.querySelector('#meta-filename')).toBeNull();
+    expect(container.querySelector('#meta-dimensions')).toBeNull();
+    expect(container.querySelector('#btn-copy-clipboard')).toBeNull();
+    expect(container.querySelector('#btn-close-editor')?.getAttribute('aria-label')).toBe('Zamknij edytor');
 
     const arrowBtn = container.querySelector('#tool-arrow');
     expect(arrowBtn?.classList.contains('is-active')).toBe(true);
@@ -89,30 +88,21 @@ describe('Task 005: Vector editor 56px top toolbar and contextual controls', () 
     expect(controller.getState().annotations.length).toBe(initialCount - 1);
   });
 
-  it('transitions "Kopiuj do schowka" to green "✓ Skopiowano!" state for 2000ms', () => {
-    vi.useFakeTimers();
+  it('closes the editor through the accessible close control', () => {
+    const container = document.createElement('div');
+    const onClose = vi.fn();
+    initEditor(container, { onClose });
+    container.querySelector<HTMLButtonElement>('#btn-close-editor')?.click();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('removes only the current extension tab when close is clicked', async () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('chrome', { tabs: { getCurrent: vi.fn().mockResolvedValue({ id: 37 }), remove } });
     const container = document.createElement('div');
     initEditor(container);
-
-    const copyBtn = container.querySelector<HTMLButtonElement>(
-      '#btn-copy-clipboard',
-    );
-    expect(copyBtn?.textContent).toContain('Kopiuj do schowka');
-
-    copyBtn?.click();
-
-    const updatedBtn = container.querySelector<HTMLButtonElement>(
-      '#btn-copy-clipboard',
-    );
-    expect(updatedBtn?.classList.contains('is-success')).toBe(true);
-    expect(updatedBtn?.textContent).toContain('✓ Skopiowano!');
-
-    vi.advanceTimersByTime(2000);
-
-    const revertedBtn = container.querySelector<HTMLButtonElement>(
-      '#btn-copy-clipboard',
-    );
-    expect(revertedBtn?.classList.contains('is-success')).toBe(false);
-    expect(revertedBtn?.textContent).toContain('Kopiuj do schowka');
+    container.querySelector<HTMLButtonElement>('#btn-close-editor')?.click();
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledWith(37));
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 });

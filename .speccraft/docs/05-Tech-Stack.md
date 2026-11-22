@@ -11,7 +11,7 @@ Instead of pulling in heavy UI frameworks (React/Vue) or heavyweight canvas engi
 ## 2. Product signals extracted from PRD
 
 - **Platform & Runtime**: Chromium Browser Extension targeting **Manifest V3** (Chrome 114+, Brave, Edge, Arc on macOS/Windows/Linux).
-- **Strict Permission Footprint**: Only `"activeTab"`, `"contextMenus"`, `"scripting"`, and `"storage"` (no `<all_urls>` host permissions, no persistent background content scripts).
+- **Strict Permission Footprint**: Only `"activeTab"`, `"contextMenus"`, `"downloads"`, `"scripting"`, and `"storage"` (no `<all_urls>` host permissions, no persistent background content scripts). `"downloads"` was added in M07 solely to observe the completion state of the editor's own PNG download.
 - **4 Contextual Capture Modes**:
   1. **Text Selection Capture**: On-demand DOM injection (`chrome.scripting.executeScript`), `Range.getBoundingClientRect()`, automatic `20px` CSS safety margin clamped to viewport, optional temporary yellow highlight (`#FFEB3B` at `0.45` alpha) before capture.
   2. **Image Element Capture (`<img>`)**: Right-click context menu (`contexts: ["image"]`) measuring `img.getBoundingClientRect()` and cropping directly from `chrome.tabs.captureVisibleTab()` to bypass CORS and `AVIF`/`WebP` format friction.
@@ -108,7 +108,7 @@ Instead of pulling in heavy UI frameworks (React/Vue) or heavyweight canvas engi
 
 ### 4.3 Security & Privacy Considerations
 
-- **Least-Privilege Permissions**: `manifest.json` requests only `["activeTab", "contextMenus", "scripting", "storage"]`. No `<all_urls>` host permission is ever declared.
+- **Least-Privilege Permissions**: `manifest.json` requests only `["activeTab", "contextMenus", "downloads", "scripting", "storage"]`. No `<all_urls>` host permission is ever declared. `"downloads"` grants no page access: it is used exclusively to read the state of downloads the editor itself starts.
 - **Guaranteed Ephemeral Cleanup**: Temporary DOM highlights (`[data-snapmark-highlight]`) and temporary `visibility: hidden` overrides on `fixed`/`sticky` elements are always wrapped in `try / finally` blocks so the user's webpage is never left in a mutated state.
 - **Immediate Storage Purge**: IndexedDB capture records are deleted as soon as `editor.html` decodes the image into canvas memory, plus a startup sweep removes any orphaned records older than 15 minutes.
 - **Strict CSP**: `script-src 'self'; object-src 'self';` with zero external scripts, fonts, or telemetry endpoints.
@@ -117,7 +117,9 @@ Instead of pulling in heavy UI frameworks (React/Vue) or heavyweight canvas engi
 
 ## M07 download lifecycle — `editor-capture-improvements`
 
-The editor closes only on confirmed successful completion of its own PNG download; failure or cancellation leaves it open. Choose and document a Chromium-supported completion mechanism during implementation; if it needs the `downloads` permission, add and justify that minimal permission and update permission tests. Blob creation or an anchor click alone is not completion. Existing clipboard paste remains supported.
+The editor closes only on confirmed successful completion of its own PNG download; failure or cancellation leaves it open. Blob creation or an anchor click alone is not completion. Existing clipboard paste remains supported.
+
+**Resolved mechanism (M07):** the editor starts the export through `chrome.downloads.download()` and monitors `chrome.downloads.onChanged` for the `state` transition of that specific download id. `complete` closes the editor tab; `interrupted`, a cancellation or a failed `download()` call leaves the editor open with its annotations and an error message. This is why `"downloads"` is in the production permission list, and the permission tests assert the exact list. If the canvas changes while a download is in flight, or a drawing gesture is active, the editor does not close and asks the user to export again.
 
 ## 5. Key technical decisions
 

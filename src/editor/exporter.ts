@@ -55,13 +55,11 @@ export async function canvasToPngBlob(
         return blob;
       }
     } catch {
-      // Fallback below
+      throw new Error('Nie udało się przygotować obrazu PNG.');
     }
   }
 
-  return new Blob([`snapmark-png-${canvas.width}x${canvas.height}`], {
-    type: 'image/png',
-  });
+  throw new Error('Nie udało się przygotować obrazu PNG.');
 }
 
 /**
@@ -87,22 +85,34 @@ export async function exportFlattenedPngDownload(
   const blob = await canvasToPngBlob(canvas);
   const filename = metadata.filename;
 
-  if (
-    typeof document !== 'undefined' &&
-    typeof URL !== 'undefined' &&
-    typeof URL.createObjectURL === 'function'
-  ) {
-    const objectUrl = URL.createObjectURL(blob);
-    try {
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = objectUrl;
-      link.click();
-    } catch {
-      // Ignore link click errors in headless environments
-    } finally {
-      URL.revokeObjectURL(objectUrl);
-    }
+  if (typeof chrome === 'undefined' || !chrome.downloads?.download || !chrome.downloads.onChanged || !chrome.downloads.search || typeof URL.createObjectURL !== 'function') {
+    throw new Error('Pobieranie PNG jest niedostępne w tej przeglądarce.');
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  const earlyStates = new Map<number, 'complete' | 'interrupted'>();
+  let downloadId: number | undefined;
+  let resolveState!: (state: 'complete' | 'interrupted') => void;
+  const completed = new Promise<'complete' | 'interrupted'>((resolve) => { resolveState = resolve; });
+  const listener = (delta: chrome.downloads.DownloadDelta): void => {
+    const state = delta.state?.current;
+    if (state !== 'complete' && state !== 'interrupted') return;
+    if (downloadId === undefined) earlyStates.set(delta.id, state);
+    else if (delta.id === downloadId) resolveState(state);
+  };
+  chrome.downloads.onChanged.addListener(listener);
+  try {
+    downloadId = await chrome.downloads.download({ url: objectUrl, filename });
+    const early = earlyStates.get(downloadId);
+    if (early) resolveState(early);
+    const items = await chrome.downloads.search({ id: downloadId });
+    if (!items.length) throw new Error('Nie można potwierdzić stanu pobierania PNG.');
+    if (items[0].state === 'complete' || items[0].state === 'interrupted') resolveState(items[0].state);
+    const finalState = await completed;
+    if (finalState !== 'complete') throw new Error('Pobieranie PNG przerwano lub anulowano.');
+  } finally {
+    chrome.downloads.onChanged.removeListener(listener);
+    URL.revokeObjectURL(objectUrl);
   }
 
   return {

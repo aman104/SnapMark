@@ -29,6 +29,7 @@ describe('Task 001 & 010: Project scaffold and complete Manifest V3 package', ()
     expect(manifest.permissions).toEqual([
       'activeTab',
       'contextMenus',
+      'downloads',
       'scripting',
       'storage',
     ]);
