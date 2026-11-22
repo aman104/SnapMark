@@ -9,3 +9,7 @@ Typecheck, 112 tests and build passed. A delayed selection refresh can replace a
 ## Round 3 — changes requested — 2026-11-22
 
 Typecheck, 113 tests and build passed. Moving focus from textarea to a toolbar button with Tab commits text but leaves pending toolbar refresh unscheduled; undo/history controls can remain stale. Distinguish keyboard focus from a held pointer and add a keyboard regression test.
+
+## Round 4 — changes requested — 2026-11-22
+
+Typecheck, 114 tests and build passed. Right-click or double-click outside text can cancel pending toolbar refresh without rendering; preserve pending refresh for interactions that do not render.
