@@ -35,5 +35,4 @@ The E2E runner uses JSDOM and mocked Chrome APIs; the real extension and demo ha
 None recorded; review the feature plan against the actual implementation during acceptance.
 
 ## Operator decision
-- Accept M06 with `08-planning-tasks` after reviewing the demo.
-- Or request changes and describe what should be corrected.
+Accepted by the operator on 2026-11-22.
