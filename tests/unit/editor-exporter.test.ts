@@ -114,10 +114,45 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     const container = document.createElement('div');
     initEditor(container, { initialSearch: '?mode=viewport', onClose: close });
     container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')).not.toBeNull());
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nie udało się pobrać PNG'));
     expect(close).not.toHaveBeenCalled();
     expect(downloads.revoke).toHaveBeenCalledWith('blob:test');
     expect(downloads.removeListener).toHaveBeenCalledOnce();
+  });
+
+  it('preserves edits made while a download is pending and does not close', async () => {
+    const downloads = mockDownloads();
+    const close = vi.fn();
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport', onClose: close });
+    container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
+    await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
+    controller.setColor('#34C759');
+    downloads.emit(41, 'complete');
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nowe zmiany'));
+    expect(close).not.toHaveBeenCalled();
+    expect(controller.getState().annotations[0].color).toBe('#34C759');
+  });
+
+  it('retains the active text input and selection when a pending download fails', async () => {
+    const downloads = mockDownloads();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
+    await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
+    controller.setTool('text');
+    container.querySelector<HTMLCanvasElement>('#editor-canvas')!.dispatchEvent(new MouseEvent('mousedown', { clientX: 120, clientY: 85, button: 0, cancelable: true }));
+    const input = container.querySelector<HTMLTextAreaElement>('#active-text-input')!;
+    input.value = 'Tekst w trakcie';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.setSelectionRange(2, 6);
+    downloads.emit(41, 'interrupted');
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nie udało się pobrać PNG'));
+    expect(container.querySelector('#active-text-input')).toBe(input);
+    expect(document.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 6]);
+    container.remove();
   });
 
   it('writes image/png ClipboardItem to navigator.clipboard.write and triggers 2-second "✓ Skopiowano!" state', async () => {

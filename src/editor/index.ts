@@ -162,7 +162,7 @@ export function initEditor(
   let toolbarRefreshPending = false;
   let toolbarPointerDown = false;
   let downloadInProgress = false;
-  let downloadError: 'download' | 'close' | null = null;
+  let downloadError: 'download' | 'close' | 'changed' | null = null;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
@@ -651,12 +651,13 @@ export function initEditor(
         ${renderToolbarHtml()}
 
         <main class="editor-stage" id="editor-stage">
-          ${downloadError ? `<div class="status-banner is-danger" role="alert">${downloadError === 'close' ? 'PNG został pobrany, ale nie udało się zamknąć karty.' : 'Nie udało się pobrać PNG. Spróbuj ponownie.'}</div>` : ''}
+          <div id="download-status" class="status-banner is-danger" role="alert" hidden></div>
           ${renderStageHtml()}
         </main>
       </div>
     `;
 
+    syncDownloadUi();
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
       renderCanvasStage(
@@ -844,6 +845,19 @@ export function initEditor(
     notifyAndRender();
   }
 
+  function syncDownloadUi(): void {
+    const status = container.querySelector<HTMLElement>('#download-status');
+    if (status) {
+      status.hidden = downloadError === null;
+      status.textContent = downloadError === 'close'
+        ? 'PNG został pobrany, ale nie udało się zamknąć karty.'
+        : downloadError === 'changed'
+          ? 'PNG został pobrany. Nowe zmiany nie są w pliku — pobierz ponownie.'
+          : downloadError === 'download' ? 'Nie udało się pobrać PNG. Spróbuj ponownie.' : '';
+    }
+    container.querySelector<HTMLButtonElement>('#btn-download-png')?.setAttribute('aria-disabled', downloadInProgress || state.prototypeState === 'empty' ? 'true' : 'false');
+  }
+
   async function closeEditor(): Promise<void> {
     if (options.onClose) {
       options.onClose();
@@ -950,13 +964,18 @@ export function initEditor(
         }
         downloadInProgress = true;
         downloadError = null;
-        notifyAndRender();
+        const exportedState = JSON.stringify({ metadata: state.metadata, annotations: state.annotations });
+        syncDownloadUi();
         void exportFlattenedPngDownload(
           state.metadata,
           state.annotations,
           baseDrawable,
           placedFrameDrawables,
         ).then(async () => {
+          if (activeTextDraft || JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) !== exportedState) {
+            downloadError = 'changed';
+            return;
+          }
           try {
             await closeEditor();
           } catch {
@@ -966,7 +985,7 @@ export function initEditor(
           downloadError = 'download';
         }).finally(() => {
           downloadInProgress = false;
-          if (downloadError) notifyAndRender();
+          syncDownloadUi();
         });
       });
 
