@@ -125,6 +125,7 @@ export interface RuntimeCaptureRequest {
   type: 'SNAPMARK_TRIGGER_CAPTURE';
   mode: CaptureMode;
   srcUrl?: string;
+  interactiveArea?: boolean;
 }
 
 export interface CancelScrollCaptureRequest {

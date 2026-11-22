@@ -43,7 +43,9 @@ export function setupBackgroundListeners(): void {
     };
     const mode = commandMap[command];
     if (mode) {
-      void handleCaptureTrigger(mode, tab);
+      void handleCaptureTrigger(mode, tab, defaultCaptureRateLimiter, {
+        interactiveArea: mode === 'selection',
+      });
     }
   });
 
@@ -59,7 +61,13 @@ export function setupBackgroundListeners(): void {
         message.mode,
         sender.tab,
         defaultCaptureRateLimiter,
-        { srcUrl: message.srcUrl },
+        {
+          srcUrl: message.srcUrl,
+          interactiveArea:
+            message.mode === 'selection'
+              ? (message.interactiveArea ?? true)
+              : false,
+        },
       ).then((response) => {
         sendResponse(response);
       });
