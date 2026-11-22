@@ -94,16 +94,38 @@ try {
   assert.ok(topPixel[0] > 200 && topPixel[1] < 60, `first captured frame should show red page top: ${topPixel}`);
 
   const canvas = editor.locator('#editor-canvas');
-  const rect = await canvas.boundingBox();
-  assert.ok(rect);
   async function drag(x1, y1, x2, y2) {
+    const rect = await canvas.boundingBox();
+    assert.ok(rect);
     await editor.mouse.move(rect.x + x1, rect.y + y1); await editor.mouse.down();
     await editor.mouse.move(rect.x + x2, rect.y + y2, { steps: 4 }); await editor.mouse.up();
   }
+  async function sample(x, y) {
+    return await canvas.evaluate((element, point) => {
+      const scale = element.width / element.getBoundingClientRect().width;
+      return Array.from(element.getContext('2d').getImageData(Math.round(point.x * scale), Math.round(point.y * scale), 1, 1).data);
+    }, { x, y });
+  }
+  async function bluePixelsNear(x, y) {
+    return await canvas.evaluate((element, point) => {
+      const scale = element.width / element.getBoundingClientRect().width;
+      const size = Math.round(20 * scale);
+      const data = element.getContext('2d').getImageData(Math.round((point.x - 10) * scale), Math.round((point.y - 10) * scale), size, size).data;
+      let blue = 0;
+      for (let i = 0; i < data.length; i += 4) if (data[i] < 130 && data[i + 1] > 70 && data[i + 2] > 180) blue++;
+      return blue;
+    }, { x, y });
+  }
+  const arrowBefore = await sample(165, 125);
   await drag(70, 100, 260, 150);
+  assert.notDeepEqual(await sample(165, 125), arrowBefore, 'arrow must change pixels on its shaft');
   await editor.locator('#tool-line').click();
+  const lineBefore = await sample(170, 210);
   await drag(70, 210, 270, 210);
+  assert.notDeepEqual(await sample(170, 210), lineBefore, 'line must change pixels on its shaft');
+  assert.ok(await bluePixelsNear(270, 210) > 0, 'selected line must show a blue endpoint handle');
   await canvas.click({ position: { x: 25, y: 270 } });
+  assert.equal(await bluePixelsNear(270, 210), 0, 'empty click must remove the endpoint handle');
   await editor.locator('#tool-text').click();
   await canvas.click({ position: { x: 100, y: 300 } });
   const text = editor.locator('#active-text-input');
@@ -124,6 +146,12 @@ try {
   await editor.locator('#btn-download-png').click();
   await editor.locator('#download-status').filter({ hasText: 'Nie udało się pobrać PNG' }).waitFor({ state: 'visible' });
   assert.equal(editor.isClosed(), false, 'failed download must leave the editor open');
+  assert.notDeepEqual(await sample(165, 125), arrowBefore, 'arrow must survive download failure');
+  assert.notDeepEqual(await sample(170, 210), lineBefore, 'line must survive download failure');
+  await canvas.dblclick({ position: { x: 110, y: 310 } });
+  await editor.locator('#active-text-input').waitFor({ state: 'visible' });
+  assert.equal(await editor.locator('#active-text-input').inputValue(), 'Tekst poprawiony', 'text must survive download failure');
+  await editor.locator('#active-text-input').press('Enter');
   await editor.evaluate(() => { chrome.downloads.download = window.originalDownload; });
   const closed = editor.waitForEvent('close', { timeout: 15000 });
   await editor.locator('#btn-download-png').click();
@@ -133,6 +161,20 @@ try {
   assert.ok(finished, 'PNG completion must be recorded');
   const png = await fs.readFile(finished.filename);
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], 'download must be a PNG');
+  const exportedPixels = await source.evaluate(async (base64) => {
+    const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob());
+    const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+    const scale = image.width / 900;
+    const pixels = [[165, 125], [170, 210]].map(([x, y]) => Array.from(ctx.getImageData(Math.round(x * scale), Math.round(y * scale), 1, 1).data));
+    const textRegion = ctx.getImageData(Math.round(90 * scale), Math.round(290 * scale), Math.round(180 * scale), Math.round(60 * scale)).data;
+    let nonwhite = 0;
+    for (let i = 0; i < textRegion.length; i += 4) if (textRegion[i] < 200 || textRegion[i + 1] < 200 || textRegion[i + 2] < 200) nonwhite++;
+    return { pixels, nonwhite };
+  }, png.toString('base64'));
+  assert.notDeepEqual(exportedPixels.pixels[0], arrowBefore, 'exported PNG must contain the arrow');
+  assert.notDeepEqual(exportedPixels.pixels[1], lineBefore, 'exported PNG must contain the line');
+  assert.ok(exportedPixels.nonwhite > 50, 'exported PNG must contain the text annotation');
   console.log('[Chromium] Full-page top, scroll restoration, annotations, text edit and completed-download tab closure passed.');
 
   const viewport = await capture("document.querySelector('#btn-capture-viewport').click(); 'started'", 'viewport');

@@ -21,3 +21,6 @@
 
 ## Notes for next tasks
 - Operator demo should additionally check native PPM menu and keyboard shortcuts in a normal browser profile.
+
+## Review fixes
+- Assert actual canvas pixels for arrow and line, blue selection handles disappearing after deselection, and retained annotations/text after injected download error. Decode the downloaded PNG in Chromium and verify arrow, line and text pixels.
