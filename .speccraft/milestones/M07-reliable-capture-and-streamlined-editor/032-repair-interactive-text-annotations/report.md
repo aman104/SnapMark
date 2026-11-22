@@ -5,7 +5,7 @@
 - Added regression coverage for prevented default focus transfer, active textarea, input and commit; existing tests cover edit, move and undo.
 
 ## Verification
-- `npm run typecheck`, `npm test` (113 tests), `npm run build` passed.
+- `npm run typecheck`, `npm test` (114 tests), `npm run build` passed.
 - Actual extension reproduction remains unverified: isolated Chrome for Testing failed to open the test editor before timeout. The operator explicitly accepted proceeding without that test for this task. Full browser integration remains task 034.
 
 ## Deviations from the plan
@@ -24,3 +24,4 @@
 - Preserve canvas during double-click selection and defer toolbar refresh; cancel a pending refresh when another render or interaction starts.
 - Commit on toolbar blur without replacing the clicked button; added full mouse-sequence regressions for editing and download.
 - Round 2: defer pending selection refresh while a toolbar press is held, then refresh after the click/mouseup; synchronize history controls after text commit. Added regression tests for both sequences.
+- Round 3: distinguish keyboard focus from held pointer; after keyboard blur, refresh toolbar and restore focus to the corresponding control. Added focus and history regression coverage.

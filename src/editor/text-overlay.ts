@@ -12,7 +12,7 @@ export interface ActiveTextEditorDraft {
 
 export interface TextOverlayCallbacks {
   onInput: (text: string) => void;
-  onCommit: (text: string, preserveToolbar?: boolean) => void;
+  onCommit: (text: string, toolbarTarget?: Element | null) => void;
   onCancel: () => void;
 }
 
@@ -94,7 +94,7 @@ export function renderTextOverlayLayer(
     if (!settled) {
       settled = true;
       const target = event.relatedTarget;
-      callbacks.onCommit(textarea.value, target instanceof Element && !!target.closest('.editor-toolbar'));
+      callbacks.onCommit(textarea.value, target instanceof Element && target.closest('.editor-toolbar') ? target : null);
     }
   });
 

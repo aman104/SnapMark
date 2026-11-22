@@ -161,6 +161,7 @@ export function initEditor(
   let activeTextDraft: ActiveTextEditorDraft | null = null;
   let selectionRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   let toolbarRefreshPending = false;
+  let toolbarPointerDown = false;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
@@ -176,7 +177,7 @@ export function initEditor(
     syncHistoryState();
   }
 
-  function commitActiveTextDraft(overrideText?: string, preserveToolbar = false): void {
+  function commitActiveTextDraft(overrideText?: string, toolbarTarget: Element | null = null): void {
     if (!activeTextDraft) {
       return;
     }
@@ -235,11 +236,20 @@ export function initEditor(
       state.selectedAnnotationId = newText.id;
     }
 
-    if (preserveToolbar) {
+    if (toolbarTarget) {
       liveInput?.remove();
       redrawCanvasOnly();
       options.onStateChange?.(state);
       toolbarRefreshPending = true;
+      if (!toolbarPointerDown) {
+        const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button'));
+        const buttonIndex = buttons.indexOf(toolbarTarget.closest('button') as HTMLButtonElement);
+        queueMicrotask(() => {
+          if (!toolbarRefreshPending) return;
+          notifyAndRender();
+          if (buttonIndex >= 0) container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button')[buttonIndex]?.focus();
+        });
+      }
     } else {
       notifyAndRender();
     }
@@ -630,8 +640,8 @@ export function initEditor(
           activeTextDraft.text = text;
         }
       },
-      onCommit: (text, preserveToolbar) => {
-        commitActiveTextDraft(text, preserveToolbar);
+      onCommit: (text, toolbarTarget) => {
+        commitActiveTextDraft(text, toolbarTarget);
       },
       onCancel: () => {
         cancelActiveTextDraft();
@@ -804,12 +814,16 @@ export function initEditor(
       }, 0);
     };
     toolbar?.addEventListener('mousedown', () => {
+      toolbarPointerDown = true;
       if (selectionRefreshTimer !== undefined) {
         clearTimeout(selectionRefreshTimer);
         selectionRefreshTimer = undefined;
         toolbarRefreshPending = true;
       }
-      window.addEventListener('mouseup', scheduleToolbarRefresh, { once: true });
+      window.addEventListener('mouseup', () => {
+        toolbarPointerDown = false;
+        scheduleToolbarRefresh();
+      }, { once: true });
     });
     toolbar?.addEventListener('click', scheduleToolbarRefresh);
     container

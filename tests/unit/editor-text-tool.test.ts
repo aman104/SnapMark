@@ -80,6 +80,24 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     vi.useRealTimers();
     container.remove();
   });
+
+  it('updates toolbar state and retains keyboard focus when Tab leaves the text input', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    controller.setTool('text');
+    container.querySelector<HTMLCanvasElement>('#editor-canvas')!.dispatchEvent(new MouseEvent('mousedown', { clientX: 120, clientY: 85, button: 0, cancelable: true }));
+    const input = container.querySelector<HTMLTextAreaElement>('#active-text-input')!;
+    input.value = 'Tekst z klawiatury';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const historyBefore = controller.getState().historyStack.length;
+    container.querySelector<HTMLButtonElement>('#btn-download-png')!.focus();
+    await Promise.resolve();
+    expect(container.querySelector('#undo-count')?.textContent).toBe(String(historyBefore + 1));
+    expect(document.activeElement?.id).toBe('btn-download-png');
+    expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Tekst z klawiatury')).toBe(true);
+    container.remove();
+  });
   it('spawns #active-text-input on canvas click with Text tool, commits on Enter, and cancels on Escape', () => {
     const container = document.createElement('div');
     const controller = initEditor(container, { initialSearch: '?mode=viewport' });
