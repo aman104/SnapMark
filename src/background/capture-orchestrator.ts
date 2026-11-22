@@ -575,11 +575,20 @@ export async function captureFullPageScroll(
 
       }
 
-      const settledResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: settleFullPageScrollInDom,
-        args: [targetY],
-      });
+      let settleTimer: ReturnType<typeof setTimeout> | undefined;
+      const settledResults = await Promise.race([
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: settleFullPageScrollInDom,
+          args: [targetY],
+        }),
+        new Promise<never>((_, reject) => {
+          settleTimer = setTimeout(() => reject(new Error('Przekroczono czas oczekiwania na odświeżenie strony.')), 3000);
+        }),
+      ]).finally(() => clearTimeout(settleTimer));
+      if (activeScrollCaptureCancelled) {
+        throw new Error('Przechwytywanie całej strony zostało anulowane.');
+      }
       const settledY = settledResults?.[0]?.result;
       if (typeof settledY !== 'number') {
         throw new Error('Nie udało się potwierdzić pozycji przewijania strony.');

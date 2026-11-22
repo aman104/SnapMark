@@ -378,6 +378,33 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
     expect(restore).toHaveBeenCalledOnce();
   });
 
+  it('bounds a suspended page script in the service worker and restores the page', async () => {
+    vi.useFakeTimers();
+    const restore = vi.fn();
+    vi.stubGlobal('chrome', {
+      tabs: { captureVisibleTab: vi.fn() },
+      scripting: { executeScript: vi.fn((injection: { func: unknown }) => {
+        if (injection.func === prepareFullPageScrollInDom) return Promise.resolve([{ result: {
+          originalScrollX: 0, originalScrollY: 400, totalWidthCss: 100,
+          totalHeightCss: 200, viewportWidthCss: 100, viewportHeightCss: 100,
+          dpr: 1, frameOffsetsY: [0, 100], exceededMaxHeight: false,
+        } }]);
+        if (injection.func === settleFullPageScrollInDom) return new Promise(() => {});
+        if (injection.func === restoreFullPageScrollInDom) restore();
+        return Promise.resolve([]);
+      }) },
+    });
+    const capture = captureFullPageScroll(
+      { id: 1, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
+      new CaptureRateLimiter({ minIntervalMs: 0 }),
+    );
+    const assertion = expect(capture).rejects.toThrow('Przekroczono czas');
+    await vi.advanceTimersByTimeAsync(3000);
+    await assertion;
+    expect(restore).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
   it('aborts cleanly and restores DOM state when full-page scroll capture is cancelled mid-flight', async () => {
     let restored = false;
     const tabsCreateMock = vi.fn(async () => ({}));
