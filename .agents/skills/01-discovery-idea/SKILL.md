@@ -8,13 +8,15 @@ description: help the user brainstorm, refine, and describe a product idea. lead
 ## Repository layout
 
 - All paths are relative to the repository root. The workflow workspace is `.speccraft/`:
-  - `.speccraft/docs/` — product documents: `01-Idea.md`, `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports and feature plans
+  - `.speccraft/docs/` — product documents: `01-Idea.md` (with its roast `01-Idea-roast.md`), `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports and feature plans
   - `.speccraft/mockup/` — mockups, screenshots, sketches and other references supplied by the user (input only; ignore `.gitkeep`)
   - `.speccraft/milestones.md` — the ordered milestone plan with milestone statuses
   - `.speccraft/milestones/[Mnn]-[slug]/` — one folder per planned milestone: its `tasks.md` (task list with statuses), one `[NNN]-[slug]/` folder per task (`implementation-plan.md`, `report.md`, `review.md`, `blocker.md`), `milestone-report.md` and run summaries
   - `.speccraft/progress.md` — project memory shared by all tasks: commands, structure, conventions, decisions, log
+  - `.speccraft/autopilot.md` — autopilot settings, the operator's brief and the decisions the autopilot made in place of the operator
   - `.speccraft/.runs/` — logs of autonomous runs (git-ignored)
-  - `.speccraft/viewer/` — the local dashboard (`node .speccraft/viewer/server.mjs`); tooling, never modify it
+  - `.speccraft/viewer/` — SpecCraft Board, the local dashboard (`.speccraft/board`); tooling, never modify it
+  - `.speccraft/board` — starts SpecCraft Board; tooling, never modify it
 - The product itself lives directly in the repository root, laid out as defined in `.speccraft/docs/05-Tech-Stack.md` (source, tests, manifests and lockfiles, configuration, migrations, `.env.example`, `README.md`, CI such as `.github/workflows/`). It can be any kind of product: web or mobile app, API, backend service, CLI, library/SDK, browser extension, desktop app, game, data or ML pipeline, multi-package workspace, and so on.
 - If the repository already contains product code, treat it as the existing product: build on its structure and conventions instead of scaffolding a new one.
 - Keep workflow and product apart: no product code, dependencies or build output in `.speccraft/`, `.agents/` or `.claude/`, and no workflow documents in the product tree. Do not modify `.agents/` or `.claude/` unless the user asks. `AGENTS.md` and `CLAUDE.md` in the repository root are shared agent instructions: keep their SpecCraft section (between the `speccraft:start` / `speccraft:end` markers) intact and add product-specific instructions only below it.
@@ -76,6 +78,18 @@ When the user asks for an assessment, feedback, or stress-test of the idea:
 3. Present your observations to the user.
 4. Suggest specific changes to `.speccraft/docs/01-Idea.md`.
 5. After the user's approval — make the changes and update the change log.
+
+### Mode 4: Autonomous (from a brief)
+
+Used by the autopilot (`00-next` full autopilot or `autopilot.sh`), when the prompt says `AUTONOMOUS MODE`, or when the user asks to generate the idea without questions. The operator is not available, so nobody answers questions.
+
+1. Read the brief: `.speccraft/autopilot.md` → "Brief", or the brief given in the prompt. Also read `.speccraft/mockup` and, if the repository already contains product code, the codebase.
+2. Treat everything the brief states as fixed: the problem, the users, the type of product and any constraint (platform, stack, deadline, budget, "must have"). Never contradict it.
+3. Answer the probing questions below yourself. Where the brief gives no answer, choose the most plausible option for the stated users and product type, and keep v1 as small as possible while still delivering the core value.
+4. Fill in the template from `references/idea-template.md`. Mark every inference as "assumed" and list the consequential ones in "9. Risks and unknowns" with the status `open`.
+5. Save `.speccraft/docs/01-Idea.md` with the change-log entry "Autopilot: created from the brief".
+6. Add the 3–6 assumptions that most shape the product (target segment, core feature, platform, business model) to `.speccraft/autopilot.md` → "Decisions to review", one line each: `- YYYY-MM-DD · 01-discovery-idea · <assumption> — <why>`.
+7. Do not ask questions and do not run the roast; the autopilot runs it as the next step.
 
 ## Probing questions
 
