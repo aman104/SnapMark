@@ -74,7 +74,7 @@ describe('Task 016: Full-page scroll DOM controller & fixed/sticky header suppre
     );
   });
 
-  it('waits for two frames and rejects a scroll that did not reach the requested position', async () => {
+  it('waits for two frames and reports the actual scroll position', async () => {
     let callbacks = 0;
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callbacks += 1;
@@ -85,6 +85,19 @@ describe('Task 016: Full-page scroll DOM controller & fixed/sticky header suppre
     expect(callbacks).toBe(2);
     window.scrollTo(0, 0);
     await expect(settleFullPageScrollInDom()).resolves.toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('stops waiting when animation frames are suspended', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 42));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const result = settleFullPageScrollInDom();
+    const assertion = expect(result).rejects.toThrow('Przekroczono czas');
+    await vi.advanceTimersByTimeAsync(1500);
+    await assertion;
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(42);
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 

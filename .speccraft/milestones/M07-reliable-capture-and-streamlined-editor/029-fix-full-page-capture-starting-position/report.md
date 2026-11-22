@@ -5,8 +5,8 @@
 - Restore the original scroll position while smooth scrolling remains disabled; then remove the temporary style.
 
 ## Verification
-- `npm run typecheck`, `npm test` (99 passed), `npm run build` passed.
-- Isolated headless Chrome fixture, using bundled production DOM helpers on a smooth-scroll page: start at 800px, prepared position 0px, restored position 800px. This checks the browser DOM helpers, not the complete extension capture path.
+- `npm run typecheck`, `npm test` (101 passed), `npm run build` passed.
+- Isolated headless Chrome fixture before the timeout adjustment, using bundled production DOM helpers on a smooth-scroll page: start at 800px, prepared position 0px, restored position 800px. This checks the browser DOM helpers, not the complete extension capture path.
 - Unit tests verify ordering, stale immediate measurements, first-frame rejection, and cleanup.
 
 ## Deviations from the plan
@@ -20,3 +20,6 @@
 
 ## Notes for next tasks
 - Task 034 must verify the complete extension capture path in Chrome, including cancellation and errors.
+
+## Review fixes
+- Bound animation-frame waiting to 1.5 seconds; added tests for suspended frames and cleanup after cancellation. A subsequent Chrome headless virtual-time attempt did not produce a completed fixture result; full extension verification remains outstanding.

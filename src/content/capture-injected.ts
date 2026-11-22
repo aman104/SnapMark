@@ -601,7 +601,19 @@ export function stepFullPageScrollInDom(targetScrollY: number): {
 
 /** Wait for scroll position and paint before a frame is captured. */
 export async function settleFullPageScrollInDom(_targetScrollY?: number): Promise<number> {
-  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  await new Promise<void>((resolve, reject) => {
+    let frame = 0;
+    const timer = setTimeout(() => {
+      cancelAnimationFrame(frame);
+      reject(new Error('Przekroczono czas oczekiwania na odświeżenie strony.'));
+    }, 1500);
+    frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  });
   return Math.round(window.scrollY || window.pageYOffset || document.documentElement?.scrollTop || 0);
 }
 

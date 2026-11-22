@@ -353,6 +353,31 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
     expect(restore).toHaveBeenCalledOnce();
   });
 
+  it('restores the page when settling times out after cancellation', async () => {
+    const restore = vi.fn();
+    vi.stubGlobal('chrome', {
+      tabs: { captureVisibleTab: vi.fn() },
+      scripting: { executeScript: vi.fn(async (injection: { func: unknown }) => {
+        if (injection.func === prepareFullPageScrollInDom) return [{ result: {
+          originalScrollX: 0, originalScrollY: 400, totalWidthCss: 100,
+          totalHeightCss: 200, viewportWidthCss: 100, viewportHeightCss: 100,
+          dpr: 1, frameOffsetsY: [0, 100], exceededMaxHeight: false,
+        } }];
+        if (injection.func === settleFullPageScrollInDom) {
+          cancelActiveScrollCapture();
+          throw new Error('Przekroczono czas');
+        }
+        if (injection.func === restoreFullPageScrollInDom) restore();
+        return [];
+      }) },
+    });
+    await expect(captureFullPageScroll(
+      { id: 1, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
+      new CaptureRateLimiter({ minIntervalMs: 0 }),
+    )).rejects.toThrow('Przekroczono czas');
+    expect(restore).toHaveBeenCalledOnce();
+  });
+
   it('aborts cleanly and restores DOM state when full-page scroll capture is cancelled mid-flight', async () => {
     let restored = false;
     const tabsCreateMock = vi.fn(async () => ({}));
