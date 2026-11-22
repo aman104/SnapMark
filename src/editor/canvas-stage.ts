@@ -8,7 +8,7 @@ import type {
   MockCaptureMetadata,
   TextAnnotation,
 } from '../shared/types';
-import { hitTestAnnotationBody } from './vector-engine';
+import { getArrowheadDimensions, hitTestAnnotationBody } from './vector-engine';
 
 export interface FramePlacementPlan {
   frameIndex: number;
@@ -206,8 +206,7 @@ export function drawArrowAnnotation(
   const { x1, y1, x2, y2, color, strokeWidth } = item;
   const angle = Math.atan2(y2 - y1, x2 - x1);
   const length = Math.hypot(x2 - x1, y2 - y1);
-  const headLength = Math.min(length, Math.max(16, strokeWidth * 4));
-  const halfWidth = headLength * 0.45;
+  const { length: headLength, halfWidth } = getArrowheadDimensions(length, strokeWidth);
   const baseX = x2 - headLength * Math.cos(angle);
   const baseY = y2 - headLength * Math.sin(angle);
 

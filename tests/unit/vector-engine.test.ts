@@ -83,6 +83,14 @@ describe('Vector Engine Geometry, Hit-Testing, Shift Lock & UndoHistoryStack (Ta
     expect(hitTestAnnotationBody(items, 20, 20)).toBeNull();
   });
 
+  it('selects the visible wing of a thick arrowhead in both directions', () => {
+    const right: ArrowAnnotation = { ...sampleArrow, x1: 0, y1: 100, x2: 100, y2: 100, strokeWidth: 8 };
+    const left: ArrowAnnotation = { ...right, x1: 100, x2: 0 };
+    expect(hitTestAnnotationBody([right], 70, 112)).toBe(right);
+    expect(hitTestAnnotationBody([left], 30, 112)).toBe(left);
+    expect(hitTestAnnotationBody([right], 70, 120)).toBeNull();
+  });
+
   it('updates arrow or line endpoints with optional Shift horizontal lock and translates items by delta', () => {
     const movedTip = updateAnnotationEndpoint(
       sampleArrow,

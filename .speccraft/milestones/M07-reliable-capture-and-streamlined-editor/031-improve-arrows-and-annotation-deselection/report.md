@@ -6,7 +6,7 @@
 - Added unit coverage for arrow geometry in both directions and short arrows, deselection, reselection and drawing.
 
 ## Verification
-- `npm run typecheck`, `npm test` (108 tests), `npm run build`, and `npm run test:e2e` (4 simulated tests) passed.
+- `npm run typecheck`, `npm test` (109 tests), `npm run build`, `npm run test:e2e` (4 simulated tests), and `npm run package` passed.
 - Inspected the built editor prototype in Chrome for Testing; full extension browser workflow remains in task 034.
 
 ## Deviations from the plan
@@ -20,3 +20,7 @@
 
 ## Notes for next tasks
 - Text tool remains task 032. End-to-end real extension verification remains task 034.
+
+## Review fixes
+- Shared arrowhead dimensions between renderer and hit testing; clicking the visible wing of a thick arrow now selects it in both directions.
+- Chrome for Testing rendered and PNG-encoded a Retina arrow; decoded pixels confirmed red shaft and wing with the expected 400×200 dimensions.
