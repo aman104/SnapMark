@@ -1,6 +1,6 @@
 # M07 - Feature: Reliable capture and streamlined editor
 
-[~] 029 - Fix full-page capture starting position - Reproduce capture from mid-page including smooth scrolling and ensure the first rendered frame is captured at the actual page top, as required by PRD FR-01. Preserve accurate subsequent frame positions and restore original position and styles on success, failure and cancellation. Add regression coverage and a real Chromium verification.
+[ ] 029 - Fix full-page capture starting position - Reproduce capture from mid-page including smooth scrolling and ensure the first rendered frame is captured at the actual page top, as required by PRD FR-01. Preserve accurate subsequent frame positions and restore original position and styles on success, failure and cancellation. Add regression coverage and a real Chromium verification.
 
 [ ] 030 - Simplify editor toolbar and add close action - Implement PRD FR-02 and FR-07 with a compact responsive toolbar without filename, dimensions or clipboard export. Retain automatic PNG names, clipboard paste and annotation controls; add an accessible editor-tab close button. Verify layout, actions and existing editor states.
 

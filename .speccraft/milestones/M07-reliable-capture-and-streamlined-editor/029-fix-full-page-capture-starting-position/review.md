@@ -5,3 +5,7 @@
 | # | Severity | Where | Problem | Expected fix |
 |---|---|---|---|---|
 | 1 | blocking | `src/content/capture-injected.ts` | Animation frames can be suspended in background tabs, leaving capture and cleanup pending indefinitely. | Bound waiting time and verify cleanup/cancellation when frames are unavailable. |
+
+## Round 2 — changes requested — 2026-11-22
+
+Typecheck, 101 tests and build passed. Page timers can freeze with animation frames; bound the wait independently in the service worker and cover cleanup. Real extension capture and restore remain unverified in Chromium.
