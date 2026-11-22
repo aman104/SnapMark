@@ -51,7 +51,7 @@
 - none
 
 ## Blocked
-- none
+- [032] Toolbar focus can be lost after text commit — see task 032 blocker.md
 
 ## Log
 - [001] [x] 2026-11-21 — Scaffolded TypeScript 5, Vite multi-entry build, Vitest JSDOM test runner, and Manifest V3 baseline.
@@ -101,3 +101,4 @@
 - [031] [x] 2026-11-22 — Improved arrowhead rendering, hit testing and click-to-deselect.
 - [032] [!] 2026-11-22 — Third review found stale toolbar state after keyboard focus transition.
 - [032] [ ] 2026-11-22 — Operator authorized another fix round.
+- [032] [!] 2026-11-22 — Third review after resumption found focus loss after toolbar text commit.

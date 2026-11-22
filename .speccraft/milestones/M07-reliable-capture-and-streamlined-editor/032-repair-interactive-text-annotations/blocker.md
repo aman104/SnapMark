@@ -1,16 +1,16 @@
 # Task 032 blocked: Repair interactive text annotations
 
 ## Reason
-Third independent review found that Tab from the text field to the toolbar commits text but leaves toolbar history and undo state stale.
+The third review after the operator resumed the task found that a toolbar-triggered text commit can lose focus when its delayed full render replaces the focused button.
 
 ## What was tried
-Fixed focus theft, real double-click event sequencing, toolbar pointer click preservation and delayed toolbar refresh. Three review rounds; typecheck, 113 unit tests and build pass, but keyboard focus transition remains incomplete.
+Fixed text-input focus, double-click target stability, pointer-held toolbar actions, keyboard Tab refresh, and selection refresh without replacing canvas. Typecheck, 116 unit tests and build pass, but toolbar-triggered commit can still lose keyboard focus.
 
 ## What is needed
-Authorize another fix round by changing task 032 from `[!]` to `[ ]` or telling the agent to unblock it; then update keyboard focus handling and add a regression test. Existing work is preserved on the task branch.
+Authorize another fix round by telling the agent to unblock task 032 or changing `[!]` to `[ ]`; preserve focus on the toolbar after text commit and add a complete interaction regression test.
 
 ## Impact
-Tasks 033 and 034 depend on this task and cannot proceed in the current sequence.
+Tasks 033 and 034 depend on this task and await its completion.
 
 ## How to resume
-Change 032 to `[ ]` or tell the agent to unblock it, then resume `10-execution-tasks`; the task branch is `task/032-repair-interactive-text-annotations`.
+Unblock task 032 and resume `10-execution-tasks`; work is on `task/032-repair-interactive-text-annotations`.
