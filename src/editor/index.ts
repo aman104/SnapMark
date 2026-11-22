@@ -159,7 +159,6 @@ export function initEditor(
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
-  let selectionRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   let toolbarRefreshPending = false;
   let toolbarPointerDown = false;
   let lastProcessedMoveEvent: MouseEvent | null = null;
@@ -306,8 +305,6 @@ export function initEditor(
   }
 
   function notifyAndRender(): void {
-    clearTimeout(selectionRefreshTimer);
-    selectionRefreshTimer = undefined;
     toolbarRefreshPending = false;
     render();
     options.onStateChange?.(state);
@@ -476,13 +473,11 @@ export function initEditor(
     `;
   }
 
-  function render(): void {
+  function renderToolbarHtml(): string {
     const canUndo = state.historyStack.length > 0;
     const hasSelection = state.selectedAnnotationId !== null;
     const isEmptyState = state.prototypeState === 'empty';
-
-    container.innerHTML = `
-      <div class="editor-shell" data-editor-state="${state.prototypeState}" data-capture-mode="${state.captureMode}">
+    return `
         <header class="editor-toolbar" role="toolbar" aria-label="Pasek narzędzi edytora SnapMark">
           <div class="toolbar-left-group">
             <!-- Cluster 1: Brand & Capture Metadata -->
@@ -612,6 +607,33 @@ export function initEditor(
             </div>
           </div>
         </header>
+    `;
+  }
+
+  function refreshToolbarOnly(): void {
+    const oldToolbar = container.querySelector<HTMLElement>('.editor-toolbar');
+    if (!oldToolbar) return;
+    const focused = document.activeElement;
+    const buttons = Array.from(oldToolbar.querySelectorAll<HTMLButtonElement>('button'));
+    const focusIndex = focused instanceof HTMLButtonElement ? buttons.indexOf(focused) : -1;
+    const focusId = focusIndex >= 0 && focused instanceof HTMLButtonElement ? focused.id : '';
+    const template = document.createElement('template');
+    template.innerHTML = renderToolbarHtml().trim();
+    const replacement = template.content.firstElementChild;
+    if (!replacement) return;
+    oldToolbar.replaceWith(replacement);
+    bindToolbarAndStageEvents(true);
+    if (focusIndex >= 0) {
+      const replacementButtons = Array.from(replacement.querySelectorAll<HTMLButtonElement>('button'));
+      (replacementButtons.find((button) => focusId && button.id === focusId) ?? replacementButtons[focusIndex])?.focus();
+    }
+    options.onStateChange?.(state);
+  }
+
+  function render(): void {
+    container.innerHTML = `
+      <div class="editor-shell" data-editor-state="${state.prototypeState}" data-capture-mode="${state.captureMode}">
+        ${renderToolbarHtml()}
 
         <main class="editor-stage" id="editor-stage">
           ${renderStageHtml()}
@@ -806,7 +828,7 @@ export function initEditor(
     notifyAndRender();
   }
 
-  function bindToolbarAndStageEvents(): void {
+  function bindToolbarAndStageEvents(toolbarOnly = false): void {
     const toolbar = container.querySelector<HTMLElement>('.editor-toolbar');
     const scheduleToolbarRefresh = (): void => {
       setTimeout(() => {
@@ -815,11 +837,6 @@ export function initEditor(
     };
     toolbar?.addEventListener('mousedown', () => {
       toolbarPointerDown = true;
-      if (selectionRefreshTimer !== undefined) {
-        clearTimeout(selectionRefreshTimer);
-        selectionRefreshTimer = undefined;
-        toolbarRefreshPending = true;
-      }
       window.addEventListener('mouseup', () => {
         toolbarPointerDown = false;
         scheduleToolbarRefresh();
@@ -920,6 +937,8 @@ export function initEditor(
       }
     });
 
+    if (toolbarOnly) return;
+
     container
       .querySelector<HTMLButtonElement>('#btn-paste-clipboard')
       ?.addEventListener('click', () => {
@@ -1004,7 +1023,6 @@ export function initEditor(
     const pt = getCanvasCssPoint(canvas, event);
     const hit = hitTestAnnotations(state.annotations, pt.x, pt.y);
     if (hit && hit.type === 'text') {
-      clearTimeout(selectionRefreshTimer);
       if (activeTextDraft) {
         commitActiveTextDraft();
       }
@@ -1043,7 +1061,6 @@ export function initEditor(
     if (event.button !== 0) {
       return;
     }
-    clearTimeout(selectionRefreshTimer);
     if (activeTextDraft) {
       commitActiveTextDraft();
       return;
@@ -1255,8 +1272,8 @@ export function initEditor(
     }
     activeInteraction = null;
     if (isUnmovedSelection) {
-      // Keep the same canvas through the browser's double-click sequence.
-      selectionRefreshTimer = setTimeout(() => notifyAndRender(), 600);
+      // Update selection controls without replacing the canvas between clicks.
+      refreshToolbarOnly();
     } else {
       notifyAndRender();
     }
