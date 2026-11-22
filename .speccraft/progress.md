@@ -31,10 +31,10 @@
 - **Conventions:**
   - Zero runtime dependencies (`dependencies` omitted); strict TypeScript (`strict: true`, `noUnusedLocals: true`).
   - Zero external network calls (no Google Fonts or remote icon CDNs).
-  - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "scripting", "storage"]`.
+  - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "downloads", "scripting", "storage"]` (`downloads` added in M07 only to observe the editor's own PNG download state).
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, active milestone branch `milestone/M07-reliable-capture-and-streamlined-editor`
+- **Git:** base branch `main`, no active milestone branch (M07 merged into `main` on 2026-11-22)
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
@@ -43,7 +43,7 @@
 - [M04] `[x]` accepted (2026-11-21) — Complete features: Vector annotation editor, undo history and export (4/4 tasks done)
 - [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
 - [M06] `[x]` accepted — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (3/3 tasks done)
-- [M07] `[?]` awaiting review — reliable capture and streamlined editor (6/6 tasks done)
+- [M07] `[x]` accepted (2026-11-22) — Feature: Reliable capture and streamlined editor (6/6 tasks done). All planned milestones are accepted; further work needs a new milestone from `12-feature-advisor`.
 
 ## Decisions and deviations
 - none
@@ -110,3 +110,4 @@
 - [033] [x] 2026-11-22 — Confirmed PNG downloads and protected edits during editor closure.
 - [034] [x] 2026-11-22 — Added and independently verified real Chromium extension workflow and package checks.
 - [M07] [?] 2026-11-22 — Ready for operator review; real Chromium workflow passed with documented limitations.
+- [M07] [x] 2026-11-22 — Accepted by operator (`--accept M07`), spec changes applied to `02-General-PRD.md`, `04-Interface-spec.md` and `05-Tech-Stack.md`, merged into main. Roadmap complete: no `[ ]` milestone left to plan.

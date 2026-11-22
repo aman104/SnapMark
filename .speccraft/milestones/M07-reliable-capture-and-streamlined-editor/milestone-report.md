@@ -51,7 +51,10 @@ None. The operator allowed task-level Chrome testing of 029 and 032 to be deferr
 Review the native browser menu, shortcuts, system clipboard and real interrupted-download behavior on the target platform.
 
 ## Operator decision
-- [ ] Accept M07 using `08-planning-tasks`.
+- [x] **Accepted on 2026-11-22.** The operator reviewed the milestone and started the autopilot with `--accept M07`.
 - [ ] Request changes and describe them in feedback.
 
+All three "Spec changes" rows were applied to `.speccraft/docs/` on acceptance (`02-General-PRD.md` §4.6 FR-06 and §6.2, `04-Interface-spec.md` §5.2, `05-Tech-Stack.md` §2, §4.3 and the M07 download lifecycle section). The milestone was merged into `main`.
+
 ### Feedback
+None. M07 is the last milestone of the plan; the recommendations above (native browser menu, shortcuts, system clipboard and real interrupted downloads on the target platform) remain open for a future milestone, to be created with `12-feature-advisor`.
