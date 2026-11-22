@@ -340,15 +340,8 @@ describe('SnapMark Chrome Extension Manifest V3 — End-to-End Suite (tests/e2e/
     );
     expect(editor.getState().annotations).toHaveLength(2);
 
-    // 8. Export to clipboard ("✓ Skopiowano!") and download flattened PNG
-    editorRoot.querySelector<HTMLButtonElement>('#btn-copy-clipboard')?.click();
-    await Promise.resolve();
-    expect(editor.getState().copySuccess).toBe(true);
-    expect(
-      editorRoot.querySelector('#btn-copy-clipboard')?.textContent,
-    ).toContain('✓ Skopiowano!');
-    expect(clipboardWriteMock).toHaveBeenCalledTimes(1);
-
+    // 8. Download flattened PNG; clipboard export is absent from the toolbar.
+    expect(editorRoot.querySelector('#btn-copy-clipboard')).toBeNull();
     editorRoot.querySelector<HTMLButtonElement>('#btn-download-png')?.click();
     expect(downloadedFiles).toHaveLength(1);
     expect(downloadedFiles[0]).toMatch(

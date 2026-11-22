@@ -18,15 +18,16 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  height: 56px;
+  min-height: 56px;
   flex-shrink: 0;
-  padding: 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
   background-color: var(--color-surface-1);
   border-bottom: 1px solid var(--color-hairline);
   box-shadow: var(--shadow-md);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-md);
 }
 
@@ -50,41 +51,41 @@
   gap: var(--space-md);
 }
 
+.toolbar-right-group {
+  max-width: 100%;
+}
+
+.toolbar-right-group .toolbar-cluster {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .editor-toolbar .brand-title,
+  .shift-hint-pill {
+    display: none;
+  }
+  .toolbar-center-group {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .toolbar-right-group {
+    width: 100%;
+    min-width: 0;
+  }
+  .toolbar-right-group .toolbar-cluster {
+    flex: 1;
+    min-width: 0;
+  }
+  #btn-undo > span {
+    display: none;
+  }
+}
+
 .toolbar-divider {
   width: 1px;
   height: 24px;
   background-color: var(--color-hairline);
   flex-shrink: 0;
-}
-
-/* Cluster 1: Metadata Pill */
-.capture-meta-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 4px 10px;
-  background-color: var(--color-surface-2);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
-  min-width: 0;
-}
-
-.meta-filename {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.meta-dimensions {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-ink-muted);
-  white-space: nowrap;
 }
 
 /* Cluster 3: Shift Hint Badge & Undo Counter */
@@ -245,7 +246,11 @@
     display: none;
   }
 
-  .meta-filename {
-    max-width: 160px;
+  .editor-toolbar .toolbar-tool-btn > span {
+    display: none;
+  }
+
+  .toolbar-left-group, .toolbar-center-group, .toolbar-right-group {
+    flex-shrink: 0;
   }
 }

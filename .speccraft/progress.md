@@ -97,3 +97,4 @@
 - [M06] [x] 2026-11-22 — Accepted by operator and merged into main.
 
 - [029] [x] 2026-11-22 — Stabilized full-page scroll capture; operator waived task-level real-extension verification.
+- [030] [x] 2026-11-22 — Simplified editor toolbar, added accessible close and responsive action layout.

@@ -63,14 +63,6 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     expect(blob.type).toBe('image/png');
     expect(clipboardWriteMock).toHaveBeenCalledTimes(1);
 
-    // Clicking #btn-copy-clipboard in UI also invokes navigator.clipboard.write and shows "✓ Skopiowano!"
-    container
-      .querySelector<HTMLButtonElement>('#btn-copy-clipboard')
-      ?.click();
 
-    expect(controller.getState().copySuccess).toBe(true);
-    expect(
-      container.querySelector('#btn-copy-clipboard')?.textContent,
-    ).toContain('✓ Skopiowano!');
   });
 });

@@ -60,13 +60,9 @@ describe('Task 013: Editor IndexedDB Blob consumption, immediate purge, and sett
     });
     await controller.ready;
 
-    // Cluster 1 shows the formatted filename and Retina dimensions
-    expect(container.querySelector('#meta-filename')?.textContent?.trim()).toBe(
-      'example-com_2026-11-21_14-10.png',
-    );
-    expect(
-      container.querySelector('#meta-dimensions')?.textContent?.trim(),
-    ).toBe('1440×900 • @2x');
+    // Filename remains available for export without occupying the toolbar.
+    expect(controller.getState().metadata.filename).toBe('example-com_2026-11-21_14-10.png');
+    expect(container.querySelector('#meta-filename')).toBeNull();
 
     // Canvas is sized to physical pixels (2880x1800) with CSS display 1440x900
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
