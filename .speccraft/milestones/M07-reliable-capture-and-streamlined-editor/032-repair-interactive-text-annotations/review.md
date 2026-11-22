@@ -17,3 +17,7 @@ Typecheck, 114 tests and build passed. Right-click or double-click outside text 
 ## Round 5 — changes requested — 2026-11-22
 
 Typecheck, 115 tests and build passed. Delayed selection refresh may replace a keyboard-focused toolbar control, and arbitrary timing may interrupt double-click. Refresh toolbar without replacing canvas or losing focus.
+
+## Round 6 — changes requested — 2026-11-22
+
+Typecheck, 116 tests and build passed. After a text commit via toolbar, delayed full render can remove the focused button without restoring focus. Refresh the toolbar while preserving focus and test the complete mouse/keyboard sequence.
