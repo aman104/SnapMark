@@ -599,6 +599,16 @@ export function stepFullPageScrollInDom(targetScrollY: number): {
   };
 }
 
+/** Wait for scroll position and paint before a frame is captured. */
+export async function settleFullPageScrollInDom(targetScrollY: number): Promise<number> {
+  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  const actual = Math.round(window.scrollY || window.pageYOffset || document.documentElement?.scrollTop || 0);
+  if (Math.abs(actual - targetScrollY) > 1) {
+    throw new Error(`Nie udało się przewinąć strony do pozycji ${targetScrollY} (aktualnie ${actual}).`);
+  }
+  return actual;
+}
+
 /**
  * Self-contained DOM cleanup function guaranteed to run in a finally block after Full-Page Scroll Capture.
  * Restores all hidden fixed/sticky elements, removes scrollbar suppression styles, and restores original scrollX/scrollY.
@@ -631,10 +641,6 @@ export function restoreFullPageScrollInDom(
     el.removeAttribute('data-snapmark-orig-visibility-priority');
   });
 
-  document
-    .querySelectorAll('[data-snapmark-scroll-style]')
-    .forEach((node) => node.remove());
-
   const docEl = document.documentElement;
   const fallbackX = Number(
     docEl?.getAttribute('data-snapmark-orig-scroll-x') ?? 0,
@@ -662,6 +668,9 @@ export function restoreFullPageScrollInDom(
   if (typeof window.scrollTo === 'function') {
     window.scrollTo(restoreX, restoreY);
   }
+  document
+    .querySelectorAll('[data-snapmark-scroll-style]')
+    .forEach((node) => node.remove());
 }
 
 export interface AreaSelectionMeasurementResult {

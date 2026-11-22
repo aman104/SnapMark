@@ -8,6 +8,7 @@ import {
   measureTargetImageInDom,
   prepareFullPageScrollInDom,
   restoreFullPageScrollInDom,
+  settleFullPageScrollInDom,
   selectAreaOverlayInDom,
   type SelectionMeasurementResult,
   stepFullPageScrollInDom,
@@ -578,6 +579,16 @@ export async function captureFullPageScroll(
         }
       }
 
+      const settledResults = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: settleFullPageScrollInDom,
+        args: [targetY],
+      });
+      const settledY = settledResults?.[0]?.result;
+      if (typeof settledY !== 'number' || Math.abs(settledY - targetY) > 1) {
+        throw new Error('Nie udało się potwierdzić pozycji przewijania strony.');
+      }
+      actualScrollY = settledY;
       lastActualScrollY = actualScrollY;
 
       const dataUrl = await rateLimiter.schedule(async () => {

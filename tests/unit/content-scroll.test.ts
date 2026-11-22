@@ -4,6 +4,7 @@ import {
   hideFixedAndStickyElementsInDom,
   prepareFullPageScrollInDom,
   restoreFullPageScrollInDom,
+  settleFullPageScrollInDom,
   stepFullPageScrollInDom,
 } from '../../src/content/capture-injected';
 
@@ -71,6 +72,20 @@ describe('Task 016: Full-page scroll DOM controller & fixed/sticky header suppre
     expect(capped.frameOffsetsY[capped.frameOffsetsY.length - 1]).toBe(
       8192 - 900,
     );
+  });
+
+  it('waits for two frames and rejects a scroll that did not reach the requested position', async () => {
+    let callbacks = 0;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks += 1;
+      queueMicrotask(() => callback(0));
+      return callbacks;
+    });
+    await expect(settleFullPageScrollInDom(0)).rejects.toThrow('Nie udało się przewinąć');
+    expect(callbacks).toBe(2);
+    window.scrollTo(0, 0);
+    await expect(settleFullPageScrollInDom(0)).resolves.toBe(0);
+    vi.unstubAllGlobals();
   });
 
   it('prepares Frame #1 at (0, 0) while keeping fixed/sticky headers visible, then hides them for Frame #2+ and restores everything in finally', () => {
