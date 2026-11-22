@@ -545,6 +545,7 @@ export function initEditor(
               <button
                 type="button"
                 id="btn-undo"
+                aria-label="Cofnij ostatnią zmianę"
                 class="btn-secondary"
                 ${canUndo ? '' : 'disabled'}
                 title="Cofnij ostatnią zmianę (Ctrl+Z)"

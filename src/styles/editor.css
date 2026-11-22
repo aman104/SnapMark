@@ -51,6 +51,14 @@
   gap: var(--space-md);
 }
 
+.toolbar-right-group {
+  max-width: 100%;
+}
+
+.toolbar-right-group .toolbar-cluster {
+  flex-wrap: wrap;
+}
+
 @media (max-width: 600px) {
   .editor-toolbar .brand-title,
   .shift-hint-pill {
@@ -59,6 +67,17 @@
   .toolbar-center-group {
     max-width: 100%;
     overflow-x: auto;
+  }
+  .toolbar-right-group {
+    width: 100%;
+    min-width: 0;
+  }
+  .toolbar-right-group .toolbar-cluster {
+    flex: 1;
+    min-width: 0;
+  }
+  #btn-undo > span {
+    display: none;
   }
 }
 

@@ -20,3 +20,6 @@
 
 ## Notes for next tasks
 - Task 033 owns closing after successful download; task 034 verifies the integrated extension in real Chromium.
+
+## Review fixes
+- Wrap the action group and compact undo at narrow widths; verified close and PNG controls are visible in Chrome for Testing at 320 px.
