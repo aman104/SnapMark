@@ -5,3 +5,7 @@ Typecheck, 122 tests and build passed. Edits during a pending download may be lo
 ## Round 2 — changes requested — 2026-11-22
 
 Typecheck, 124 tests and build passed. Edits can occur while waiting for chrome.tabs.getCurrent after download completion; recheck directly before tab removal and test delayed lookup.
+
+## Round 3 — changes requested — 2026-11-22
+
+Typecheck, 125 tests and build passed. After the final check, editing is still possible while chrome.tabs.remove is pending; active drawing before creation is also not checked. Block editing during closure, restore it on failure, and test delayed removal and active drawing.
