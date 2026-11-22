@@ -4,6 +4,7 @@ import {
   hideFixedAndStickyElementsInDom,
   prepareFullPageScrollInDom,
   restoreFullPageScrollInDom,
+  settleFullPageScrollInDom,
   stepFullPageScrollInDom,
 } from '../../src/content/capture-injected';
 
@@ -71,6 +72,33 @@ describe('Task 016: Full-page scroll DOM controller & fixed/sticky header suppre
     expect(capped.frameOffsetsY[capped.frameOffsetsY.length - 1]).toBe(
       8192 - 900,
     );
+  });
+
+  it('waits for two frames and reports the actual scroll position', async () => {
+    let callbacks = 0;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks += 1;
+      queueMicrotask(() => callback(0));
+      return callbacks;
+    });
+    await expect(settleFullPageScrollInDom()).resolves.toBe(320);
+    expect(callbacks).toBe(2);
+    window.scrollTo(0, 0);
+    await expect(settleFullPageScrollInDom()).resolves.toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('stops waiting when animation frames are suspended', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 42));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const result = settleFullPageScrollInDom();
+    const assertion = expect(result).rejects.toThrow('Przekroczono czas');
+    await vi.advanceTimersByTimeAsync(1500);
+    await assertion;
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(42);
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it('prepares Frame #1 at (0, 0) while keeping fixed/sticky headers visible, then hides them for Frame #2+ and restores everything in finally', () => {

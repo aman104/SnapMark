@@ -15,6 +15,7 @@ import {
   measureTargetImageInDom,
   prepareFullPageScrollInDom,
   restoreFullPageScrollInDom,
+  settleFullPageScrollInDom,
   stepFullPageScrollInDom,
 } from '../../src/content/capture-injected';
 import {
@@ -234,13 +235,19 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
           stepLog.push('hideFixedSticky');
           return [{ result: 2 }];
         }
+        if (injection.func === settleFullPageScrollInDom) {
+          const targetY = Number(injection.args?.[0] ?? 0);
+          stepLog.push(`settle:${targetY}`);
+          return [{ result: targetY }];
+        }
         if (injection.func === stepFullPageScrollInDom) {
           const targetY = Number(injection.args?.[0] ?? 0);
           stepLog.push(`scrollTo:${targetY}`);
           return [
             {
               result: {
-                actualScrollY: targetY,
+                // Simulate a browser where the immediate measurement is stale.
+                actualScrollY: targetY === 900 ? 0 : targetY,
                 viewportWidthCss: 1440,
                 viewportHeightCss: 900,
               },
@@ -303,11 +310,14 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
     // Order of operations: prepare -> capture Frame #1 -> hideFixedSticky -> scrollTo:900 -> capture Frame #2 -> scrollTo:1350 -> capture Frame #3 -> restore:0,250
     expect(stepLog).toEqual([
       'prepare',
+      'settle:0',
       'captureFrame',
       'hideFixedSticky',
       'scrollTo:900',
+      'settle:900',
       'captureFrame',
       'scrollTo:1350',
+      'settle:1350',
       'captureFrame',
       'restore:0,250',
     ]);
@@ -317,6 +327,82 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
 
     // Badge progressed 1/3 -> 2/3 -> 3/3 and cleared to '' in finally
     expect(badgeTexts).toEqual(['1/3', '2/3', '3/3', '']);
+  });
+
+  it('does not capture when the first frame cannot be confirmed at the top and restores the page', async () => {
+    const capture = vi.fn();
+    const restore = vi.fn();
+    vi.stubGlobal('chrome', {
+      tabs: { captureVisibleTab: capture },
+      scripting: { executeScript: vi.fn(async (injection: { func: unknown }) => {
+        if (injection.func === prepareFullPageScrollInDom) return [{ result: {
+          originalScrollX: 0, originalScrollY: 400, totalWidthCss: 100,
+          totalHeightCss: 200, viewportWidthCss: 100, viewportHeightCss: 100,
+          dpr: 1, frameOffsetsY: [0, 100], exceededMaxHeight: false,
+        } }];
+        if (injection.func === settleFullPageScrollInDom) return [{ result: 400 }];
+        if (injection.func === restoreFullPageScrollInDom) restore();
+        return [];
+      }) },
+    });
+    await expect(captureFullPageScroll(
+      { id: 1, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
+      new CaptureRateLimiter({ minIntervalMs: 0 }),
+    )).rejects.toThrow('Nie udało się potwierdzić pozycji');
+    expect(capture).not.toHaveBeenCalled();
+    expect(restore).toHaveBeenCalledOnce();
+  });
+
+  it('restores the page when settling times out after cancellation', async () => {
+    const restore = vi.fn();
+    vi.stubGlobal('chrome', {
+      tabs: { captureVisibleTab: vi.fn() },
+      scripting: { executeScript: vi.fn(async (injection: { func: unknown }) => {
+        if (injection.func === prepareFullPageScrollInDom) return [{ result: {
+          originalScrollX: 0, originalScrollY: 400, totalWidthCss: 100,
+          totalHeightCss: 200, viewportWidthCss: 100, viewportHeightCss: 100,
+          dpr: 1, frameOffsetsY: [0, 100], exceededMaxHeight: false,
+        } }];
+        if (injection.func === settleFullPageScrollInDom) {
+          cancelActiveScrollCapture();
+          throw new Error('Przekroczono czas');
+        }
+        if (injection.func === restoreFullPageScrollInDom) restore();
+        return [];
+      }) },
+    });
+    await expect(captureFullPageScroll(
+      { id: 1, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
+      new CaptureRateLimiter({ minIntervalMs: 0 }),
+    )).rejects.toThrow('Przekroczono czas');
+    expect(restore).toHaveBeenCalledOnce();
+  });
+
+  it('bounds a suspended page script in the service worker and restores the page', async () => {
+    vi.useFakeTimers();
+    const restore = vi.fn();
+    vi.stubGlobal('chrome', {
+      tabs: { captureVisibleTab: vi.fn() },
+      scripting: { executeScript: vi.fn((injection: { func: unknown }) => {
+        if (injection.func === prepareFullPageScrollInDom) return Promise.resolve([{ result: {
+          originalScrollX: 0, originalScrollY: 400, totalWidthCss: 100,
+          totalHeightCss: 200, viewportWidthCss: 100, viewportHeightCss: 100,
+          dpr: 1, frameOffsetsY: [0, 100], exceededMaxHeight: false,
+        } }]);
+        if (injection.func === settleFullPageScrollInDom) return new Promise(() => {});
+        if (injection.func === restoreFullPageScrollInDom) restore();
+        return Promise.resolve([]);
+      }) },
+    });
+    const capture = captureFullPageScroll(
+      { id: 1, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
+      new CaptureRateLimiter({ minIntervalMs: 0 }),
+    );
+    const assertion = expect(capture).rejects.toThrow('Przekroczono czas');
+    await vi.advanceTimersByTimeAsync(3000);
+    await assertion;
+    expect(restore).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 
   it('aborts cleanly and restores DOM state when full-page scroll capture is cancelled mid-flight', async () => {
@@ -357,6 +443,7 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
           if (injection.func === restoreFullPageScrollInDom) {
             restored = true;
           }
+          if (injection.func === settleFullPageScrollInDom) return [{ result: 0 }];
           return [];
         }),
       },
