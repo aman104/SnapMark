@@ -33,7 +33,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     expect(selectionBtn?.getAttribute('aria-disabled')).toBe('false');
     expect(
       container.querySelector('#selection-card-subtitle')?.textContent,
-    ).toContain('Gotowe: wytnij zaznaczenie (+20 px marginesu)');
+    ).toContain('Włącz celownik i zaznacz kawałek strony');
     expect(
       container.querySelector('.image-hint-strip')?.textContent,
     ).toContain('PPM na dowolnym obrazku');
@@ -207,4 +207,21 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
       mode: 'viewport',
     });
   });
+  it('keeps area selection enabled without selected text and sends the capture request', async () => {
+    const sendMessage = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal('chrome', {
+      tabs: { query: vi.fn().mockResolvedValue([{ id: 15, url: 'https://example.com' }]) },
+      scripting: { executeScript: vi.fn().mockResolvedValue([{ result: false }]) },
+      runtime: { sendMessage },
+    });
+    const container = document.createElement('div');
+    const controller = renderPopup(container, { initialSearch: '' });
+    await controller.ready;
+    const button = container.querySelector<HTMLButtonElement>('#btn-capture-selection')!;
+    expect(button.getAttribute('aria-disabled')).toBe('false');
+    expect(button.textContent).toContain('Zaznacz fragment ekranu');
+    button.click();
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'SNAPMARK_TRIGGER_CAPTURE', mode: 'selection' });
+  });
+
 });
