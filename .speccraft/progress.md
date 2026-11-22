@@ -51,7 +51,7 @@
 - none
 
 ## Blocked
-- [032] Tab to toolbar leaves undo/history stale — see task 032 blocker.md
+- none
 
 ## Log
 - [001] [x] 2026-11-21 — Scaffolded TypeScript 5, Vite multi-entry build, Vitest JSDOM test runner, and Manifest V3 baseline.
@@ -100,3 +100,4 @@
 - [030] [x] 2026-11-22 — Simplified editor toolbar, added accessible close and responsive action layout.
 - [031] [x] 2026-11-22 — Improved arrowhead rendering, hit testing and click-to-deselect.
 - [032] [!] 2026-11-22 — Third review found stale toolbar state after keyboard focus transition.
+- [032] [ ] 2026-11-22 — Operator authorized another fix round.
