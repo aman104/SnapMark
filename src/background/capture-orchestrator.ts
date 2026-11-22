@@ -1,4 +1,5 @@
 import {
+  type AreaSelectionMeasurementResult,
   cleanupSelectionHighlightInDom,
   type FullPageScrollPlan,
   hideFixedAndStickyElementsInDom,
@@ -7,6 +8,7 @@ import {
   measureTargetImageInDom,
   prepareFullPageScrollInDom,
   restoreFullPageScrollInDom,
+  selectAreaOverlayInDom,
   type SelectionMeasurementResult,
   stepFullPageScrollInDom,
 } from '../content/capture-injected';
@@ -269,7 +271,72 @@ export async function captureVisibleViewport(
 }
 
 /**
- * Tryb 1: Zrzut zaznaczonego fragmentu tekstu (Selection Capture — 02-General-PRD.md §4.1)
+ * Tryb 1A: Interaktywne zaznaczenie fragmentu ekranu myszą
+ * (Interactive Screen Area Selection — 07-feature-plan-interactive-area-selection.md & 02-General-PRD.md §4.1)
+ */
+export async function captureInteractiveArea(
+  providedTab?: chrome.tabs.Tab,
+  rateLimiter: CaptureRateLimiter = defaultCaptureRateLimiter,
+  now: Date = new Date(),
+): Promise<CaptureSession | null> {
+  const tab = await resolveActiveTab(providedTab);
+  const sourceUrl = assertTabUrlAllowed(tab);
+
+  if (typeof tab.id !== 'number') {
+    throw new Error('Brak identyfikatora aktywnej karty.');
+  }
+
+  const execResults = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: selectAreaOverlayInDom,
+  });
+
+  const measurement = execResults?.[0]?.result as
+    | AreaSelectionMeasurementResult
+    | undefined;
+
+  if (!measurement || measurement.cancelled || !measurement.cropRectCss) {
+    return null;
+  }
+
+  const dataUrl = await rateLimiter.schedule(async () => {
+    return await chrome.tabs.captureVisibleTab(tab.windowId, {
+      format: 'png',
+    });
+  });
+
+  const blob = dataUrlToBlob(dataUrl);
+  const dpr = normalizeDpr(measurement.dpr);
+  const id = `cap_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const session: CaptureSession = {
+    id,
+    mode: 'selection',
+    sourceUrl,
+    sourceDomain: normalizeDomainForFilename(sourceUrl),
+    capturedAt: now.toISOString(),
+    dpr,
+    cropRectCss: measurement.cropRectCss,
+    frames: [
+      {
+        blob,
+        scrollYCss: 0,
+        viewportWidthCss: measurement.viewportWidthCss,
+        viewportHeightCss: measurement.viewportHeightCss,
+      },
+    ],
+    totalWidthCss: measurement.cropRectCss.width,
+    totalHeightCss: measurement.cropRectCss.height,
+  };
+
+  await saveCaptureSession(session);
+  await openEditorForSession(session);
+
+  return session;
+}
+
+/**
+ * Tryb 1B: Zrzut zaznaczonego fragmentu tekstu z menu kontekstowego PPM (Selection Capture — 02-General-PRD.md §4.1)
  */
 export async function captureTextSelection(
   providedTab?: chrome.tabs.Tab,
@@ -577,12 +644,23 @@ export async function handleCaptureTrigger(
   mode: CaptureMode,
   tab?: chrome.tabs.Tab,
   rateLimiter: CaptureRateLimiter = defaultCaptureRateLimiter,
-  options: { srcUrl?: string } = {},
+  options: { srcUrl?: string; interactiveArea?: boolean } = {},
 ): Promise<RuntimeCaptureResponse> {
   try {
     let session: CaptureSession;
     if (mode === 'selection') {
-      session = await captureTextSelection(tab, rateLimiter);
+      if (options.interactiveArea) {
+        const areaSession = await captureInteractiveArea(tab, rateLimiter);
+        if (!areaSession) {
+          return {
+            ok: false,
+            error: 'Anulowano zaznaczanie fragmentu ekranu.',
+          };
+        }
+        session = areaSession;
+      } else {
+        session = await captureTextSelection(tab, rateLimiter);
+      }
     } else if (mode === 'image') {
       session = await captureImageElement(options.srcUrl, tab, rateLimiter);
     } else if (mode === 'fullpage') {
