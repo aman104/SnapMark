@@ -8,7 +8,7 @@ import type {
   MockCaptureMetadata,
   TextAnnotation,
 } from '../shared/types';
-import { hitTestAnnotationBody } from './vector-engine';
+import { getArrowheadDimensions, hitTestAnnotationBody } from './vector-engine';
 
 export interface FramePlacementPlan {
   frameIndex: number;
@@ -198,14 +198,17 @@ function drawEndpointHandle(
   ctx.restore();
 }
 
-function drawArrowAnnotation(
+export function drawArrowAnnotation(
   ctx: CanvasRenderingContext2D,
   item: ArrowAnnotation,
   isSelected: boolean,
 ): void {
   const { x1, y1, x2, y2, color, strokeWidth } = item;
   const angle = Math.atan2(y2 - y1, x2 - x1);
-  const headLength = Math.max(12, strokeWidth * 3.5);
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  const { length: headLength, halfWidth } = getArrowheadDimensions(length, strokeWidth);
+  const baseX = x2 - headLength * Math.cos(angle);
+  const baseY = y2 - headLength * Math.sin(angle);
 
   ctx.save();
   ctx.strokeStyle = color;
@@ -217,20 +220,14 @@ function drawArrowAnnotation(
   // Main shaft
   ctx.beginPath();
   ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
+  ctx.lineTo(baseX, baseY);
   ctx.stroke();
 
   // Proportional filled arrowhead
   ctx.beginPath();
   ctx.moveTo(x2, y2);
-  ctx.lineTo(
-    x2 - headLength * Math.cos(angle - Math.PI / 6),
-    y2 - headLength * Math.sin(angle - Math.PI / 6),
-  );
-  ctx.lineTo(
-    x2 - headLength * Math.cos(angle + Math.PI / 6),
-    y2 - headLength * Math.sin(angle + Math.PI / 6),
-  );
+  ctx.lineTo(baseX - halfWidth * Math.sin(angle), baseY + halfWidth * Math.cos(angle));
+  ctx.lineTo(baseX + halfWidth * Math.sin(angle), baseY - halfWidth * Math.cos(angle));
   ctx.closePath();
   ctx.fill();
   ctx.restore();

@@ -4,7 +4,7 @@
 
 [x] 030 - Simplify editor toolbar and add close action - Implement PRD FR-02 and FR-07 with a compact responsive toolbar without filename, dimensions or clipboard export. Retain automatic PNG names, clipboard paste and annotation controls; add an accessible editor-tab close button. Verify layout, actions and existing editor states.
 
-[~] 031 - Improve arrows and annotation deselection - Implement PRD FR-03 and FR-04 with a recognizable connected arrow shaft and filled arrowhead, oriented along the drag and faithfully exported. Clicking empty canvas deselects while dragging still draws; selecting, moving and editing handles remain functional. Add regression tests for appearance, interactions and export.
+[x] 031 - Improve arrows and annotation deselection - Implement PRD FR-03 and FR-04 with a recognizable connected arrow shaft and filled arrowhead, oriented along the drag and faithfully exported. Clicking empty canvas deselects while dragging still draws; selecting, moving and editing handles remain functional. Add regression tests for appearance, interactions and export.
 
 [ ] 032 - Repair interactive text annotations - Reproduce the reported text entry failure in a real Chromium extension and correct focus, placement and input under PRD FR-05. Verify creating, committing, editing, moving and exporting text and preserve keyboard and other annotation behavior. Add a regression test that exercises the real user interaction.
 

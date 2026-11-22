@@ -95,6 +95,11 @@ export function getTextAnnotationBounds(item: TextAnnotation): {
 /**
  * Hit-tests the annotations array from top-most (`length - 1`) to bottom-most (`0`).
  */
+export function getArrowheadDimensions(length: number, strokeWidth: number): { length: number; halfWidth: number } {
+  const headLength = Math.min(length, Math.max(16, strokeWidth * 4));
+  return { length: headLength, halfWidth: headLength * 0.45 };
+}
+
 export function hitTestAnnotationBody(
   annotations: AnnotationItem[],
   cssX: number,
@@ -124,6 +129,17 @@ export function hitTestAnnotationBody(
       const threshold = Math.max(10, item.strokeWidth / 2 + 6);
       if (dist <= threshold) {
         return item;
+      }
+      if (item.type === 'arrow' && lenSq > 0) {
+        const length = Math.sqrt(lenSq);
+        const head = getArrowheadDimensions(length, item.strokeWidth);
+        const fromTipX = cssX - item.x2;
+        const fromTipY = cssY - item.y2;
+        const back = -(fromTipX * dx + fromTipY * dy) / length;
+        const lateral = Math.abs(fromTipX * dy - fromTipY * dx) / length;
+        if (back >= 0 && back <= head.length && lateral <= head.halfWidth * back / head.length) {
+          return item;
+        }
       }
     } else if (item.type === 'text') {
       const bounds = getTextAnnotationBounds(item);
