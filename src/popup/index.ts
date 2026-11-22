@@ -148,14 +148,14 @@ export function renderPopup(
             >
               <span class="popup-card-left">
                 <svg class="popup-card-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M6 4h8M10 4v12M6 16h8M4 7.5h2.5M13.5 12.5H16" />
+                  <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M10 6v8M6 10h8" />
                 </svg>
                 <span class="popup-card-text">
-                  <span class="popup-card-title">Zaznaczony fragment tekstu</span>
+                  <span class="popup-card-title">Zaznacz fragment ekranu</span>
                   <span id="selection-card-subtitle" class="popup-card-subtitle ${hasTextSelection ? 'is-ready' : 'is-muted'}">
                     ${
                       hasTextSelection
-                        ? 'Gotowe: wytnij zaznaczenie (+20 px marginesu)'
+                        ? 'Włącz celownik i zaznacz kawałek strony'
                         : 'Zaznacz tekst na stronie lub użyj PPM'
                     }
                   </span>
@@ -299,20 +299,8 @@ export function renderPopup(
           type: 'SNAPMARK_TRIGGER_CAPTURE',
           mode: 'selection',
         };
-        void Promise.resolve(
-          chrome.runtime.sendMessage(message) as unknown as
-            | Promise<RuntimeCaptureResponse>
-            | RuntimeCaptureResponse,
-        )
-          .then((res) => {
-            if (res && typeof res === 'object' && 'ok' in res && res.ok) {
-              closePopupWindow();
-            }
-          })
-          .catch(() => {
-            const highlightFlag = highlightSelectionBeforeCapture ? '1' : '0';
-            navigate(`editor.html?mode=selection&highlight=${highlightFlag}`);
-          });
+        void Promise.resolve(chrome.runtime.sendMessage(message)).catch(() => {});
+        closePopupWindow();
         return;
       }
       const highlightFlag = highlightSelectionBeforeCapture ? '1' : '0';
@@ -375,22 +363,7 @@ export function renderPopup(
         if (activeTab) {
           if (isRestrictedBrowserUrl(activeTab.url)) {
             currentState = 'restricted';
-          } else if (
-            typeof activeTab.id === 'number' &&
-            chrome.scripting &&
-            typeof chrome.scripting.executeScript === 'function'
-          ) {
-            try {
-              const results = await chrome.scripting.executeScript({
-                target: { tabId: activeTab.id },
-                func: () =>
-                  (window.getSelection()?.toString().trim().length ?? 0) > 0,
-              });
-              const hasSel = Boolean(results?.[0]?.result);
-              currentState = hasSel ? 'default' : 'no-selection';
-            } catch {
-              // Keep currentState as default when script check is unavailable
-            }
+
           }
         }
       } catch {

@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { captureTextSelection } from '../../src/background/capture-orchestrator';
+import { captureTextSelection, handleCaptureTrigger } from '../../src/background/capture-orchestrator';
 import { CaptureRateLimiter } from '../../src/background/rate-limiter';
 import { initEditor } from '../../src/editor/index';
 import { renderPopup } from '../../src/popup/index';
@@ -109,6 +109,38 @@ describe('SnapMark Chrome Extension Manifest V3 — End-to-End Suite (tests/e2e/
     expect(sendMessage).toHaveBeenCalledWith({
       type: 'SNAPMARK_CANCEL_SCROLL_CAPTURE',
     });
+  });
+
+  it('opens the editor with the area selected from the popup', async () => {
+    const tab = { id: 42, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab;
+    let opened = '';
+    const sendMessage = vi.fn(() => handleCaptureTrigger(
+      'selection', tab, new CaptureRateLimiter({ minIntervalMs: 0 }), { interactiveArea: true },
+    ));
+    (globalThis as unknown as { chrome: unknown }).chrome = {
+      tabs: {
+        query: vi.fn().mockResolvedValue([tab]),
+        captureVisibleTab: vi.fn().mockResolvedValue(SAMPLE_PNG_DATA_URL),
+        create: vi.fn(async ({ url }: { url: string }) => { opened = url; }),
+      },
+      scripting: { executeScript: vi.fn().mockResolvedValue([{ result: {
+        cancelled: false, cropRectCss: { x: 10, y: 20, width: 80, height: 60 },
+        viewportWidthCss: 300, viewportHeightCss: 200, dpr: 2,
+      } }]) },
+      runtime: { sendMessage, getURL: (p: string) => `chrome-extension://snapmark/${p}` },
+    };
+    const root = document.getElementById('popup-app')!;
+    const popup = renderPopup(root, { initialSearch: '' });
+    await popup.ready;
+    root.querySelector<HTMLButtonElement>('#btn-capture-selection')!.click();
+    await vi.waitFor(() => expect(opened).toContain('editor.html?captureId='));
+    const result = await sendMessage.mock.results[0].value;
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error);
+    const editor = initEditor(document.getElementById('editor-app')!, { initialSearch: `?captureId=${result.captureId}` });
+    await editor.ready;
+    const canvas = document.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    expect([canvas.width, canvas.height]).toEqual([160, 120]);
   });
 
   it('E2E 3: executes full capture -> IndexedDB Blob transfer -> editor.html hydration -> immediate IndexedDB purge -> vector annotation & flattened PNG/Clipboard export', async () => {

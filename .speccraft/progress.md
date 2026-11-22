@@ -42,7 +42,7 @@
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
 - [M04] `[x]` accepted (2026-11-21) — Complete features: Vector annotation editor, undo history and export (4/4 tasks done)
 - [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
-- [M06] `[>]` in progress — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (2/3 tasks done)
+- [M06] `[>]` in progress — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (3/3 tasks done)
 
 ## Decisions and deviations
 - none
@@ -92,3 +92,4 @@
 - [026] [x] 2026-11-21 — Implemented on-demand interactive screen area selection overlay (`selectAreaOverlayInDom` in `src/content/capture-injected.ts`).
 
 - [027] [x] 2026-11-22 — Orchestrated interactive area capture and preserved context-menu text selection.
+- [028] [x] 2026-11-22 — Enabled interactive area selection in popup and verified release package.
