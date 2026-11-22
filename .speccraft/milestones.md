@@ -6,13 +6,14 @@
 
 | Phase | Milestones | What you will see at the end | Status |
 |---|---|---|---|
-| 1–2. Look & feel & Clickable prototype | M01 | The real TypeScript + Vite project running both `popup.html` and `editor.html` in the Dark Studio Utility design system (`03-Design.md`), with every UI state switchable (`?state=default\|progress\|restricted\|empty`) and a clickable mock capture flow loading a sample Retina screenshot onto the editor stage | in review |
-| 3. Foundations | M02 | A loadable Chrome Extension Manifest V3 package (`dist/`) with minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`), IndexedDB `Blob` transfer store (`SnapMarkDB`) with automatic cleanup, persistent settings in `chrome.storage.local`, and **Tryb 3: Widoczny ekran (Viewport)** working end-to-end from popup, context menu, and `Alt+Shift+V` | planned |
-| 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | planned |
-| 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | planned |
-| 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | planned |
+| 1–2. Look & feel & Clickable prototype | M01 | The real TypeScript + Vite project running both `popup.html` and `editor.html` in the Dark Studio Utility design system (`03-Design.md`), with every UI state switchable (`?state=default\|progress\|restricted\|empty`) and a clickable mock capture flow loading a sample Retina screenshot onto the editor stage | done |
+| 3. Foundations | M02 | A loadable Chrome Extension Manifest V3 package (`dist/`) with minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`), IndexedDB `Blob` transfer store (`SnapMarkDB`) with automatic cleanup, persistent settings in `chrome.storage.local`, and **Tryb 3: Widoczny ekran (Viewport)** working end-to-end from popup, context menu, and `Alt+Shift+V` | done |
+| 4. Core features | M03 | All remaining contextual capture modes working on live websites: **Tryb 1: Zaznaczony fragment tekstu** (+20 px safety margin, DPI scaling, optional yellow highlight), **Tryb 2: Wybrany obrazek `<img>`** (bypassing CORS and AVIF/WebP via `captureVisibleTab`), and **Tryb 4: Cała strona ze scrollem** (>= 550 ms rate-limit throttling, hiding `fixed`/`sticky` headers after Frame #1, live progress bar/badge, multi-frame stitching) | done |
+| 5. Complete features | M04 | The complete interactive **Vector Annotation Editor (`editor.html`)** and export pipeline: vector **Strzałka** (with post-draw draggable endpoint handles), 2-in-1 **Podkreślenie i zakreślacz** (`Shift` horizontal axis lock, `globalAlpha = 0.35`), **Tekst** (in-canvas `<textarea>` with contrasting background pill or white stroke outline), **Cofnij (`Ctrl+Z`) / Usuń (`Delete`)**, **Pobierz PNG** (`domena-pl_YYYY-MM-DD_HH-mm.png`), and **Kopiuj do schowka** (`✓ Skopiowano!`) | done |
+| 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | done |
+| 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | done |
 
-## [?] M01 - Look & feel and clickable prototype
+## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
 - **Type:** prototype
 - **What you will see:** Przed: tylko dokumentacja projektowa w `.speccraft/docs/`. Po: działająca aplikacja frontendowa (TypeScript + Vite) z kompletnym systemem wizualnym **Dark Studio Utility** (`03-Design.md`) oraz klikalnymi widokami `popup.html` (`320px`) i `editor.html` (pasek `56px` + płótno `<canvas>`), w których możesz przełączać wszystkie stany interfejsu (`default`, `progress`, `restricted`, `empty`, `warning`) i przeklikać pełną ścieżkę od wywołania zrzutu do edytora na realistycznych danych testowych.
@@ -38,7 +39,7 @@
 - **Depends on:** none
 - **Estimated size:** 6–8 tasks
 
-## [ ] M02 - Foundations: Manifest V3, IndexedDB transfer and Viewport capture
+## [x] M02 - Foundations: Manifest V3, IndexedDB transfer and Viewport capture
 - **Phase:** 3 — Foundations
 - **Type:** foundation
 - **What you will see:** Przed: klikalny prototyp w karcie deweloperskiej z przykładowym obrazkiem. Po: prawdziwa, gotowa do załadowania w Chrome wtyczka Manifest V3 (`dist/`), która nie żąda uprawnienia `<all_urls>`, rejestruje menu kontekstowe i skróty klawiszowe, zapisuje ustawienia w `chrome.storage.local`, wykonuje prawdziwy **Zrzut widocznego ekranu (Viewport)** w natywnej rozdzielczości Retina, przesyła surowy `Blob` przez bazę **IndexedDB** (`SnapMarkDB`) do nowej karty `editor.html` i natychmiast czyści dane tymczasowe po wczytaniu na płótno.
@@ -67,7 +68,7 @@
 - **Depends on:** M01
 - **Estimated size:** 7–9 tasks
 
-## [ ] M03 - Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll)
+## [x] M03 - Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll)
 - **Phase:** 4 — Core features
 - **Type:** feature
 - **What you will see:** Przed: działał tylko prosty zrzut aktualnie widocznego okna (Viewport). Po: działają wszystkie 4 tryby przechwytywania z PRD — możesz zaznaczyć dowolny akapit tekstu i kliknąć PPM *„Zrób screena zaznaczenia”* (otrzymując idealnie przycięty wycinek z marginesem 20 px i opcjonalnym żółtym podświetleniem), kliknąć PPM na dowolne zdjęcie `<img>` *„Edytuj i pobierz obrazek”* (nawet na stronach z blokadą CORS lub formatami AVIF/WebP) albo uruchomić *„Cała strona ze scrollem”* (strona sama przewinie się krok po kroku z odstępem ~550 ms, ukryje po pierwszej klatce pływające nagłówki `fixed`/`sticky` i sklei wszystko w jeden długi obraz w `editor.html`).
@@ -94,15 +95,15 @@
     2. **Wybrany obrazek**: Kliknij PPM na dowolne zdjęcie `<img>` → **„Edytuj i pobierz obrazek”** — w `editor.html` otwiera się idealnie wycięty obrazek w pełnej rozdzielczości ekranu.
     3. **Cała strona ze scrollem**: Kliknij ikonę SnapMark → **„Cała strona ze scrollem”** (lub `Alt+Shift+F`) — obserwuj pasek postępu `Klatka 1 z N...`, po zakończeniu w `editor.html` pojawia się sklejona cała strona, na której górny przyklejony pasek nawigacji (`sticky`/`fixed`) widnieje tylko raz na samej górze.
 - **Exit criteria:**
-  - [ ] Tryb 1 (Zaznaczony tekst) wycina zaznaczenie z marginesem `20 px` CSS przeliczonym przez `window.devicePixelRatio` oraz poprawnie nakłada i usuwa tymczasowe żółte podświetlenie, gdy opcja jest włączona
-  - [ ] Tryb 2 (Wybrany obrazek `<img>`) wycina dokładny prostokąt `img.getBoundingClientRect() * dpr` z `captureVisibleTab` bez wykonywania zapytań sieciowych `fetch`
-  - [ ] Tryb 4 (Cała strona ze scrollem) zachowuje odstęp `>= 550 ms` między klatkami (zero błędów `MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND`), ukrywa elementy `fixed`/`sticky` po pierwszej klatce, skleja klatki bez szwów/duplikacji na ostatniej klatce i zawsze przywraca oryginalny stan DOM oraz pozycję scrolla strony
-  - [ ] Użytkownik może anulować trwający zrzut ze scrollem przyciskiem w popupie lub klawiszem `Esc`, co natychmiast przywraca stronę do stanu początkowego
-  - [ ] Testy jednostkowe i integracyjne dla wycinania DPI, ukrywania `fixed`/`sticky` oraz sklejania klatek przechodzą (`npm test && npm run build`)
+  - [x] Tryb 1 (Zaznaczony tekst) wycina zaznaczenie z marginesem `20 px` CSS przeliczonym przez `window.devicePixelRatio` oraz poprawnie nakłada i usuwa tymczasowe żółte podświetlenie, gdy opcja jest włączona
+  - [x] Tryb 2 (Wybrany obrazek `<img>`) wycina dokładny prostokąt `img.getBoundingClientRect() * dpr` z `captureVisibleTab` bez wykonywania zapytań sieciowych `fetch`
+  - [x] Tryb 4 (Cała strona ze scrollem) zachowuje odstęp `>= 550 ms` między klatkami (zero błędów `MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND`), ukrywa elementy `fixed`/`sticky` po pierwszej klatce, skleja klatki bez szwów/duplikacji na ostatniej klatce i zawsze przywraca oryginalny stan DOM oraz pozycję scrolla strony
+  - [x] Użytkownik może anulować trwający zrzut ze scrollem przyciskiem w popupie lub klawiszem `Esc`, co natychmiast przywraca stronę do stanu początkowego
+  - [x] Testy jednostkowe i integracyjne dla wycinania DPI, ukrywania `fixed`/`sticky` oraz sklejania klatek przechodzą (`npm test && npm run build`)
 - **Depends on:** M02
 - **Estimated size:** 8–10 tasks
 
-## [ ] M04 - Complete features: Vector annotation editor, undo history and export
+## [x] M04 - Complete features: Vector annotation editor, undo history and export
 - **Phase:** 5 — Complete features
 - **Type:** feature
 - **What you will see:** Przed: wszystkie 4 tryby zrzutu otwierały przechwycony obraz na płótnie w `editor.html`, ale narzędzia rysowania były tylko makietą z prototypu. Po: pełny, płynny (60 FPS) wektorowy edytor adnotacji — jednym przeciągnięciem myszy rysujesz czerwoną **Strzałkę** (`#FF3B30`) i po narysowaniu możesz chwycić jej grot lub początek, by skorygować kierunek; przełączasz na **Podkreślenie i zakreślacz** i z przytrzymanym `Shift` rysujesz idealnie proste linie lub półprzezroczysty marker (`globalAlpha = 0.35`); klikasz **Tekst** i wpisujesz komentarz z kontrastowym tłem lub białym obrysem wokół liter; cofasz dowolny ruch przez `Ctrl+Z` (`Cmd+Z`) lub usuwasz wybrany obiekt klawiszem `Delete`, a na końcu jednym kliknięciem **„Kopiuj do schowka”** lub **„Pobierz PNG”** eksportujesz spłaszczony obraz w pełnej rozdzielczości.
@@ -134,17 +135,17 @@
     4. Wciśnij `Ctrl+Z` (lub `Cmd+Z`), aby cofnąć ostatnie zmiany, zaznacz obiekt i wciśnij `Delete`.
     5. Kliknij **„Kopiuj do schowka”** (przycisk zmieni się na `✓ Skopiowano!`) i wklej obraz przez `Ctrl+V` / `Cmd+V` bezpośrednio do Slacka, dokumentu lub nowej karty; kliknij **„Pobierz PNG”** i sprawdź pobrany plik `domena_YYYY-MM-DD_HH-mm.png`.
 - **Exit criteria:**
-  - [ ] Wszystkie obiekty rysowane w edytorze są przechowywane w tablicy wektorowej `annotations[]`, a nie wypalane od razu na źródłowej bitmapie
-  - [ ] Strzałka posiada domyślny kolor `#FF3B30`, obsługuje zmianę koloru i grubości oraz pozwala po narysowaniu przesuwać oba swoje końce `(x1, y1)` i `(x2, y2)` za pomocą uchwytów
-  - [ ] Narzędzie Podkreślenie i zakreślacz obsługuje oba podtryby, stosuje `globalAlpha = 0.35` dla zakreślacza i wymusza idealny poziom (`y2 = y1`) przy przytrzymaniu `Shift`
-  - [ ] Narzędzie Tekst pozwala umieścić, przesunąć i edytować pole tekstowe oraz przełączać kontrastowe tło i biały/kontrastowy obrys wokół liter
-  - [ ] `Ctrl+Z` / `Cmd+Z` cofa kolejne operacje z historii, a `Delete` / `Backspace` usuwa zaznaczony obiekt
-  - [ ] „Pobierz PNG” pobiera spłaszczony obraz z nazwą `<domena>_YYYY-MM-DD_HH-mm.png`, a „Kopiuj do schowka” kopiuje `image/png` do schowka systemowego
-  - [ ] Testy jednostkowe silnika wektorowego, hit-testingu, historii `Ctrl+Z` i eksportera przechodzą (`npm test && npm run build`)
+  - [x] Wszystkie obiekty rysowane w edytorze są przechowywane w tablicy wektorowej `annotations[]`, a nie wypalane od razu na źródłowej bitmapie
+  - [x] Strzałka posiada domyślny kolor `#FF3B30`, obsługuje zmianę koloru i grubości oraz pozwala po narysowaniu przesuwać oba swoje końce `(x1, y1)` i `(x2, y2)` za pomocą uchwytów
+  - [x] Narzędzie Podkreślenie i zakreślacz obsługuje oba podtryby, stosuje `globalAlpha = 0.35` dla zakreślacza i wymusza idealny poziom (`y2 = y1`) przy przytrzymaniu `Shift`
+  - [x] Narzędzie Tekst pozwala umieścić, przesunąć i edytować pole tekstowe oraz przełączać kontrastowe tło i biały/kontrastowy obrys wokół liter
+  - [x] `Ctrl+Z` / `Cmd+Z` cofa kolejne operacje z historii, a `Delete` / `Backspace` usuwa zaznaczony obiekt
+  - [x] „Pobierz PNG” pobiera spłaszczony obraz z nazwą `<domena>_YYYY-MM-DD_HH-mm.png`, a „Kopiuj do schowka” kopiuje `image/png` do schowka systemowego
+  - [x] Testy jednostkowe silnika wektorowego, hit-testingu, historii `Ctrl+Z` i eksportera przechodzą (`npm test && npm run build`)
 - **Depends on:** M03
 - **Estimated size:** 8–10 tasks
 
-## [ ] M05 - Quality and release: Playwright E2E tests, edge-case hardening and Web Store package
+## [x] M05 - Quality and release: Playwright E2E tests, edge-case hardening and Web Store package
 - **Phase:** 6–7 — Quality & release
 - **Type:** release
 - **What you will see:** Przed: funkcjonalna wtyczka przetestowana jednostkowo i manualnie. Po: zautomatyzowany zestaw testów End-to-End w **Playwright**, który uruchamia prawdziwą przeglądarkę Chromium z załadowaną wtyczką `--load-extension=./dist` i automatycznie weryfikuje popup, zrzuty, edytor wektorowy i eksport; pełna odporność na sytuacje brzegowe (ekstremalnie długie strony > `MAX_CANVAS_HEIGHT`, strony bez zaznaczenia, błędy limitu zapytań API Chrome); zielony pipeline CI GitHub Actions oraz gotowa do publikacji w Chrome Web Store paczka `snapmark-extension.zip` wraz z dokumentacją `README.md`.
@@ -168,12 +169,37 @@
     `npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package`
   - Obserwuj przechodzące testy jednostkowe Vitest oraz testy E2E Playwright w Chromium i sprawdź wygenerowany artefakt wydaniowy `snapmark-extension.zip` oraz `README.md`
 - **Exit criteria:**
-  - [ ] Zestaw testów Playwright E2E (`npm run test:e2e`) przechodzi w 100% na zbudowanej paczce `./dist` w przeglądarce Chromium
-  - [ ] Wszystkie sytuacje brzegowe z `PRD §7` (krawędzie viewportu przy marginesie 20 px, brak zaznaczenia tekstu, `MAX_CANVAS_HEIGHT`, strony `chrome://`, rate-limit backoff `>= 550 ms`) są pokryte testami i działają zgodnie ze specyfikacją
-  - [ ] Audyt potwierdza 0 zewnętrznych zapytań sieciowych, 0 zalegających rekordów w IndexedDB po otwarciu edytora oraz wyłącznie 4 uprawnienia w `manifest.json` (`activeTab`, `contextMenus`, `scripting`, `storage`)
-  - [ ] Skrypt `npm run package` generuje poprawny plik `snapmark-extension.zip`, a `README.md` opisuje instalację, użytkowanie i architekturę
+  - [x] Zestaw testów Playwright E2E (`npm run test:e2e`) przechodzi w 100% na zbudowanej paczce `./dist` w przeglądarce Chromium
+  - [x] Wszystkie sytuacje brzegowe z `PRD §7` (krawędzie viewportu przy marginesie 20 px, brak zaznaczenia tekstu, `MAX_CANVAS_HEIGHT`, strony `chrome://`, rate-limit backoff `>= 550 ms`) są pokryte testami i działają zgodnie ze specyfikacją
+  - [x] Audyt potwierdza 0 zewnętrznych zapytań sieciowych, 0 zalegających rekordów w IndexedDB po otwarciu edytora oraz wyłącznie 4 uprawnienia w `manifest.json` (`activeTab`, `contextMenus`, `scripting`, `storage`)
+  - [x] Skrypt `npm run package` generuje poprawny plik `snapmark-extension.zip`, a `README.md` opisuje instalację, użytkowanie i architekturę
 - **Depends on:** M04
 - **Estimated size:** 5–7 tasks
+
+## [x] M06 - Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu)
+- **Phase:** 8+ — Evolution
+- **Type:** feature
+- **What you will see:** Przed: trzecia karta w popupie (*„Zaznaczony fragment tekstu”*) wymagała wcześniejszego zaznaczenia tekstu na stronie i nie pozwalała zaznaczyć dowolnego kawałka ekranu myszą. Po: trzecia karta w popupie (**„Zaznacz fragment ekranu”**, `Alt+Shift+S`) jest zawsze aktywna — po jej kliknięciu popup zamyka się, na stronie pojawia się celownik (`crosshair`), przeciągasz myszą dowolny prostokątny obszar strony (z czerwoną ramką `#FF3B30`, przyciemnieniem tła wokół wycinka i wymiarami `W × H px`), a po puszczeniu przycisku myszy zaznaczony kawałek ekranu natychmiast otwiera się w pełnej rozdzielczości Retina w `editor.html` (przy zachowaniu wycinania zaznaczonego tekstu spod PPM).
+- **Source:** `docs/07-feature-plan-interactive-area-selection.md`
+- **Goal:** Zastąpić w popupie i pod skrótem `Alt+Shift+S` pasywne wycinanie tekstu aktywnym, interaktywnym narzędziem zaznaczania dowolnego fragmentu ekranu myszą (`selectAreaOverlayInDom`), zachowując wycinanie tekstu z menu kontekstowego PPM (`contexts: ["selection"]`).
+- **Scope:**
+  - Wstrzykiwana na żądanie funkcja `selectAreaOverlayInDom()` w `src/content/capture-injected.ts` tworząca pełnoekranową nakładkę `[data-snapmark-area-overlay]` (`cursor: crosshair`), rysująca na żywo prostokąt wycinka (`#FF3B30` + `box-shadow` przyciemniający resztę strony + licznik `W × H px`), obsługująca anulowanie klawiszem `Escape` i gwarantująca usunięcie nakładki z DOM przed wykonaniem zrzutu (`PRD §4.1`, `04-Interface-spec.md §6.4`)
+  - Orkiestracja `captureInteractiveArea()` w `src/background/capture-orchestrator.ts` oraz `src/background/index.ts` wywoływana z popupu (`mode: 'selection'` / `#btn-capture-selection`) i skrótu `Alt+Shift+S`, wycinająca zaznaczony obszar z `captureVisibleTab()` w skali `devicePixelRatio` i otwierająca `editor.html` (przy zachowaniu `captureTextSelection` dla menu kontekstowego PPM `capture-selection`)
+  - Aktualizacja trzeciej karty w `src/popup/index.ts` na zawsze aktywną opcję **„Zaznacz fragment ekranu”** (*„Włącz celownik i zaznacz kawałek strony”*) oraz aktualizacja testów jednostkowych i E2E
+- **Out of scope:**
+  - Przewijanie strony w trakcie przeciągania prostokąta celownika (dotyczy aktualnie widocznego ekranu; do pełnej strony służy Tryb 4)
+- **Demo for the operator:**
+  - Zbuduj wtyczkę (`npm run build`), przeładuj katalog `dist/` w `chrome://extensions` i otwórz dowolną stronę WWW:
+    1. Kliknij ikonę SnapMark → kliknij **„Zaznacz fragment ekranu”** (lub wciśnij `Alt+Shift+S`).
+    2. Popup zamknie się, a kursor na stronie zmieni się w celownik z podpowiedzią u góry ekranu.
+    3. Przeciągnij myszą dowolny prostokąt na stronie i puść przycisk myszy — wycięty fragment natychmiast otworzy się w `editor.html`.
+- **Exit criteria:**
+  - [ ] Karta `#btn-capture-selection` w `popup.html` nosi nazwę **„Zaznacz fragment ekranu”** i pozwala włączyć zaznaczanie obszaru na dowolnej stronie WWW bez konieczności wcześniejszego zaznaczania tekstu
+  - [ ] `selectAreaOverlayInDom()` w `src/content/capture-injected.ts` pozwala zaznaczyć prostokąt myszą (`mousedown` → `mousemove` → `mouseup`), anulować klawiszem `Escape` i całkowicie usuwa nakładkę `[data-snapmark-area-overlay]` z DOM przed wykonaniem zrzutu
+  - [ ] Zaznaczony obszar ekranu otwiera się w `editor.html` wycięty w fizycznej rozdzielczości Retina (`cropRectCss * dpr`)
+  - [ ] Dotychczasowe przepływy (Widoczny ekran, Cała strona ze scrollem, Wybrany obrazek z PPM, Zaznaczony tekst z PPM oraz edytor wektorowy) działają bez regresji (`npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package`)
+- **Depends on:** M05
+- **Estimated size:** 3 tasks
 
 ## Coverage
 

@@ -123,11 +123,9 @@ Because `popup.html` and `editor.html` are separate extension documents, they sh
        - Left icon: `20px × 20px` vertical scroll page SVG (`{colors.ink}`).
        - Center column: Title **"Cała strona ze scrollem"** (`{typography.button}`, `{colors.ink}`) + subtitle *"Skleja klatki i ukrywa pływające nagłówki"* (`{typography.caption}`, `{colors.ink-muted}`).
        - Right: `<kbd>` badge `Alt+Shift+F`.
-     - **Card 3 — Zaznaczony fragment tekstu** (`#btn-capture-selection`, `{components.popup-action-card}`):
-       - Left icon: `20px × 20px` text selection cursor SVG.
-       - Center column: Title **"Zaznaczony fragment tekstu"** (`{typography.button}`) + dynamic subtitle:
-         - When `hasTextSelection === true`: *"Gotowe: wytnij zaznaczenie (+20 px marginesu)"* in `{colors.success}` (`#22C55E`).
-         - When `hasTextSelection === false`: *"Zaznacz tekst na stronie lub użyj PPM"* in `{colors.ink-subtle}` (`#6B7280`), card enters `aria-disabled="true"` muted state (`opacity: 0.55`).
+     - **Card 3 — Zaznacz fragment ekranu** (`#btn-capture-selection`, `{components.popup-action-card}` — updated by `07-feature-plan-interactive-area-selection`):
+       - Left icon: `20px × 20px` crosshair / crop area selection SVG.
+       - Center column: Title **"Zaznacz fragment ekranu"** (`{typography.button}`) + subtitle *"Włącz celownik i zaznacz kawałek strony"* (`{typography.caption}`, `{colors.ink-muted}`). Always enabled on regular web pages; clicking it closes the popup and launches the in-page crosshair area selector (`[data-snapmark-area-overlay]`).
        - Right: `<kbd>` badge `Alt+Shift+S`.
   3. **Contextual Image Hint Strip (`background: {colors.surface-1}`, `border: 1px dashed {colors.hairline-strong}`, `{rounded.md}`, `padding: 8px 10px`)**:
      - Flex row with `16px` image icon + `{typography.caption}` text in `{colors.ink-muted}`:
@@ -271,8 +269,12 @@ Because `popup.html` and `editor.html` are separate extension documents, they sh
      - For `text`: A dashed `{colors.accent}` selection rectangle (`4px` padding around measured text box) with `move` cursor.
 
 3. **Ephemeral DOM Selection Highlight (`[data-snapmark-highlight]`)**:
-   - **Trigger**: Injected into the target webpage only when `mode === 'selection'` and `highlightSelectionBeforeCapture === true`.
+   - **Trigger**: Injected into the target webpage only when `mode === 'selection'` (PPM context menu text capture) and `highlightSelectionBeforeCapture === true`.
    - **Visual Spec**: Fixed/absolute overlay `<div>` elements matching each client rect of `range.getClientRects()` with `background: rgba(255, 235, 59, 0.45); border-radius: 2px; pointer-events: none; z-index: 2147483646;`. Removed in a `finally` block immediately after `captureVisibleTab()` returns.
+
+4. **Interactive In-Page Screen Area Selection Overlay (`[data-snapmark-area-overlay]` — `07-feature-plan-interactive-area-selection`)**:
+   - **Trigger**: Clicking **„Zaznacz fragment ekranu”** (`#btn-capture-selection`) in `popup.html` or pressing `Alt + Shift + S`.
+   - **Visual Spec**: Full-viewport overlay (`position: fixed; inset: 0; z-index: 2147483647; cursor: crosshair; user-select: none;`) with top helper pill (*„Przeciągnij myszą, aby zaznaczyć fragment ekranu • Esc anuluje”*), a dragging selection box (`border: 2px solid #FF3B30; box-shadow: 0 0 0 9999px rgba(15, 17, 21, 0.48);`), and a live dimension badge (`W × H px`). Removed completely from DOM before `captureVisibleTab()` fires.
 
 ---
 

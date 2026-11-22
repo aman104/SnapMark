@@ -7,7 +7,7 @@
 - **System projektowy Dark Studio Utility (`src/styles/tokens.css`)**:
   - Kompletna paleta ciemnego studia (`#0F1115` → `#262B36`), akcent Signal Red (`#FF3B30`), 6 kolorów adnotacji wektorowych, stosy fontów systemowych (100% offline, zero wywołań CDN) oraz współdzielone komponenty UI.
 - **Klikalny prototyp Popup (`popup.html`, `320px`)**:
-  - 3 karty trybów przechwytywania (**Widoczny ekran**, **Cała strona ze scrollem**, **Zaznaczony fragment tekstu**) ze skrótami `<kbd>` (`Alt+Shift+V`, `Alt+Shift+F`, `Alt+Shift+S`).
+  - 3 karty trybów przechwytywania (**Widoczny ekran**, **Cała strona ze scrollem**, **Zaznacz fragment ekranu**) ze skrótami `<kbd>` (`Alt+Shift+V`, `Alt+Shift+F`, `Alt+Shift+S`).
   - Wskazówka kontekstowa dla wycinania obrazków `<img>` przez PPM oraz przełącznik **„Podświetl zaznaczony tekst na żółto”**.
   - Obsługa wszystkich 4 stanów UI: `?state=default`, `?state=no-selection`, `?state=progress` (pasek postępu zrzutu całej strony `Klatka 3 z 8` z anulowaniem `Esc`) oraz `?state=restricted` (baner dla stron `chrome://` i Chrome Web Store).
 - **Klikalny prototyp Edytora Wektorowego (`editor.html`)**:
@@ -72,20 +72,47 @@ Po uruchomieniu serwera deweloperskiego Vite (`http://localhost:5173`) możesz p
   - Stan pusty / awaryjny (Empty State z wklejaniem `Ctrl+V`): `http://localhost:5173/editor.html?state=empty`
   - Ostrzeżenie o maksymalnej bezpiecznej wysokości `<canvas>`: `http://localhost:5173/editor.html?state=max-height-warning`
 
-### Build
+### Build & Load Unpacked Chrome Extension (Milestones M02 & M03)
 
 ```bash
 npm run build
 ```
 
-Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/`.
+Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/` (`manifest.json`, `background.js`, `popup.html`, `editor.html`, `icons/icon-16..128.png`).
+
+**Jak załadować wtyczkę w Google Chrome / Brave / Edge i przetestować wszystkie 4 tryby przechwytywania (M03):**
+1. Otwórz w przeglądarce adres `chrome://extensions`.
+2. Włącz przełącznik **Tryb dewelopera** (*Developer mode*) w prawym górnym rogu.
+3. Kliknij **Załaduj rozpakowane** (*Load unpacked*) i wskaż katalog `dist/` w tym repozytorium.
+4. Otwórz dowolną stronę WWW i przetestuj **4 tryby przechwytywania kontekstowego**:
+   - **Tryb 1: Zaznacz fragment ekranu (`selection`)** — Wybierz kartę w popupie lub `Alt + Shift + S`, a następnie przeciągnij prostokąt na stronie. `Esc` anuluje wybór. Po zwolnieniu myszy wycinek otworzy się w edytorze. Aby przechwycić zaznaczony tekst, kliknij PPM → **„Zrób zrzut zaznaczenia”**. Wstrzykiwany na żądanie skrypt mierzy `Range.getBoundingClientRect()`, dodaje **20 px marginesu bezpieczeństwa** przyciętego do granic widoku, opcjonalnie nakłada żółte podświetlenie `rgba(255, 235, 59, 0.45)` na czas zrzutu i otwiera wycięty fragment w fizycznej rozdzielczości Retina (`cropRectCss * devicePixelRatio`).
+   - **Tryb 2: Wybrany obrazek `<img>` (`image`)** — Kliknij PPM na dowolnym obrazku na stronie → **„Edytuj i pobierz obrazek”**. Skrypt mierzy rzeczywiste współrzędne `img.getBoundingClientRect()` (dopasowując element po `srcUrl` / `currentSrc` / środku widoku) i wycina go bezpośrednio z bufora ekranu (`captureVisibleTab`), **całkowicie omijając blokady CORS/Hotlink oraz formaty WebP/AVIF**.
+   - **Tryb 3: Widoczny ekran (`viewport`)** — Kliknij ikonę **SnapMark** → **„Widoczny ekran”** (lub `Alt + Shift + V` / PPM → **„Zrób zrzut widocznego ekranu”**).
+   - **Tryb 4: Cała strona ze scrollem (`fullpage`)** — Kliknij w popupie **„Cała strona ze scrollem”** (lub `Alt + Shift + F`). Wtyczka przewija stronę w pętli z bezpiecznym throttlingiem **`>= 550 ms`** (respektując limit `MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND` w Chrome), ukrywa pływające elementy `position: fixed` i `sticky` po pierwszej klatce (aby nagłówki i banery cookie nie powtarzały się na złączeniach), przywraca oryginalny stan DOM i pozycję przewinięcia w bloku `finally`, a w `editor.html` bezszwowo skleja klatki na płótnie `<canvas>` (z kontrolą limitu `MAX_CANVAS_HEIGHT_PHYSICAL_PX = 16384`).
+5. Każdy zrzut w natywnej rozdzielczości Retina trafia jako surowy obiekt `Blob` do bazy **IndexedDB** (`SnapMarkDB.captures`), otwiera kartę `editor.html?captureId=<id>` i **natychmiast usuwa dane tymczasowe z IndexedDB** zaraz po wczytaniu na płótno `<canvas>`.
 
 ## Available Scripts
 
 - `npm run dev`: uruchamia lokalny serwer Vite dla `popup.html` i `editor.html`
 - `npm run typecheck`: weryfikuje typy TypeScript (`tsc --noEmit`)
-- `npm test`: uruchamia zestaw testów jednostkowych Vitest (`vitest run`)
+- `npm test`: uruchamia zestaw testów jednostkowych i integracyjnych Vitest (`vitest run`)
 - `npm run build`: wykonuje `typecheck` oraz buduje produkcyjną paczkę rozszerzenia do `dist/`
+- `npm run test:e2e`: uruchamia zestaw testów End-to-End (`tests/e2e/extension.spec.ts`) na zbudowanej paczce `./dist`
+- `npm run package`: buduje `./dist`, weryfikuje kompletność plików Manifest V3 i tworzy archiwum wydaniowe Chrome Web Store `snapmark-extension.zip`
+
+## Keyboard Shortcuts
+
+| Skrót klawiszowy | Kontekst | Działanie |
+|---|---|---|
+| `Alt + Shift + V` | Globalny (Chrome) | Zrzut widocznego ekranu (**Tryb 3: Viewport**) |
+| `Alt + Shift + F` | Globalny (Chrome) | Zrzut całej strony ze scrollem (**Tryb 4: Full-Page Scroll**) |
+| `Alt + Shift + S` | Globalny (Chrome) | Interaktywne zaznaczenie obszaru ekranu |
+| `Esc` | Popup (podczas scrolla) | Natychmiast anuluje zrzut całej strony i przywraca DOM |
+| `1` / `2` / `3` | Edytor (`editor.html`) | Przełącza narzędzie: **1 = Strzałka**, **2 = Linia / Marker**, **3 = Tekst** |
+| `Shift` (przytrzymany) | Edytor (`editor.html`) | Wymusza idealnie poziomą linię (`y2 = y1`) przy rysowaniu i edycji uchwytów |
+| `Ctrl + Z` / `Cmd + Z` | Edytor (`editor.html`) | Cofa ostatnią operację z historii (`UndoHistoryStack`) |
+| `Delete` / `Backspace` | Edytor (`editor.html`) | Usuwa zaznaczony obiekt wektorowy z płótna |
+| `Ctrl + V` / `Cmd + V` | Edytor (`editor.html`) | Wkleja obraz bezpośrednio ze schowka systemowego na płótno |
 
 ## Project Structure
 
@@ -119,14 +146,16 @@ SnapMark/
 
 ## Testing and Quality
 
-Uruchomienie pełnej weryfikacji typów, testów jednostkowych i produkcyjnego buildu:
+Uruchomienie pełnej weryfikacji typów, testów jednostkowych, produkcyjnego buildu, testów E2E oraz pakowania `.zip` do Chrome Web Store:
 
 ```bash
-npm run typecheck && npm test && npm run build
+npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package
 ```
 
-## Assumptions and Deferred Scope
+## Delivered Milestones (v1 Complete)
 
-- **M02 (Foundations)**: Wpięcie Background Service Workera, bazy IndexedDB (`SnapMarkDB`) do transferu surowych obiektów `Blob`, trwałych ustawień w `chrome.storage.local` oraz prawdziwego zrzutu widocznego ekranu (`chrome.tabs.captureVisibleTab`).
-- **M03 (Core Features)**: Wstrzykiwany na żądanie skrypt DOM dla zrzutu zaznaczenia (+20 px marginesu i opcjonalne żółte podświetlenie), wycinania `<img>` oraz pętli zrzutu całej strony ze scrollem (`>= 550 ms` throttling i ukrywanie `fixed`/`sticky`).
-- **M04 (Complete Features)**: Pełne interaktywne rysowanie i przeciąganie uchwytów obiektów wektorowych na płótnie oraz eksport `ClipboardItem` / PNG.
+- **M01 (Look & Feel and Clickable Prototype — Zrealizowano)**: System projektowy Dark Studio Utility (`src/styles/tokens.css`) oraz widoki `popup.html` i `editor.html`.
+- **M02 (Foundations — Zrealizowano)**: Background Service Worker Manifest V3, baza IndexedDB (`SnapMarkDB`) do transferu surowych obiektów `Blob` z natychmiastowym czyszczeniem po wczytaniu, ustawienia w `chrome.storage.local` oraz zrzut widocznego ekranu (`chrome.tabs.captureVisibleTab`).
+- **M03 (Core Features — Zrealizowano)**: Wstrzykiwany na żądanie skrypt DOM (`src/content/capture-injected.ts`) dla zrzutu zaznaczenia (+20 px marginesu i opcjonalne żółte podświetlenie), wycinania `<img>` z pominięciem CORS/AVIF/WebP oraz pętli zrzutu całej strony ze scrollem (`>= 550 ms` throttling, ukrywanie `fixed`/`sticky` po klatce #1 i bezszwowe sklejanie na `<canvas>`).
+- **M04 (Complete Features — Zrealizowano)**: Pełny interaktywny silnik warstwy wektorowej (`src/editor/vector-engine.ts`, `src/editor/history.ts`, `src/editor/text-overlay.ts`, `src/editor/exporter.ts`): rysowanie i przeciąganie uchwytów końcowych `(x1, y1)` i `(x2, y2)` strzałki, podkreślenie i zakreślacz (`globalAlpha = 0.35`) z blokadą poziomu `Shift`, pole tekstowe `<textarea>` z edycją po dwukliku i 3 trybami czytelności (**Tło / Obrys / Czysty**), wielopoziomowe `Ctrl+Z` / `Delete` oraz spłaszczony eksport HiDPI do pliku PNG (`<domena>_YYYY-MM-DD_HH-mm.png`) i schowka systemowego (`ClipboardItem`).
+- **M05 (Quality and Release — Zrealizowano)**: Zestaw testów E2E (`tests/e2e/extension.spec.ts`, `npm run test:e2e`), audyt bezpieczeństwa, prywatności i uprawnień (`tests/unit/security-privacy-audit.test.ts`), pipeline CI GitHub Actions (`.github/workflows/ci.yml`) oraz skrypt pakujący `snapmark-extension.zip` (`npm run package`).

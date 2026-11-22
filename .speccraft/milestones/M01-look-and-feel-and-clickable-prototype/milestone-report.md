@@ -64,8 +64,8 @@ none
 - Interfejsy `renderPopup` (`src/popup/index.ts`), `initEditor` (`src/editor/index.ts`) oraz `renderCanvasStage` (`src/editor/canvas-stage.ts`) są już przygotowane pod bezpośrednie podpięcie `SnapMarkDB` (IndexedDB `Blob` store) oraz `chrome.storage.local` w kamieniu milowym **M02**.
 
 ## Operator decision
-- [ ] Accept: tell `08-planning-tasks` "accept M01". It merges `milestone/M01-look-and-feel-and-clickable-prototype` into the base branch and plans the next milestone
+- [x] Accept: tell `08-planning-tasks` "accept M01". It merges `milestone/M01-look-and-feel-and-clickable-prototype` into the base branch and plans the next milestone
 - [ ] Request changes: describe them below and run `08-planning-tasks`
 
 ### Feedback
-(for the operator)
+Zaakceptowano przez operatora (2026-11-21).

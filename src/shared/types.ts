@@ -120,3 +120,32 @@ export interface MockCaptureMetadata {
   dpr: number;
   highlightApplied: boolean;
 }
+
+export interface RuntimeCaptureRequest {
+  type: 'SNAPMARK_TRIGGER_CAPTURE';
+  mode: CaptureMode;
+  srcUrl?: string;
+  interactiveArea?: boolean;
+}
+
+export interface CancelScrollCaptureRequest {
+  type: 'SNAPMARK_CANCEL_SCROLL_CAPTURE';
+}
+
+export interface ScrollCaptureProgressMessage {
+  type: 'SNAPMARK_SCROLL_PROGRESS';
+  currentFrame: number;
+  totalFrames: number;
+  statusText: string;
+}
+
+export type RuntimeCaptureResponse =
+  | {
+      ok: true;
+      captureId: string;
+      mode: CaptureMode;
+    }
+  | {
+      ok: false;
+      error: string;
+    };

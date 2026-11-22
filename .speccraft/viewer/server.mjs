@@ -1,26 +1,65 @@
 #!/usr/bin/env node
-// SpecCraft Board — a read-only local dashboard for the .speccraft workspace.
-// Zero dependencies. Usage: node .speccraft/viewer/server.mjs [--port 4545] [--open]
+// SpecCraft Board — a local dashboard and control panel for the .speccraft workspace.
+// Zero dependencies. Start it with .speccraft/board, or: node .speccraft/viewer/server.mjs [--port N] [--open] [--read-only]
 
 import http from 'node:http';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import crypto from 'node:crypto';
+import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { initChat, sendMessage, stopChat, stopAllChats, getChat, listChats, deleteChat, streamChat, chatStatus, adapterInfo } from './chat.mjs';
+// The state engine of the workflow (shared with 00-next and autopilot.sh): parsing and the next-step decision.
+import { readWorkspace, readGit, decide, parseSections, canonicalSkill } from '../../.agents/skills/00-next/scripts/state.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SPEC = path.resolve(HERE, '..');
 const ROOT = path.resolve(SPEC, '..');
 const PUBLIC = path.join(HERE, 'public');
+const ENGINE_DIR = path.join(ROOT, '.agents', 'skills', '00-next', 'scripts');
 
 const argv = process.argv.slice(2);
 const argValue = (name) => {
   const i = argv.indexOf(name);
   return i >= 0 ? argv[i + 1] : undefined;
 };
-const PORT = Number(argValue('--port') ?? process.env.SPECCRAFT_VIEWER_PORT ?? 4545);
+// Supervisor: the board runs as a child process and restarts itself when its own code changes, e.g.
+// after `speccraft` updated it. The page then reloads by itself. Ctrl+C stops both processes.
+if (!process.env.SPECCRAFT_BOARD_CHILD) {
+  let port = null;
+  let restarted = false;
+  let child = null;
+  const start = () => {
+    let args = [...argv];
+    if (restarted) args = args.filter((a) => a !== '--open');
+    if (port) {
+      const i = args.indexOf('--port');
+      if (i >= 0) args.splice(i, 2);
+      args.push('--port', String(port));
+    }
+    child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...args], { stdio: ['inherit', 'inherit', 'inherit', 'ipc'], env: { ...process.env, SPECCRAFT_BOARD_CHILD: '1' } });
+    child.on('message', (m) => { if (m?.port) port = m.port; });
+    child.on('exit', (code, signal) => {
+      if (code === 75) { restarted = true; setTimeout(start, 150); return; }
+      process.exit(code ?? (signal ? 1 : 0));
+    });
+  };
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { if (child) child.kill(sig); else process.exit(0); });
+  start();
+  await new Promise(() => {}); // the rest of this file runs in the child
+}
+
+// Without an explicit port the board takes the first free one from 4545 up.
+const PORT_FIXED = argValue('--port') ?? process.env.SPECCRAFT_VIEWER_PORT;
+let PORT = Number(PORT_FIXED ?? 4545);
 const HOST = '127.0.0.1';
+// --read-only hides every control: the board then only shows the files.
+const READ_ONLY = argv.includes('--read-only');
+// Changes when the server restarts: the page reloads to pick up the new token and code.
+const STARTED = Date.now();
+// Per-process secret: only the page served by this server can start or stop agents.
+const TOKEN = crypto.randomBytes(24).toString('hex');
 
 // ---------------------------------------------------------------- helpers
 
@@ -43,204 +82,45 @@ function git(args, timeout = 4000) {
   });
 }
 
-// ---------------------------------------------------------------- parsers
-
-function parseTableAfter(lines, headingRe) {
-  const start = lines.findIndex((l) => headingRe.test(l));
-  if (start < 0) return null;
-  const rows = [];
-  for (let i = start + 1; i < lines.length; i++) {
-    const l = lines[i];
-    if (/^## /.test(l)) break;
-    if (!l.trim().startsWith('|')) { if (rows.length) break; continue; }
-    const cells = l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
-    if (cells.every((c) => /^:?-{2,}:?$/.test(c))) continue;
-    rows.push(cells);
-  }
-  if (!rows.length) return null;
-  return { headers: rows[0], rows: rows.slice(1) };
-}
-
-function parseMilestones(md) {
-  const lines = md.split('\n');
-  const titleLine = lines.find((l) => /^# /.test(l)) || '';
-  const title = titleLine.replace(/^# /, '').replace(/^Milestones:\s*/i, '').trim();
-  const milestones = [];
-  let cur = null;
-  let field = null;
-  for (const line of lines) {
-    const h = line.match(/^## \[(.)\] (M\d\d) - (.+)$/);
-    if (h) {
-      cur = { status: h[1], id: h[2], name: h[3].trim(), fields: {}, order: [] };
-      milestones.push(cur);
-      field = null;
-      continue;
-    }
-    if (/^## /.test(line)) { cur = null; continue; }
-    if (!cur) continue;
-    const f = line.match(/^- \*\*(.+?):\*\*\s*(.*)$/);
-    if (f) {
-      field = f[1];
-      cur.fields[field] = { text: f[2].trim(), items: [] };
-      cur.order.push(field);
-      continue;
-    }
-    const it = line.match(/^\s{2,}- (?:\[( |x|X)\] )?(.*)$/);
-    if (it && field) {
-      cur.fields[field].items.push({ checked: it[1] === undefined ? null : it[1].toLowerCase() === 'x', text: it[2] });
-    }
-  }
-  for (const m of milestones) {
-    const ph = m.fields.Phase?.text || '';
-    const num = ph.match(/^(\d+(?:[–-]\d+)?\+?)/);
-    m.phase = { label: ph, key: num ? num[1] : ph || '—' };
-  }
-  return {
-    title,
-    roadmap: parseTableAfter(lines, /^## Roadmap/),
-    coverage: parseTableAfter(lines, /^## Coverage/),
-    milestones,
-  };
-}
-
-function parseTasks(md) {
-  const tasks = [];
-  let title = '';
-  for (const line of md.split('\n')) {
-    if (!title && /^# /.test(line)) title = line.replace(/^# /, '').trim();
-    const m = line.match(/^\[(.)\] (\d{3}) - (.+?) - (.*)$/) || line.match(/^\[(.)\] (\d{3}) - (.+)$/);
-    if (m) tasks.push({ status: m[1], num: m[2], name: m[3].trim(), description: (m[4] || '').trim() });
-  }
-  return { title, tasks };
-}
-
-function planSummary(md) {
-  if (!md) return null;
-  const get = (label) => {
-    const m = md.match(new RegExp(`^- \\*\\*${label}:\\*\\*\\s*(.*)$`, 'mi'));
-    return m ? m[1].replace(/`/g, '').trim() : null;
-  };
-  const parallel = get('Parallel');
-  return {
-    type: get('Type'),
-    dependsOn: get('Depends on'),
-    deps: (get('Depends on') || '').match(/\b\d{3}\b/g) || [],
-    parallel: parallel ? (/^safe/i.test(parallel) ? 'safe' : 'exclusive') : null,
-    parallelNote: parallel,
-    sources: get('Sources'),
-  };
-}
-
-function reviewSummary(md) {
-  if (!md) return null;
-  const rounds = [...md.matchAll(/^## Round (\d+)\s*[—-]\s*([^—\n]+?)\s*(?:[—-].*)?$/gm)];
-  if (!rounds.length) return { rounds: 0, verdict: null };
-  const last = rounds[rounds.length - 1];
-  return { rounds: rounds.length, verdict: last[2].trim().toLowerCase() };
-}
-
-function parseSections(md) {
-  const out = {};
-  let cur = null;
-  for (const line of (md || '').split('\n')) {
-    const h = line.match(/^## (.+)$/);
-    if (h) { cur = h[1].trim(); out[cur] = []; continue; }
-    if (cur && line.trim()) out[cur].push(line);
-  }
-  return out;
-}
-
 // ---------------------------------------------------------------- state
 
-async function milestoneFolder(id) {
-  for (const d of await listDir(path.join(SPEC, 'milestones'))) {
-    if (d.isDirectory() && d.name.startsWith(`${id}-`)) return path.join(SPEC, 'milestones', d.name);
-  }
-  return null;
-}
-
-async function loadMilestoneDetail(m) {
-  const dir = await milestoneFolder(m.id);
-  m.folder = dir ? rel(dir) : null;
-  m.tasks = [];
-  m.files = { report: null, summaries: [], screenshots: [] };
-  if (!dir) return;
-  const tasksMd = await readText(path.join(dir, 'tasks.md'));
-  if (tasksMd) m.tasks = parseTasks(tasksMd).tasks;
-  const entries = await listDir(dir);
-  const taskDirs = new Map();
-  for (const e of entries) {
-    if (e.isDirectory() && /^\d{3}-/.test(e.name)) taskDirs.set(e.name.slice(0, 3), e.name);
-    if (e.isFile() && e.name === 'milestone-report.md') m.files.report = rel(path.join(dir, e.name));
-    if (e.isFile() && e.name.startsWith('run-summary-')) m.files.summaries.push(rel(path.join(dir, e.name)));
-  }
-  for (const s of await listDir(path.join(dir, 'screenshots'))) {
-    if (s.isFile() && /\.(png|jpe?g|gif|webp|svg)$/i.test(s.name)) m.files.screenshots.push(rel(path.join(dir, 'screenshots', s.name)));
-  }
-  m.files.summaries.reverse();
-  for (const t of m.tasks) {
-    const tdName = taskDirs.get(t.num);
-    t.folder = tdName ? rel(path.join(dir, tdName)) : null;
-    t.files = {};
-    if (!tdName) continue;
-    for (const f of ['implementation-plan.md', 'report.md', 'review.md', 'blocker.md']) {
-      const p = path.join(dir, tdName, f);
-      if (exists(p)) t.files[f.replace('.md', '')] = rel(p);
-    }
-    t.plan = planSummary(await readText(path.join(dir, tdName, 'implementation-plan.md')));
-    t.review = reviewSummary(await readText(path.join(dir, tdName, 'review.md')));
-  }
-  m.counts = { pending: 0, review: 0, done: 0, blocked: 0 };
-  for (const t of m.tasks) {
-    if (t.status === 'x') m.counts.done++;
-    else if (t.status === '~') m.counts.review++;
-    else if (t.status === '!') m.counts.blocked++;
-    else m.counts.pending++;
-  }
-}
-
-const DOC_STEPS = [
-  { file: '01-Idea.md', skill: '01-discovery-idea', title: 'Shape the product idea', gate: true,
-    detail: 'Describe your idea. The skill interviews you and writes 01-Idea.md.' },
-  { file: '02-General-PRD.md', skill: '03-discovery-prd', title: 'Write the requirements (PRD)',
-    detail: 'Optionally stress-test the idea first with 02-discovery-idea-roast.' },
-  { file: '03-Design.md', skill: '04-planning-design-system', title: 'Define the design system' },
-  { file: '04-Interface-spec.md', skill: '05-planning-interface', title: 'Specify the interface' },
-  { file: '05-Tech-Stack.md', skill: '06-planning-tech-stack', title: 'Choose the tech stack' },
-];
-
 async function loadGit() {
-  const branch = await git(['branch', '--show-current']);
-  if (branch === null) return null;
-  const [status, log, branches, worktrees] = await Promise.all([
-    git(['status', '--porcelain']),
+  const base = await readGit(ROOT);
+  if (!base) return null;
+  const [log, worktrees] = await Promise.all([
     git(['log', '--oneline', '--first-parent', '-n', '15', '--format=%h%x09%cr%x09%s']),
-    git(['for-each-ref', '--format=%(refname:short)', 'refs/heads/milestone/', 'refs/heads/task/', 'refs/heads/attic/']),
     git(['worktree', 'list', '--porcelain']),
   ]);
-  const dirty = (status || '').split('\n').filter(Boolean);
   return {
-    branch: branch || '(detached)',
-    dirty: dirty.length,
-    // product changes only: workflow (.speccraft) and toolkit files do not count
-    dirtyOutsideSpec: dirty.filter((l) => !/^"?(\.speccraft\/|\.agents\/|\.claude\/|AGENTS\.md|CLAUDE\.md)/.test(l.slice(3))).length,
+    ...base,
     log: (log || '').split('\n').filter(Boolean).map((l) => {
       const [hash, when, ...msg] = l.split('\t');
       return { hash, when, message: msg.join('\t') };
     }),
-    branches: (branches || '').split('\n').filter(Boolean),
     worktrees: (worktrees || '').split('\n').filter((l) => l.startsWith('worktree ')).length,
   };
 }
 
 async function loadRuns() {
   const runsDir = path.join(SPEC, '.runs');
-  if (!exists(runsDir)) return { running: false, latest: null };
-  const running = exists(path.join(runsDir, 'lock'));
+  if (!exists(runsDir)) return { running: false, latest: null, autopilot: null, working: [] };
+  const mtime = async (p) => { try { return (await fsp.stat(p)).mtimeMs; } catch { return null; } };
+  const stepFile = path.join(runsDir, 'autopilot.lock', 'step');
+  const autopilotStep = exists(path.join(runsDir, 'autopilot.lock'))
+    ? ((await readText(stepFile)) || 'starting').trim() : null;
+  const autopilotSince = autopilotStep ? (await mtime(stepFile)) || (await mtime(path.join(runsDir, 'autopilot.lock'))) : null;
+  const running = exists(path.join(runsDir, 'lock')) || autopilotStep !== null;
   const stop = await readText(path.join(runsDir, 'STOP'));
-  const dirs = (await listDir(runsDir)).filter((d) => d.isDirectory() && /^M\d\d-/.test(d.name)).map((d) => d.name);
-  const latestName = dirs.sort().pop();
+  // milestone runs (Mnn-*) and autopilot runs (autopilot-*); the most recently changed one is shown
+  const dirs = [];
+  for (const d of await listDir(runsDir)) {
+    if (d.isDirectory() && /^(M\d\d|autopilot)-/.test(d.name)) dirs.push({ name: d.name, mtime: (await fsp.stat(path.join(runsDir, d.name))).mtimeMs });
+  }
+  dirs.sort((a, b) => a.mtime - b.mtime);
+  const latestName = dirs.pop()?.name;
   let latest = null;
+  // what the agents are doing right now: the main lane (review, implementation, completion) and parallel workers
+  const working = [];
   if (latestName) {
     const dir = path.join(runsDir, latestName);
     const logs = [];
@@ -261,70 +141,293 @@ async function loadRuns() {
       if (w.isFile() && /^\d{3}$/.test(w.name) && !exists(path.join(dir, 'workers', `${w.name}.fin`))) {
         const line = (await readText(path.join(dir, 'workers', w.name))) || '';
         workers.push({ task: w.name, slot: line.trim().split(/\s+/)[3] || '?' });
+        if (running) working.push({ action: 'implement', task: w.name, lane: `slot ${line.trim().split(/\s+/)[3] || '?'}`, since: await mtime(path.join(dir, 'workers', w.name)) });
       }
+    }
+    const cur = running ? ((await readText(path.join(dir, 'current'))) || '').trim() : '';
+    if (cur) {
+      const m = cur.match(/(review|implement) task (\d{3})/);
+      working.unshift({ action: m ? m[1] : /completion/.test(cur) ? 'complete' : 'work', task: m ? m[2] : null, lane: 'main', since: await mtime(path.join(dir, 'current')), text: cur });
     }
     latest = { id: latestName, logs: logs.slice(0, 12), current: logs[0]?.name || null, tail, workers };
   }
-  return { running, stop: stop?.trim() || null, latest };
+  return { running, stop: stop?.trim() || null, latest, autopilot: autopilotStep, autopilotSince, working };
 }
 
+// An interactive agent session (no script): the agent writes .speccraft/.runs/activity.json when it
+// starts a step (AGENTS.md). Without the file, a task branch with fresh uncommitted changes counts too.
+// Claude Code hooks (.speccraft/hooks/activity.sh) mark it busy after every tool call and waiting
+// when the turn goes back to the user; without hooks, recent file changes count as a sign of life.
+const SESSION_FRESH = 15 * 60 * 1000;
+const mtimeOf = async (p) => { try { return (await fsp.stat(p)).mtimeMs; } catch { return null; } };
+
+async function loadSession(git) {
+  const dir = path.join(SPEC, '.runs');
+  const file = path.join(dir, 'activity.json');
+  const text = await readText(file);
+  let marker = null;
+  if (text !== null && text.trim()) {
+    try { marker = JSON.parse(text); } catch { marker = { title: text.trim().split('\n')[0].slice(0, 200) }; }
+  }
+  const markerAt = marker ? await mtimeOf(file) : null;
+  // files an agent changes while it works (toolkit files changed by an update do not count)
+  const dirty = (git?.dirtyFiles || []).filter((f) => !/^(\.speccraft\/(\.runs|viewer|hooks)\/|\.agents\/|\.claude\/)/.test(f));
+  const branchTask = git?.branch?.match(/^task\/(\d{3})-/)?.[1] || null;
+  let fileAt = 0;
+  for (const f of dirty.slice(0, 80)) fileAt = Math.max(fileAt, (await mtimeOf(path.join(ROOT, f))) || 0);
+  let s = marker;
+  if (!s && branchTask && dirty.length && Date.now() - fileAt < SESSION_FRESH) {
+    s = { skill: '10-execution-tasks', action: 'implement', task: branchTask, inferred: true };
+  }
+  if (!s) return null;
+  const lastSeen = Math.max(markerAt || 0, fileAt);
+  const idleAt = await mtimeOf(path.join(dir, 'activity.idle'));
+  let state = Date.now() - lastSeen < SESSION_FRESH ? 'active' : 'stale';
+  if (marker && idleAt && idleAt >= (markerAt || 0)) state = 'waiting';
+  const task = /^\d{3}$/.test(String(s.task || '')) ? String(s.task) : (s.action === 'implement' || s.action === 'review') ? branchTask : null;
+  return {
+    skill: typeof s.skill === 'string' ? canonicalSkill(s.skill.slice(0, 60)) : null,
+    action: typeof s.action === 'string' ? s.action.slice(0, 20) : null,
+    task,
+    milestone: /^M\d\d$/.test(String(s.milestone || '')) ? s.milestone : null,
+    title: typeof s.title === 'string' ? s.title.slice(0, 200) : null,
+    since: Date.parse(s.started || '') || markerAt || fileAt || Date.now(),
+    lastSeen,
+    state,
+    inferred: !!s.inferred,
+  };
+}
+
+const AUTOPILOT = '.agents/skills/00-next/scripts/autopilot.sh';
+
+// The next step: decided by the state engine; the board adds the commands that run it.
 function computeNext(state) {
   const cmd = (skill) => ({ claude: `/${skill}`, codex: `$${skill}`, antigravity: `/${skill}` });
-  const g = state.git;
-  if (g && g.dirtyOutsideSpec > 0) {
-    return { kind: 'gate', title: 'Uncommitted changes in the product', detail: `${g.dirtyOutsideSpec} changed product file(s). Commit or stash them before the next step.`, skill: null };
+  const ap = state.autopilot;
+  if (state.runs.autopilot) {
+    const until = ap?.stopAt === 'spec' ? 'when the specification is ready' : ap?.stopAt === 'plan' ? 'when the next milestone is planned' : 'when the next milestone waits for your review';
+    return { kind: 'running', stage: state.stage.id, title: `Autopilot running — ${state.runs.autopilot}`, detail: `One step per fresh agent process. It stops ${until}, or at a blocker. Watch the live log below.`, skill: null };
   }
-  for (const step of DOC_STEPS) {
-    const d = state.docs.find((x) => x.name === step.file);
-    if (!d || d.empty) return { kind: step.gate ? 'gate' : 'skill', title: step.title, detail: step.detail || `Creates .speccraft/docs/${step.file}.`, skill: step.skill, commands: cmd(step.skill) };
+  const d = decide(state);
+  const n = {
+    kind: d.kind === 'point' ? 'gate' : d.kind,
+    stage: d.stage, milestone: d.milestone, task: d.task, action: d.action, key: d.key,
+    title: d.title, detail: d.detail, skill: d.skill, alt: d.alt || null,
+    commands: d.skill ? cmd(d.skill) : undefined,
+  };
+  const runMilestone = '.agents/skills/10-execution-tasks/scripts/run-milestone.sh';
+  if (d.step === 'build') {
+    if (state.runs.running) return { kind: 'running', stage: d.stage, milestone: d.milestone, title: state.runs.session ? `An agent session is working on ${d.milestone}` : `Autonomous run in progress on ${d.milestone}`, detail: 'Watch the live log below. The run stops at the milestone review or at a blocker.', skill: null };
+    n.run = d.parallelSafe > 1 ? `${runMilestone} --parallel 3` : runMilestone;
+  } else if (d.kind === 'skill' && /^0[1-7]/.test(d.skill)) {
+    n.run = AUTOPILOT;
+    if (d.skill === '01-discovery-idea') n.commands = { claude: '/00-next autopilot full', codex: '$00-next autopilot full', antigravity: '/00-next autopilot full' };
+  } else if (d.kind === 'gate' && d.stage === 'review' && d.milestone) {
+    n.link = `#/m/${d.milestone}/report`;
+    n.run = `${AUTOPILOT} --accept ${d.milestone}`;
+  } else if (d.kind === 'gate' && d.skill === '01-discovery-idea') {
+    n.run = `${AUTOPILOT} "<your idea>"`;
+  } else if (d.kind === 'gate' && d.milestone && d.stage === 'build') {
+    n.link = `#/m/${d.milestone}`;
   }
-  const ms = state.milestones;
-  if (!ms.length) return { kind: 'skill', title: 'Plan the roadmap', detail: 'Splits v1 into phases and milestones. Review the whole specification afterwards, before any code is written.', skill: '07-planning-milestones', commands: cmd('07-planning-milestones') };
-  const branches = g?.branches || [];
-  const unmerged = ms.find((m) => m.status === 'x' && m.folder && branches.includes(`milestone/${m.folder.split('/').pop()}`));
-  if (unmerged) return { kind: 'skill', title: `Merge accepted ${unmerged.id}`, detail: `${unmerged.id} is accepted but its branch is not merged yet.`, skill: '08-planning-tasks', commands: cmd('08-planning-tasks') };
-  const review = ms.find((m) => m.status === '?');
-  if (review) return { kind: 'gate', title: `Review ${review.id} — ${review.name}`, detail: 'Read the milestone report, run the demo, then accept it ("accept ' + review.id + '") or request changes.', skill: '08-planning-tasks', commands: cmd('08-planning-tasks'), link: `#/m/${review.id}/report` };
-  const active = ms.find((m) => m.status === '>');
-  if (!active) {
-    const nextPlanned = ms.find((m) => m.status === ' ');
-    if (nextPlanned) return { kind: 'skill', title: `Plan tasks for ${nextPlanned.id} — ${nextPlanned.name}`, detail: 'Creates the milestone branch and its task list.', skill: '08-planning-tasks', commands: cmd('08-planning-tasks') };
-    return { kind: 'done', title: 'The roadmap is complete', detail: 'Add features or fixes with 12-feature-advisor. Consider a security review with 11-security-researcher.', skill: '12-feature-advisor', commands: cmd('12-feature-advisor') };
+  if (n.kind === 'gate' && !['01-discovery-idea', '08-planning-tasks'].includes(d.skill)) delete n.commands;
+  return n;
+}
+
+// ---------------------------------------------------------------- control
+
+const AUTOPILOT_SH = path.join(ROOT, '.agents', 'skills', '00-next', 'scripts', 'autopilot.sh');
+const BOARD_DIR = path.join(SPEC, '.runs', 'board');
+const BOARD_RUN = path.join(BOARD_DIR, 'run.json');
+const BOARD_SETTINGS = path.join(BOARD_DIR, 'settings.json');
+
+// Agent CLIs the scripts can drive. Models: the CLIs have no command that lists models, so the
+// board offers the documented aliases plus whatever is configured as the CLI's default.
+const AGENTS = [
+  { id: 'claude', bin: 'claude', name: 'Claude Code', models: ['opus', 'sonnet', 'haiku'], config: ['.claude/settings.json', /"model"\s*:\s*"([^"]+)"/] },
+  { id: 'codex', bin: 'codex', name: 'Codex CLI', models: [], config: ['.codex/config.toml', /^\s*model\s*=\s*"([^"]+)"/m] },
+  { id: 'gemini', bin: 'gemini', name: 'Gemini CLI', models: [], config: ['.gemini/settings.json', /"model"\s*:\s*(?:\{[^}]*?"name"\s*:\s*)?"([^"]+)"/] },
+  { id: 'antigravity', bin: 'agy', name: 'Antigravity CLI', models: null, config: null },
+];
+
+function findBin(bin) {
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    if (!dir) continue;
+    const full = path.join(dir, bin);
+    try { fs.accessSync(full, fs.constants.X_OK); if (fs.statSync(full).isFile()) return full; } catch { /* next */ }
   }
-  const tasks = active.tasks || [];
-  const noPlan = tasks.filter((t) => t.status === ' ' && !t.files['implementation-plan']);
-  if (noPlan.length) return { kind: 'skill', title: `Write implementation plans for ${active.id}`, detail: `${noPlan.length} pending task(s) without a plan: ${noPlan.map((t) => t.num).join(', ')}.`, skill: '09-planning-task-details', commands: cmd('09-planning-task-details') };
-  const run = '.agents/skills/10-execution-initial/scripts/run-milestone.sh';
-  const inReview = tasks.find((t) => t.status === '~');
-  const done = new Set(tasks.filter((t) => t.status === 'x').map((t) => t.num));
-  const inMilestone = new Set(tasks.map((t) => t.num));
-  const eligible = tasks.filter((t) => t.status === ' ' && (t.plan?.deps || []).every((d) => d === t.num || !inMilestone.has(d) || done.has(d)));
-  if (state.runs.running) return { kind: 'running', title: `Autonomous run in progress on ${active.id}`, detail: 'Watch the live log below. The run stops at the milestone review or at a blocker.', skill: null };
-  if (inReview || eligible.length) {
-    const safe = eligible.filter((t) => t.plan?.parallel === 'safe').length;
-    const what = inReview ? `review task ${inReview.num}` : `implement task ${eligible[0].num} — ${eligible[0].name}`;
-    return { kind: 'skill', title: `Build ${active.id}: ${what}`, detail: `${eligible.length} task(s) ready, ${tasks.filter((t) => t.status === '~').length} in review.`, skill: '10-execution-initial', commands: cmd('10-execution-initial'), run: safe > 1 ? `${run} --parallel 3` : run };
+  return null;
+}
+const firstLine = (cmd, args) => new Promise((resolve) => {
+  execFile(cmd, args, { timeout: 8000 }, (err, out) => resolve(err ? null : String(out).trim().split('\n')[0].slice(0, 80)));
+});
+
+let agentsCache = null;
+let agentsAt = 0;
+async function detectAgents(force = false) {
+  if (agentsCache && !force && Date.now() - agentsAt < 5 * 60 * 1000) return agentsCache;
+  agentsCache = await Promise.all(AGENTS.map(async (a) => {
+    const bin = findBin(a.bin);
+    let configured = null;
+    if (bin && a.config) {
+      const text = await readText(path.join(process.env.HOME || '', a.config[0]));
+      configured = text?.match(a.config[1])?.[1] || null;
+    }
+    return {
+      id: a.id, name: a.name, bin: a.bin, installed: !!bin,
+      version: bin ? await firstLine(bin, ['--version']) : null,
+      models: a.models, // null: the CLI has no model option
+      configured,
+    };
+  }));
+  agentsAt = Date.now();
+  return agentsCache;
+}
+
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const readJson = async (p) => { try { return JSON.parse(await fsp.readFile(p, 'utf8')); } catch { return null; } };
+const writeJson = async (p, v) => { await fsp.mkdir(path.dirname(p), { recursive: true }); await fsp.writeFile(p, JSON.stringify(v, null, 2)); };
+
+async function boardSettings() {
+  const saved = (await readJson(BOARD_SETTINGS)) || {};
+  const agents = await detectAgents();
+  const agent = agents.find((a) => a.id === saved.agent && a.installed) || agents.find((a) => a.installed) || agents[0];
+  const ap = (await readWorkspace(ROOT, { git: false })).autopilot;
+  return {
+    agent: agent.id,
+    model: !saved.agent || saved.agent === agent.id ? saved.model || '' : '',
+    mode: saved.mode === 'full' ? 'full' : 'step',
+    stopAt: ['spec', 'plan', 'milestone'].includes(saved.stopAt) ? saved.stopAt : ap?.stopAt || 'milestone',
+    parallel: Math.min(Math.max(Number(saved.parallel) || 1, 1), 6),
+  };
+}
+
+async function boardRun() {
+  const run = await readJson(BOARD_RUN);
+  if (!run) return null;
+  run.running = !run.endedAt && alive(run.pid);
+  if (!run.running && !run.endedAt) run.endedAt = Date.now();
+  const text = (await readText(path.join(SPEC, run.log))) || '';
+  const lines = text.split('\n').filter((l) => l.trim());
+  run.tail = lines.slice(-30).join('\n');
+  run.result = [...lines].reverse().find((l) => /Autopilot stopped:|^Error:/.test(l))?.replace(/^\[[^\]]+\]\s*/, '') || null;
+  // step mode: "--max-steps 1 reached; next would be X" reads better as a finished step
+  if (run.result) run.result = run.result.replace(/^Autopilot stopped: --max-steps \d+ reached; next would be (.+)$/, 'Step done. Next: $1').replace(/^Autopilot stopped: /, '');
+  return run;
+}
+
+const isBusy = async () => (await boardRun())?.running || exists(path.join(SPEC, '.runs', 'lock')) || exists(path.join(SPEC, '.runs', 'autopilot.lock')) || chatStatus().running.length > 0;
+
+// Why a write-capable chat turn cannot start now (a script or the autopilot is working), or null.
+async function chatBlocker() {
+  if ((await boardRun())?.running) return 'A run started from the board is working.';
+  if (exists(path.join(SPEC, '.runs', 'autopilot.lock'))) return 'The autopilot is running.';
+  if (exists(path.join(SPEC, '.runs', 'lock'))) return 'An autonomous milestone run is working.';
+  return null;
+}
+
+// Every run goes through autopilot.sh; text from the page is passed as a separate argument, never through a shell.
+async function startRun(kind, body) {
+  if (!exists(AUTOPILOT_SH)) throw Object.assign(new Error('autopilot.sh not found in .agents/skills/00-next/scripts/'), { status: 500 });
+  if (await isBusy()) throw Object.assign(new Error('An agent is already running.'), { status: 409 });
+  const session = await loadSession(await loadGit());
+  if (session?.state === 'active') throw Object.assign(new Error(`An agent session is working (${session.title || session.skill || 'task ' + session.task}). Wait until it finishes, or clear its status if it ended.`), { status: 409 });
+  const st = await boardSettings();
+  const args = ['--agent', st.agent];
+  if (st.model) args.push('--model', st.model);
+  const step = st.mode !== 'full';
+  const text = String(body.text || '').trim().slice(0, 8000);
+  if (kind === 'next') {
+    // one step; at the build, one task (implementation and its independent review)
+    args.push('--max-steps', '1', '--max-tasks', '1', '--stop-at', 'milestone');
+  } else if (kind === 'autopilot') {
+    args.push('--stop-at', st.stopAt);
+    if (st.parallel > 1) args.push('--parallel', String(st.parallel));
+  } else if (kind === 'accept') {
+    if (!/^M\d\d$/.test(body.milestone || '')) throw Object.assign(new Error('Bad milestone id.'), { status: 400 });
+    args.push('--accept', body.milestone, ...(step ? ['--max-steps', '1'] : ['--stop-at', st.stopAt]));
+  } else if (kind === 'changes' || kind === 'feature') {
+    if (!text) throw Object.assign(new Error('Write what should change first.'), { status: 400 });
+    args.push(`--${kind}`, text, ...(step ? ['--max-steps', '1'] : ['--stop-at', st.stopAt]));
+  } else {
+    throw Object.assign(new Error('Unknown action.'), { status: 400 });
   }
-  if (tasks.length && tasks.every((t) => t.status === 'x')) return { kind: 'skill', title: `Complete ${active.id}`, detail: 'Verify the exit criteria and write the milestone report.', skill: '10-execution-initial', commands: cmd('10-execution-initial'), run };
-  const blocked = tasks.filter((t) => t.status === '!');
-  if (blocked.length) return { kind: 'gate', title: `${active.id} is blocked`, detail: `Resolve ${blocked.map((t) => t.num).join(', ')} (see blocker.md), then change [!] back to [ ].`, skill: null, link: `#/m/${active.id}` };
-  return { kind: 'gate', title: `${active.id} has no runnable task`, detail: 'Check dependencies in the implementation plans.', skill: null };
+  if (!step && st.parallel > 1 && kind !== 'autopilot') args.push('--parallel', String(st.parallel));
+  await fsp.mkdir(BOARD_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const logAbs = path.join(BOARD_DIR, `${stamp}-${kind}.log`);
+  const fd = fs.openSync(logAbs, 'a');
+  fs.writeSync(fd, `$ autopilot.sh ${args.map((a) => (/^[\w./:=-]+$/.test(a) ? a : JSON.stringify(a))).join(' ')}\n`);
+  // detached: own process group, so Stop ends the script and every agent it started; the run survives the board
+  const child = spawn('bash', [AUTOPILOT_SH, ...args], { cwd: ROOT, detached: true, stdio: ['ignore', fd, fd], env: process.env });
+  fs.closeSync(fd);
+  const run = { pid: child.pid, kind, mode: st.mode, agent: st.agent, model: st.model, startedAt: Date.now(), log: rel(logAbs) };
+  await writeJson(BOARD_RUN, run);
+  child.on('exit', async (code, signal) => {
+    await writeJson(BOARD_RUN, { ...run, endedAt: Date.now(), exit: code ?? signal });
+    broadcast();
+  });
+  child.unref();
+  return run;
+}
+
+async function stopRun() {
+  const run = await boardRun();
+  if (!run?.running) throw Object.assign(new Error('No run started from the board is active. Stop a terminal run with Ctrl+C there.'), { status: 409 });
+  try { process.kill(-run.pid, 'SIGTERM'); } catch { /* already gone */ }
+  setTimeout(() => { if (alive(run.pid)) { try { process.kill(-run.pid, 'SIGKILL'); } catch { /* gone */ } } }, 15000);
+  return { stopping: true };
+}
+
+// Replace the content of a "## Heading" section of a markdown file (the section is added if missing).
+function setSection(text, heading, body) {
+  const lines = (text || '').split('\n');
+  const start = lines.findIndex((l) => l.trim() === `## ${heading}`);
+  if (start < 0) return `${(text || '').replace(/\s*$/, '')}\n\n## ${heading}\n\n${body}\n`;
+  let end = lines.findIndex((l, i) => i > start && /^## /.test(l));
+  if (end < 0) end = lines.length;
+  return [...lines.slice(0, start + 1), '', body, '', ...lines.slice(end)].join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
+async function saveBrief(text) {
+  const file = path.join(SPEC, 'autopilot.md');
+  const brief = String(text || '').trim().slice(0, 8000);
+  if (!brief) throw Object.assign(new Error('The idea is empty.'), { status: 400 });
+  const current = (await readText(file)) || '# Autopilot\n\n## Settings\n\n- Stop at: milestone\n- Roast rounds: 3\n\n## Decisions to review\n';
+  await fsp.writeFile(file, setSection(current, 'Brief', brief));
+  return { saved: true };
+}
+
+async function saveSettings(body) {
+  const cur = (await readJson(BOARD_SETTINGS)) || {};
+  const next = { ...cur };
+  const agents = await detectAgents();
+  if (body.agent !== undefined) {
+    if (!agents.some((a) => a.id === body.agent && a.installed)) throw Object.assign(new Error('That agent is not installed.'), { status: 400 });
+    if (body.agent !== cur.agent) next.model = '';
+    next.agent = body.agent;
+  }
+  if (body.model !== undefined) {
+    const m = String(body.model).trim();
+    if (m && !/^[\w.:@/[\]-]{1,80}$/.test(m)) throw Object.assign(new Error('Model names use letters, digits and . : @ / [ ] - _ only.'), { status: 400 });
+    next.model = m === 'default' ? '' : m;
+  }
+  if (body.mode !== undefined) next.mode = body.mode === 'full' ? 'full' : 'step';
+  if (body.stopAt !== undefined && ['spec', 'plan', 'milestone'].includes(body.stopAt)) next.stopAt = body.stopAt;
+  if (body.parallel !== undefined) next.parallel = Math.min(Math.max(Number(body.parallel) || 1, 1), 6);
+  await writeJson(BOARD_SETTINGS, next);
+  return boardSettings();
+}
+
+async function loadControl() {
+  if (READ_ONLY) return { enabled: false };
+  return { enabled: true, agents: await detectAgents(), settings: await boardSettings(), run: await boardRun(), chat: { ...chatStatus(), adapters: adapterInfo() } };
 }
 
 async function loadState() {
+  const [ws, gitState] = await Promise.all([readWorkspace(ROOT, { git: false }), loadGit()]);
+  const parsed = ws;
   const docsDir = path.join(SPEC, 'docs');
-  const docs = [];
-  for (const d of await listDir(docsDir)) {
-    if (!d.isFile() || !d.name.endsWith('.md')) continue;
-    const p = path.join(docsDir, d.name);
-    const text = await readText(p);
-    const st = await fsp.stat(p);
-    const h1 = (text || '').match(/^# (.+)$/m);
-    docs.push({ name: d.name, path: rel(p), empty: isEmpty(text), title: h1 ? h1[1].trim() : d.name.replace(/\.md$/, ''), mtime: st.mtimeMs, words: text ? text.split(/\s+/).filter(Boolean).length : 0 });
-  }
-  const msText = await readText(path.join(SPEC, 'milestones.md'));
-  const parsed = !isEmpty(msText) ? parseMilestones(msText) : { title: '', roadmap: null, coverage: null, milestones: [] };
-  for (const m of parsed.milestones) await loadMilestoneDetail(m);
   const progressText = await readText(path.join(SPEC, 'progress.md'));
   const progress = parseSections(progressText);
   const mockups = [];
@@ -335,17 +438,48 @@ async function loadState() {
   const ideaTitle = (ideaText || '').match(/^# (?:Idea:\s*)?(.+)$/m);
   const state = {
     generatedAt: Date.now(),
+    server: { api: 2, started: STARTED },
     project: parsed.title || (ideaTitle ? ideaTitle[1].trim() : path.basename(ROOT)),
     root: path.basename(ROOT),
-    docs,
+    docs: ws.docs,
     roadmap: parsed.roadmap,
     coverage: parsed.coverage,
     milestones: parsed.milestones,
     progress: { empty: isEmpty(progressText), sections: progress, path: 'progress.md' },
     mockups,
-    git: await loadGit(),
+    git: gitState,
     runs: await loadRuns(),
+    autopilot: ws.autopilot,
+    control: await loadControl(),
   };
+  // a run started from the board counts as running from its first second
+  if (state.control.run?.running && !state.runs.running) state.runs = { ...state.runs, running: true, autopilot: state.runs.autopilot || 'starting' };
+  // a chat turn of the board is an agent session at work
+  const chatting = READ_ONLY ? [] : chatStatus().running;
+  if (!state.runs.running && chatting.length) {
+    const session = (await loadSession(state.git)) || {};
+    const c = chatting[0];
+    state.runs = {
+      ...state.runs,
+      running: true,
+      session: { skill: session.skill || null, action: session.action || null, task: session.task || null, title: session.title || `Chat: ${c.title}`, since: session.since || c.since, lastSeen: Date.now(), state: 'active', chat: c.id },
+      working: session.task && ['implement', 'review'].includes(session.action) ? [{ action: session.action, task: session.task, lane: 'chat', since: session.since }] : [],
+    };
+  }
+  // an interactive agent session, when no script is running
+  if (!state.runs.running) {
+    const session = await loadSession(state.git);
+    if (session) {
+      state.runs = { ...state.runs, session };
+      if (session.state === 'active') {
+        state.runs.running = true;
+        state.runs.working = session.task && ['implement', 'review'].includes(session.action)
+          ? [{ action: session.action, task: session.task, lane: 'agent session', since: session.since }] : [];
+      }
+    }
+  }
+  const where = decide(state);
+  state.stage = { id: where.stage, milestone: where.milestone };
   state.next = computeNext(state);
   return state;
 }
@@ -360,6 +494,32 @@ function broadcast() {
     for (const res of clients) res.write(`data: ${Date.now()}\n\n`);
   }, 250);
 }
+// Updates of the board itself: new page files reload open pages, new server code restarts the server.
+function watchSelf() {
+  let restartTimer = null;
+  let reloadTimer = null;
+  const restart = () => {
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => {
+      if (!process.send) { console.log('SpecCraft Board was updated: restart it to use the new version.'); return; }
+      if (chatStatus().running.length) { restart(); return; } // wait until the agent in the chat has finished
+      console.log('SpecCraft Board was updated: restarting…');
+      for (const res of clients) res.write('event: reload\ndata: server\n\n');
+      server.close();
+      setTimeout(() => process.exit(75), 300);
+    }, 1500);
+  };
+  try {
+    fs.watch(HERE, (_e, file) => { if (file && /\.mjs$/.test(file)) restart(); });
+    if (exists(ENGINE_DIR)) fs.watch(ENGINE_DIR, (_e, file) => { if (file === 'state.mjs') restart(); });
+    fs.watch(PUBLIC, (_e, file) => {
+      if (!file) return;
+      clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => { for (const res of clients) res.write('event: reload\ndata: page\n\n'); }, 800);
+    });
+  } catch { /* watching is optional */ }
+}
+
 function watch() {
   try {
     fs.watch(SPEC, { recursive: true }, (_e, file) => {
@@ -402,9 +562,61 @@ async function sendFile(res, file, cache = false) {
   }
 }
 
+let LOCAL_HOSTS = new Set();
+const readBody = (req) => new Promise((resolve, reject) => {
+  let size = 0;
+  const chunks = [];
+  req.on('data', (c) => { size += c.length; if (size > 64 * 1024) { reject(Object.assign(new Error('Too large'), { status: 413 })); req.destroy(); } else chunks.push(c); });
+  req.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); } catch { reject(Object.assign(new Error('Bad JSON'), { status: 400 })); } });
+  req.on('error', reject);
+});
+const json = (res, status, body) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${HOST}`);
+  // Only this machine's browser, by name: blocks DNS rebinding.
+  if (!LOCAL_HOSTS.has(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('Forbidden host'); }
   try {
+    if (req.method === 'POST') {
+      // Writes need the per-process token from the page and a same-origin request.
+      const origin = req.headers.origin;
+      if (READ_ONLY) return json(res, 403, { error: 'The board runs with --read-only.' });
+      if (req.headers['x-speccraft-token'] !== TOKEN || (origin && !LOCAL_HOSTS.has(origin.replace(/^https?:\/\//, '')))) return json(res, 403, { error: 'Reload the page (the board was restarted).' });
+      const body = await readBody(req);
+      if (url.pathname === '/api/run') { const r = await startRun(String(body.kind || ''), body); broadcast(); return json(res, 200, r); }
+      if (url.pathname === '/api/stop') { const r = await stopRun(); return json(res, 200, r); }
+      if (url.pathname === '/api/brief') { const r = await saveBrief(body.text); broadcast(); return json(res, 200, r); }
+      if (url.pathname === '/api/settings') { const r = await saveSettings(body); broadcast(); return json(res, 200, r); }
+      if (url.pathname === '/api/activity/clear') {
+        for (const f of ['activity.json', 'activity.idle']) await fsp.rm(path.join(SPEC, '.runs', f), { force: true });
+        broadcast();
+        return json(res, 200, { cleared: true });
+      }
+      if (url.pathname === '/api/agents') { const r = await detectAgents(true); broadcast(); return json(res, 200, r); }
+      if (url.pathname === '/api/chat/send') {
+        const agents = await detectAgents();
+        if (!agents.some((a) => a.id === body.agent && a.installed)) return json(res, 400, { error: 'That agent CLI is not installed.' });
+        const r = await sendMessage(body, { busy: await chatBlocker() });
+        broadcast();
+        return json(res, 200, r);
+      }
+      if (url.pathname === '/api/chat/stop') return json(res, 200, stopChat(body.chat));
+      if (url.pathname === '/api/chat/delete') return json(res, 200, await deleteChat(body.chat));
+      return json(res, 404, { error: 'Not found' });
+    }
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      const html = await fsp.readFile(path.join(PUBLIC, 'index.html'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(html.replace('</head>', `  <meta name="speccraft-token" content="${READ_ONLY ? '' : TOKEN}">\n</head>`));
+    }
+    if (url.pathname === '/api/whoami') return json(res, 200, { app: 'speccraft-board', root: ROOT });
+    if (url.pathname.startsWith('/api/chat/')) {
+      // chat contents need the page's token too (EventSource cannot send headers, so it is a query parameter)
+      if (READ_ONLY || url.searchParams.get('token') !== TOKEN) return json(res, 403, { error: 'Reload the page (the board was restarted).' });
+      if (url.pathname === '/api/chat/list') return json(res, 200, await listChats());
+      if (url.pathname === '/api/chat/get') return json(res, 200, await getChat(url.searchParams.get('id')));
+      if (url.pathname === '/api/chat/stream') return streamChat(url.searchParams.get('id'), req, res);
+    }
     if (url.pathname === '/api/state') {
       const state = await loadState();
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -427,24 +639,56 @@ const server = http.createServer(async (req, res) => {
     if (!file) { res.writeHead(400); return res.end('Bad path'); }
     return sendFile(res, file, false);
   } catch (err) {
+    if (req.method === 'POST' || url.pathname.startsWith('/api/chat/')) return json(res, err.status || 500, { error: err.message || String(err) });
     res.writeHead(500, { 'Content-Type': 'text/plain' });
     res.end(String(err?.stack || err));
   }
 });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') console.error(`Port ${PORT} is in use. Try: node .speccraft/viewer/server.mjs --port ${PORT + 1}`);
-  else console.error(err);
-  process.exit(1);
+function openBrowser(url) {
+  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  execFile(opener, args, () => {});
+}
+
+// Is the board of this same project already listening on that port?
+async function sameBoard(port) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/whoami`, { signal: AbortSignal.timeout(1500) });
+    const who = await res.json();
+    return who.app === 'speccraft-board' && who.root === ROOT;
+  } catch { return false; }
+}
+
+server.on('error', async (err) => {
+  if (err.code !== 'EADDRINUSE') { console.error(err); process.exit(1); }
+  if (await sameBoard(PORT)) {
+    const url = `http://localhost:${PORT}`;
+    console.log(`SpecCraft Board of this project is already running → ${url}`);
+    if (argv.includes('--open')) openBrowser(url);
+    process.exit(0);
+  }
+  if (PORT_FIXED || PORT >= 4545 + 20) {
+    console.error(`Port ${PORT} is in use. Try another one: --port ${PORT + 1}`);
+    process.exit(1);
+  }
+  PORT += 1;
+  server.listen(PORT, HOST);
 });
 
-server.listen(PORT, HOST, () => {
+initChat({ root: ROOT, spec: SPEC, changed: () => broadcast() });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAllChats(); process.exit(0); });
+
+server.on('listening', () => {
+  LOCAL_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
   const url = `http://localhost:${PORT}`;
-  console.log(`SpecCraft Board → ${url}   (workspace: ${SPEC})`);
+  console.log(`SpecCraft Board → ${url}   (workspace: ${SPEC})${READ_ONLY ? '   read-only' : ''}`);
+  if (!READ_ONLY) detectAgents().then((a) => console.log(`Agents: ${a.map((x) => `${x.id}${x.installed ? '' : ' (not installed)'}`).join(', ')}`));
+  console.log('Press Ctrl+C to stop the board (runs started from it keep going).');
+  process.send?.({ port: PORT });
   watch();
-  if (argv.includes('--open')) {
-    const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-    const args = process.platform === 'win32' ? ['/c', 'start', url] : [url];
-    execFile(opener, args, () => {});
-  }
+  watchSelf();
+  if (argv.includes('--open')) openBrowser(url);
 });
+
+server.listen(PORT, HOST);
