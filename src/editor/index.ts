@@ -858,16 +858,20 @@ export function initEditor(
     container.querySelector<HTMLButtonElement>('#btn-download-png')?.setAttribute('aria-disabled', downloadInProgress || state.prototypeState === 'empty' ? 'true' : 'false');
   }
 
-  async function closeEditor(): Promise<void> {
+  async function closeEditor(canClose: () => boolean = () => true): Promise<boolean> {
     if (options.onClose) {
+      if (!canClose()) return false;
       options.onClose();
     } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
       const tab = await chrome.tabs.getCurrent();
+      if (!canClose()) return false;
       if (typeof tab?.id === 'number') await chrome.tabs.remove(tab.id);
       else window.close();
     } else {
+      if (!canClose()) return false;
       window.close();
     }
+    return true;
   }
 
   function bindToolbarAndStageEvents(toolbarOnly = false): void {
@@ -972,12 +976,13 @@ export function initEditor(
           baseDrawable,
           placedFrameDrawables,
         ).then(async () => {
-          if (activeTextDraft || JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) !== exportedState) {
+          const canClose = (): boolean => !activeTextDraft && JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) === exportedState;
+          if (!canClose()) {
             downloadError = 'changed';
             return;
           }
           try {
-            await closeEditor();
+            if (!await closeEditor(canClose)) downloadError = 'changed';
           } catch {
             downloadError = 'close';
           }

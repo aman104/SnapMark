@@ -134,6 +134,25 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     expect(controller.getState().annotations[0].color).toBe('#34C759');
   });
 
+  it('rechecks for edits after a delayed current-tab lookup before removing the tab', async () => {
+    const downloads = mockDownloads();
+    let finishLookup!: (tab: { id: number }) => void;
+    const getCurrent = vi.fn(() => new Promise<{ id: number }>((resolve) => { finishLookup = resolve; }));
+    const remove = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('chrome', { downloads: chrome.downloads, tabs: { getCurrent, remove } });
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+    container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
+    await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
+    downloads.emit(41, 'complete');
+    await vi.waitFor(() => expect(getCurrent).toHaveBeenCalledOnce());
+    controller.setColor('#34C759');
+    finishLookup({ id: 37 });
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nowe zmiany'));
+    expect(remove).not.toHaveBeenCalled();
+    expect(controller.getState().annotations[0].color).toBe('#34C759');
+  });
+
   it('retains the active text input and selection when a pending download fails', async () => {
     const downloads = mockDownloads();
     const container = document.createElement('div');

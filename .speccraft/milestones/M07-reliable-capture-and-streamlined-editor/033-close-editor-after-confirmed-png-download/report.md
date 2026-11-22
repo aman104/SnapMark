@@ -6,7 +6,7 @@
 - Update manifest permission tests, simulated E2E tests and README.
 
 ## Verification
-- `npm run typecheck`, `npm test` (124 passed), `npm run build`, `npm run test:e2e` (4 simulated tests), `npm run package` passed.
+- `npm run typecheck`, `npm test` (125 passed), `npm run build`, `npm run test:e2e` (4 simulated tests), `npm run package` passed.
 - In isolated Chrome for Testing, a temporary copy of the extension ran the real editor download flow and `chrome.downloads`; the completed callback fired and a valid 1920×1160 PNG was written to a temporary directory. The close action was substituted by a callback, so actual tab removal remains for task 034.
 - Tests cover matching IDs, unrelated events, early completion, interruption, startup errors and resource cleanup.
 
@@ -25,3 +25,4 @@
 ## Review fixes
 - Keep the editor open with a retry message if metadata, annotations or a text draft changed during download.
 - Update download feedback in place, preserving the active textarea, focus and selection; added regression tests. Repeated real Chrome success-path download after the fixes.
+- Round 2: recheck content and active text draft immediately after current-tab lookup and before closing; added delayed-lookup regression. Repeated real Chrome success-path test.
