@@ -8,13 +8,15 @@ description: split the v1 product described in .speccraft/docs (idea, PRD, desig
 ## Repository layout
 
 - All paths are relative to the repository root. The workflow workspace is `.speccraft/`:
-  - `.speccraft/docs/` — product documents: `01-Idea.md`, `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports and feature plans
+  - `.speccraft/docs/` — product documents: `01-Idea.md` (with its roast `01-Idea-roast.md`), `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports and feature plans
   - `.speccraft/mockup/` — mockups, screenshots, sketches and other references supplied by the user (input only; ignore `.gitkeep`)
   - `.speccraft/milestones.md` — the ordered milestone plan with milestone statuses
   - `.speccraft/milestones/[Mnn]-[slug]/` — one folder per planned milestone: its `tasks.md` (task list with statuses), one `[NNN]-[slug]/` folder per task (`implementation-plan.md`, `report.md`, `review.md`, `blocker.md`), `milestone-report.md` and run summaries
   - `.speccraft/progress.md` — project memory shared by all tasks: commands, structure, conventions, decisions, log
+  - `.speccraft/autopilot.md` — autopilot settings, the operator's brief and the decisions the autopilot made in place of the operator
   - `.speccraft/.runs/` — logs of autonomous runs (git-ignored)
-  - `.speccraft/viewer/` — the local dashboard (`node .speccraft/viewer/server.mjs`); tooling, never modify it
+  - `.speccraft/viewer/` — SpecCraft Board, the local dashboard (`.speccraft/board`); tooling, never modify it
+  - `.speccraft/board` — starts SpecCraft Board; tooling, never modify it
 - The product itself lives directly in the repository root, laid out as defined in `.speccraft/docs/05-Tech-Stack.md` (source, tests, manifests and lockfiles, configuration, migrations, `.env.example`, `README.md`, CI such as `.github/workflows/`). It can be any kind of product: web or mobile app, API, backend service, CLI, library/SDK, browser extension, desktop app, game, data or ML pipeline, multi-package workspace, and so on.
 - If the repository already contains product code, treat it as the existing product: build on its structure and conventions instead of scaffolding a new one.
 - Keep workflow and product apart: no product code, dependencies or build output in `.speccraft/`, `.agents/` or `.claude/`, and no workflow documents in the product tree. Do not modify `.agents/` or `.claude/` unless the user asks. `AGENTS.md` and `CLAUDE.md` in the repository root are shared agent instructions: keep their SpecCraft section (between the `speccraft:start` / `speccraft:end` markers) intact and add product-specific instructions only below it.
@@ -26,7 +28,7 @@ Read all planning documents and produce `.speccraft/milestones.md`: a **phased r
 
 The roadmap works like a waterfall the operator can watch. The product grows through a fixed sequence of **phases**, from the look and feel, through a clickable prototype and the real foundations, to complete features, quality and release. Each phase is finished and accepted before the next one starts. At the end of every phase, and of every milestone inside it, the operator can see a clear, visible step forward compared to the previous one.
 
-A milestone is the unit of **operator control**. Tasks are planned for one milestone at a time (`08-planning-tasks`). The execution agent works autonomously only within the active milestone (`10-execution-initial`). At the end of every milestone the operator reviews the result and accepts it before the next milestone is planned. Milestones must therefore be:
+A milestone is the unit of **operator control**. Tasks are planned for one milestone at a time (`08-planning-tasks`). The execution agent works autonomously only within the active milestone (`10-execution-tasks`). At the end of every milestone the operator reviews the result and accepts it before the next milestone is planned. Milestones must therefore be:
 
 - **visible:** at the end, the operator can run, click or call something and *see* what is new compared to the previous milestone
 - **valuable to review:** the review can still change the direction of later milestones cheaply
@@ -158,7 +160,7 @@ For other product types, adapt the names but keep the visible step per phase. Fo
   |---|---|---|
   | `[ ]` | planned, no tasks yet | this skill |
   | `[>]` | active: tasks defined, execution in progress | `08-planning-tasks` |
-  | `[?]` | all tasks done, waiting for the operator's review | `10-execution-initial` |
+  | `[?]` | all tasks done, waiting for the operator's review | `10-execution-tasks` |
   | `[x]` | accepted by the operator | operator, or `08-planning-tasks` on the operator's explicit acceptance |
 
 - The **Status** column of the roadmap shows `planned`, `in progress`, `in review` or `done` per phase. It is derived from its milestones and updated by `08-planning-tasks` when a milestone is activated or accepted.

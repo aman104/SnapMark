@@ -8,12 +8,13 @@ This repository is built with the SpecCraft skills, a spec-driven workflow that 
 
 - **Skills:** `.agents/skills/<NN-name>/SKILL.md`. Codex and Antigravity read them natively. Claude Code reads them through the `.claude/skills` symlink. When a request matches a skill, follow its `SKILL.md`.
 - **Workflow workspace:** `.speccraft/`. The guide is `.speccraft/Readme.md`.
-  - `docs/`: `01-Idea.md`, `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports, feature plans
+  - `docs/`: `01-Idea.md` (with its roast `01-Idea-roast.md`), `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports, feature plans
   - `mockup/`: visual references supplied by the user
   - `milestones.md`: the milestone plan; milestone statuses live only here
   - `milestones/Mnn-slug/`: `tasks.md` (task statuses live only here), one `NNN-slug/` folder per task with `implementation-plan.md` and `report.md`, plus `milestone-report.md`
   - `progress.md`: project memory with commands, structure, conventions and decisions
-  - `viewer/`: SpecCraft Board, a read-only local dashboard (`node .speccraft/viewer/server.mjs --open`). It is tooling: never modify it as part of product work
+  - `autopilot.md`: autopilot settings (`Stop at`, `Roast rounds`), the user's brief, and the decisions the autopilot made in the user's place
+  - `viewer/`: SpecCraft Board, the local dashboard and control panel (`.speccraft/board`). It is tooling: never modify it as part of product work
 - **Product code** lives in the repository root, laid out as defined in `.speccraft/docs/05-Tech-Stack.md`.
 
 ### Rules
@@ -25,6 +26,10 @@ This repository is built with the SpecCraft skills, a spec-driven workflow that 
   - Task: `[ ]` pending → `[~]` waiting for independent review → `[x]` approved and merged, or `[!]` blocked.
   - Milestone: `[ ]` → `[>]` → `[?]` → `[x]`. Only the user accepts a milestone (`[x]`).
 - Do not know what to do next? Follow `00-next`.
+- **Show what you are doing on SpecCraft Board.** In an interactive session, when you start a SpecCraft step, write `.speccraft/.runs/activity.json` (git-ignored; create the folder if needed):
+  `{"skill": "03-discovery-prd", "action": "write", "task": "007", "milestone": "M03", "title": "Writing the requirements (PRD)", "started": "2026-11-21T10:00:00Z"}`.
+  `action` is one of `write`, `plan`, `implement`, `review`, `complete`; leave out `task` and `milestone` when they do not apply. Rewrite the file when you move to another task. Delete it when the step is finished or blocked, not when you only ask the user a question. Scripts report their own progress: skip this in `AUTONOMOUS MODE`.
+- A prompt that starts with `AUTONOMOUS MODE` comes from a SpecCraft script (`autopilot.sh`, `run-milestone.sh`): nobody can answer questions. Follow its rules and the skill's "Autonomous mode" section.
 - Never push, deploy or publish unless the user asks.
 
 ### Git
@@ -35,13 +40,13 @@ This repository is built with the SpecCraft skills, a spec-driven workflow that 
 - Only `08-planning-tasks` merges a milestone into `main`, and only after the user accepts it.
 - In parallel runs (`run-milestone.sh --parallel N`), workers stay in their own worktree and task branch, never edit `.speccraft/` workflow files, and use the resources of their `SPECCRAFT_SLOT`.
 - Never push, force-push, rewrite merged history or delete unmerged branches.
-- Details: `.agents/skills/10-execution-initial/SKILL.md` → "Git workflow".
+- Details: `.agents/skills/10-execution-tasks/SKILL.md` → "Git workflow".
 
 ### Skills
 
 | Step | Skill | Purpose |
 |---|---|---|
-| 00 | `00-next` | status and the next step, or autopilot until a gate |
+| 00 | `00-next` | status and the next step; guided autopilot until a gate; full autopilot from a brief to a built milestone (`scripts/autopilot.sh` runs it unattended) |
 | 01 | `01-discovery-idea` | shape the idea → `docs/01-Idea.md` |
 | 02 | `02-discovery-idea-roast` | stress-test the idea |
 | 03 | `03-discovery-prd` | requirements → `docs/02-General-PRD.md` |
@@ -51,7 +56,7 @@ This repository is built with the SpecCraft skills, a spec-driven workflow that 
 | 07 | `07-planning-milestones` | milestone plan → `milestones.md` |
 | 08 | `08-planning-tasks` | milestone gate, tasks of the next milestone |
 | 09 | `09-planning-task-details` | implementation plan per task |
-| 10 | `10-execution-initial` | implement tasks, independent review, merge; milestone report with spec changes |
+| 10 | `10-execution-tasks` | implement tasks, independent review, merge; milestone report with spec changes |
 | 11 | `11-security-researcher` | security review and fixes |
 | 12 | `12-feature-advisor` | feature or bug fix → spec update + new milestone |
 

@@ -34,7 +34,7 @@
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "scripting", "storage"]`.
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, active milestone branch none (all v1 milestones accepted and merged to `main`)
+- **Git:** base branch `main`, no active milestone branch
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
@@ -42,6 +42,7 @@
 - [M03] `[x]` accepted (2026-11-21) — Core features: Contextual DOM captures (Selection, Image, Full-Page Scroll) (5/5 tasks done)
 - [M04] `[x]` accepted (2026-11-21) — Complete features: Vector annotation editor, undo history and export (4/4 tasks done)
 - [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
+- [M06] `[x]` accepted — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (3/3 tasks done)
 
 ## Decisions and deviations
 - none
@@ -88,3 +89,9 @@
 - [025] [x] 2026-11-21 — Added Chrome Web Store release packager (`npm run package` -> `snapmark-extension.zip`), GitHub Actions CI (`.github/workflows/ci.yml`), and final `README.md`.
 - [M05] [?] 2026-11-21 — Milestone M05 completed and ready for operator review.
 - [M05] [x] 2026-11-21 — Milestone M05 accepted by operator and merged into `main` (v1 complete).
+- [026] [x] 2026-11-21 — Implemented on-demand interactive screen area selection overlay (`selectAreaOverlayInDom` in `src/content/capture-injected.ts`).
+
+- [027] [x] 2026-11-22 — Orchestrated interactive area capture and preserved context-menu text selection.
+- [028] [x] 2026-11-22 — Enabled interactive area selection in popup and verified release package.
+- [M06] [?] 2026-11-22 — Ready for operator review; manual Chrome walkthrough pending.
+- [M06] [x] 2026-11-22 — Accepted by operator and merged into main.
