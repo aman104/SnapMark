@@ -329,6 +329,9 @@ SnapMark has two distinct visual surfaces, each governed by a 4px base spacing g
   - Positioned below the top toolbar or inside the popup; background `rgba(245, 158, 11, 0.12)` with border `1px solid {colors.warning}` for warnings, or `rgba(239, 68, 68, 0.12)` with border `1px solid {colors.danger}` for restricted `chrome://` pages.
 
 ### 6. Navigation (Top Toolbar)
+
+**M07 override — `editor-capture-improvements`:** Use a compact responsive toolbar without image filename/dimensions or clipboard-export control. Make PNG download the primary action and provide a clearly labeled, keyboard-accessible close button. Earlier conflicting clipboard-primary guidance is superseded; keep the established palette and annotation controls.
+
 - Single horizontal bar (`56px` height) in `editor.html`. No sidebars, no nested dropdown menus deeper than 1 level, and no tabs — every v1 tool is visible and reachable in a single click.
 
 ### 7. Tables, Tabs, Avatars / Badges, Tooltips, Loaders & Empty States

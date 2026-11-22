@@ -13,6 +13,8 @@
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | done |
 | 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | done |
 
+| 8+. Evolution | M07 | Reliable full-page capture and a compact, usable annotation editor | planned |
+
 ## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
 - **Type:** prototype
@@ -201,6 +203,31 @@
 - **Depends on:** M05
 - **Estimated size:** 3 tasks
 
+
+## [ ] M07 - Feature: Reliable capture and streamlined editor
+- **Phase:** 8+ — Evolution
+- **Type:** feature
+- **What you will see:** Full-page capture starts at the top; the editor has a compact toolbar, clear arrows, working text and deselection, PNG download with automatic close on completion, and an explicit close button.
+- **Source:** `docs/07-feature-plan-editor-capture-improvements.md`
+- **Goal:** Fix reported capture and editor defects and simplify the export workflow.
+- **Scope:**
+  - Confirm and render the top before the first full-page frame, preserve restoration and cancellation (PRD FR-01).
+  - Compact the toolbar, remove filename/dimensions display and clipboard export, retain clipboard paste and automatic filename (FR-02, FR-07).
+  - Correct arrow appearance, support deselection and repair text entry (FR-03–FR-05).
+  - Close only after confirmed successful PNG download; retain the editor and report failures or cancellation (FR-06).
+  - Verify existing capture, editor and export flows with unit and real Chromium extension tests (FR-08).
+- **Out of scope:** New annotation tools, cloud storage, internal scroll-container capture.
+- **Demo for the operator:** Start a full-page capture midway down a page, annotate with arrow, line and text, deselect/reselect, download and observe tab close; separately verify close and failure handling.
+- **Exit criteria:**
+  - [ ] First frame starts at page top, even with smooth scrolling; source scroll and styles restore on completion, cancellation and failure.
+  - [ ] Toolbar is compact, without filename/dimensions or clipboard export, and has accessible close and PNG controls.
+  - [ ] Arrows are recognizable; empty click deselects and dragging, selection and editing continue working.
+  - [ ] Text can be entered, edited and exported in a real Chromium extension.
+  - [ ] Only a confirmed completed PNG download closes the editor; failure or cancellation preserves it and shows feedback.
+  - [ ] Existing capture, annotation, clipboard paste and export flows pass regression checks, including real Chromium coverage and `npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package`.
+- **Depends on:** M06
+- **Estimated size:** 4–6 tasks
+
 ## Coverage
 
 | Requirement / screen | Milestone |
@@ -220,3 +247,5 @@
 | `PRD §6.1–6.3` Manifest V3 minimal permissions (`activeTab`, `contextMenus`, `scripting`, `storage`) & IndexedDB `Blob` transfer with immediate cleanup | M02 |
 | `PRD §8` User Settings & Configuration in `chrome.storage.local` | M02 |
 | `PRD §7, §10, §11` Edge cases (`MAX_CANVAS_HEIGHT`, restricted pages, rate-limit retry), non-functional requirements, Playwright E2E & Web Store release package | M05 (hardening & E2E), unit criteria in M02–M04 |
+
+| `PRD FR-01–FR-08` reliable capture and streamlined editor | M07 |

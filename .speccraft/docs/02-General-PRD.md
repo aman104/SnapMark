@@ -89,6 +89,19 @@ W codziennej pracy przeglądarkowej (zgłaszanie błędów, design/code review, 
 
 ---
 
+### 4.6 Wymagania M07 — `editor-capture-improvements`
+
+Poniższe wymagania zastępują sprzeczne wcześniejsze opisy paska i eksportu do schowka; wklejanie ze schowka w pustym edytorze pozostaje dostępne.
+
+- **FR-01:** Zrzut całej strony zaczyna się po potwierdzeniu położenia i wyrenderowania samej góry strony; przy zakończeniu, błędzie i anulowaniu przywraca pierwotną pozycję i style.
+- **FR-02:** Kompaktowy pasek edytora nie pokazuje nazwy ani wymiarów obrazu i nie oferuje kopiowania wyniku do schowka. Zachowuje narzędzia, kontrolki adnotacji i automatyczne nazewnictwo PNG.
+- **FR-03:** Strzałka ma połączony trzon i czytelny wypełniony grot w kierunku przeciągania, z poprawnym wyglądem w edytorze i eksporcie.
+- **FR-04:** Kliknięcie pustego miejsca odznacza strzałkę lub linię; przeciąganie rysuje nowy obiekt, a ponowne zaznaczanie, uchwyty i przesuwanie działają.
+- **FR-05:** Narzędzie Tekst umożliwia wpisywanie, zatwierdzanie, ponowną edycję i eksport tekstu w rzeczywistej wtyczce.
+- **FR-06:** Pobranie PNG zamyka kartę edytora dopiero po potwierdzonym zakończeniu pobierania; błąd lub anulowanie pozostawia kartę i adnotacje oraz pokazuje błąd.
+- **FR-07:** Dostępny i opisany przycisk na pasku zamyka kartę edytora.
+- **FR-08:** Testy regresji i rzeczywistego rozszerzenia Chromium obejmują powyższe oraz istniejące tryby zrzutu, adnotacje i eksport.
+
 ## 5. User Experience & Interface (if applicable)
 
 ### 5.1 User Flows

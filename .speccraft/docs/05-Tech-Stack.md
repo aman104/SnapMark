@@ -115,6 +115,10 @@ Instead of pulling in heavy UI frameworks (React/Vue) or heavyweight canvas engi
 
 ---
 
+## M07 download lifecycle — `editor-capture-improvements`
+
+The editor closes only on confirmed successful completion of its own PNG download; failure or cancellation leaves it open. Choose and document a Chromium-supported completion mechanism during implementation; if it needs the `downloads` permission, add and justify that minimal permission and update permission tests. Blob creation or an anchor click alone is not completion. Existing clipboard paste remains supported.
+
 ## 5. Key technical decisions
 
 ### Decision 1: Vanilla TypeScript + Native HTML5 2D Canvas instead of React + Fabric.js/Konva

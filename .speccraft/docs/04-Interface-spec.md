@@ -143,6 +143,9 @@ Because `popup.html` and `editor.html` are separate extension documents, they sh
 
 ### 5.2 Screen 2: Vector Annotation Editor (`editor.html`)
 
+**M07 override — `editor-capture-improvements`:** Earlier conflicting toolbar and clipboard-export descriptions below are superseded. The compact toolbar omits image name/dimensions and clipboard export, retains drawing controls, and has primary PNG download and a labeled close control. Empty-canvas click deselects arrows/lines; drag draws. Text must be focusable, editable and exportable. On confirmed PNG download completion close the editor tab; on failure or cancellation leave it open with feedback. Clipboard paste remains available in the empty editor. Full-page capture must confirm the first frame is rendered at the top and restore the prior scroll on all exits.
+
+
 - **Purpose**: Allow the user to annotate the captured screenshot with vector arrows, underlines, semi-transparent highlighter strokes, and readable text callouts, undo any step with `Ctrl+Z`, and export in 1 click to Clipboard or an auto-named PNG file.
 - **Layout Structure**:
   - Full-window app shell (`width: 100vw; height: 100vh; display: flex; flex-direction: column; background: {colors.canvas}; overflow: hidden`).
