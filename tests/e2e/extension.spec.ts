@@ -50,6 +50,7 @@ describe('SnapMark Chrome Extension Manifest V3 — End-to-End Suite (tests/e2e/
     expect(manifest.permissions).toEqual([
       'activeTab',
       'contextMenus',
+      'downloads',
       'scripting',
       'storage',
     ]);

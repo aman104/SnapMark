@@ -161,6 +161,8 @@ export function initEditor(
   let activeTextDraft: ActiveTextEditorDraft | null = null;
   let toolbarRefreshPending = false;
   let toolbarPointerDown = false;
+  let downloadInProgress = false;
+  let downloadError: 'download' | 'close' | null = null;
   let lastProcessedMoveEvent: MouseEvent | null = null;
   let lastProcessedUpEvent: MouseEvent | null = null;
   let annotationSeq = 0;
@@ -605,6 +607,7 @@ export function initEditor(
                 id="btn-download-png"
                 class="btn-primary"
                 ${isEmptyState ? 'disabled' : ''}
+                aria-disabled="${isEmptyState || downloadInProgress ? 'true' : 'false'}"
                 title="Pobierz spłaszczony plik PNG"
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -648,6 +651,7 @@ export function initEditor(
         ${renderToolbarHtml()}
 
         <main class="editor-stage" id="editor-stage">
+          ${downloadError ? `<div class="status-banner is-danger" role="alert">${downloadError === 'close' ? 'PNG został pobrany, ale nie udało się zamknąć karty.' : 'Nie udało się pobrać PNG. Spróbuj ponownie.'}</div>` : ''}
           ${renderStageHtml()}
         </main>
       </div>
@@ -840,6 +844,18 @@ export function initEditor(
     notifyAndRender();
   }
 
+  async function closeEditor(): Promise<void> {
+    if (options.onClose) {
+      options.onClose();
+    } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
+      const tab = await chrome.tabs.getCurrent();
+      if (typeof tab?.id === 'number') await chrome.tabs.remove(tab.id);
+      else window.close();
+    } else {
+      window.close();
+    }
+  }
+
   function bindToolbarAndStageEvents(toolbarOnly = false): void {
     const toolbar = container.querySelector<HTMLElement>('.editor-toolbar');
     const scheduleToolbarRefresh = (): void => {
@@ -925,31 +941,37 @@ export function initEditor(
     container
       .querySelector<HTMLButtonElement>('#btn-download-png')
       ?.addEventListener('click', () => {
+        if (downloadInProgress) return;
         if (activeTextDraft) {
           commitActiveTextDraft();
         }
         if (options.onDownloadPng) {
           options.onDownloadPng(state.metadata.filename, state);
         }
+        downloadInProgress = true;
+        downloadError = null;
+        notifyAndRender();
         void exportFlattenedPngDownload(
           state.metadata,
           state.annotations,
           baseDrawable,
           placedFrameDrawables,
-        );
+        ).then(async () => {
+          try {
+            await closeEditor();
+          } catch {
+            downloadError = 'close';
+          }
+        }).catch(() => {
+          downloadError = 'download';
+        }).finally(() => {
+          downloadInProgress = false;
+          if (downloadError) notifyAndRender();
+        });
       });
 
     container.querySelector<HTMLButtonElement>('#btn-close-editor')?.addEventListener('click', () => {
-      if (options.onClose) {
-        options.onClose();
-      } else if (typeof chrome !== 'undefined' && chrome.tabs?.getCurrent && chrome.tabs?.remove) {
-        void chrome.tabs.getCurrent().then((tab) => {
-          if (typeof tab?.id === 'number') return chrome.tabs.remove(tab.id);
-          window.close();
-        }).catch(() => window.close());
-      } else {
-        window.close();
-      }
+      void closeEditor().catch(() => window.close());
     });
 
     if (toolbarOnly) return;

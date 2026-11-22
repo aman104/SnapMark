@@ -15,7 +15,7 @@
     1. **Metadane zrzutu**: `domena-pl_2026-11-21_14-10.png` oraz rozdzielczość HiDPI `@2x`.
     2. **3 główne narzędzia wektorowe**: **Strzałka** (`1`), **Linia / Marker** (`2`), **Tekst** (`3`).
     3. **Kontekstowe właściwości**: 6 próbek koloru (domyślnie `#FF3B30`), grubość linii (`2px / 4px / 8px`), przełącznik **Podkreślenie ↔ Zakreślacz** z podpowiedzią `Shift = poziom`, przełącznik czytelności tekstu **Tło / Obrys / Czysty**.
-    4. **Historia i eksport**: **Cofnij (`Ctrl+Z`)**, **Usuń (`Delete`)**, **Pobierz PNG** oraz **Zamknij edytor**.
+    4. **Historia i eksport**: **Cofnij (`Ctrl+Z`)**, **Usuń (`Delete`)**, **Pobierz PNG** (po potwierdzonym ukończeniu pobierania zamyka edytor) oraz **Zamknij edytor**.
   - Scena `<canvas id="editor-canvas">` skalowana w fizycznych pikselach Retina (`width = cssWidth * dpr`) z cieniem `shadow-xl` i `border-radius: 0px`, obsługująca podgląd adnotacji wektorowych, ekran pustego stanu (`?state=empty`) oraz baner ostrzegawczy maksymalnej wysokości płótna (`?state=max-height-warning`).
 
 ## Product Context
@@ -31,7 +31,7 @@
 
 ## Stack
 
-- **Extension Runtime / Client Platform**: Chrome Extension Manifest V3 (`activeTab`, `contextMenus`, `scripting`, `storage`)
+- **Extension Runtime / Client Platform**: Chrome Extension Manifest V3 (`activeTab`, `contextMenus`, `downloads`, `scripting`, `storage`)
 - **Frontend (`popup.html` & `editor.html`)**: TypeScript 5.x (Strict Mode) + Vanilla DOM + HTML5 2D `<canvas>` + CSS Custom Properties
 - **Build & Packaging**: Node.js 20+ & Vite 5.x (multi-entry Rollup build to `dist/`)
 - **Testing**: Vitest (JSDOM unit & integration tests)
