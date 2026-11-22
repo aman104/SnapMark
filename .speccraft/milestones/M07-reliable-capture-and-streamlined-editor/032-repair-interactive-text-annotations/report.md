@@ -1,0 +1,21 @@
+# Task 032 report: Repair interactive text annotations
+
+## Changes
+- Prevent default canvas mousedown focus handling while creating a text draft, so it cannot immediately blur the newly focused textarea.
+- Added regression coverage for prevented default focus transfer, active textarea, input and commit; existing tests cover edit, move and undo.
+
+## Verification
+- `npm run typecheck`, `npm test` (110 tests), `npm run build` passed.
+- Actual extension reproduction remains unverified: isolated Chrome for Testing failed to open the test editor before timeout. The operator explicitly accepted proceeding without that test for this task. Full browser integration remains task 034.
+
+## Deviations from the plan
+- Real extension reproduction and verification not completed, with operator acceptance.
+
+## Spec impact
+- None.
+
+## Assumptions
+- Focus transfer during mousedown is the suspected cause; real extension verification is still needed.
+
+## Notes for next tasks
+- Task 034 must verify creation, typing, edit and export in the actual extension.
