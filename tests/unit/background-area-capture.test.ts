@@ -6,11 +6,31 @@ import {
 } from '../../src/background/capture-orchestrator';
 import { CaptureRateLimiter } from '../../src/background/rate-limiter';
 import { getCaptureSession } from '../../src/shared/db';
+import { measureSelectionInDom } from '../../src/content/capture-injected';
 
 const SAMPLE_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 describe('Task 027: Background Service Worker Interactive Screen Area Selection Orchestration', () => {
+  it('routes the selection context menu to text selection measurement', async () => {
+    let listener: ((info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab) => void) | undefined;
+    const executeScript = vi.fn().mockResolvedValue([{ result: { hasSelection: false } }]);
+    vi.stubGlobal('chrome', {
+      contextMenus: { onClicked: { addListener: (fn: typeof listener) => { listener = fn; } } },
+      scripting: { executeScript },
+      runtime: {},
+    });
+
+    const { setupBackgroundListeners } = await import('../../src/background/index');
+    setupBackgroundListeners();
+    listener?.({ menuItemId: 'capture-selection' } as chrome.contextMenus.OnClickData, {
+      id: 23, windowId: 1, url: 'https://example.com',
+    } as chrome.tabs.Tab);
+
+    await vi.waitFor(() => expect(executeScript).toHaveBeenCalled());
+    expect(executeScript.mock.calls[0][0].func).toBe(measureSelectionInDom);
+    vi.unstubAllGlobals();
+  });
   it('injects selectAreaOverlayInDom, captures the visible tab, saves cropRectCss in IndexedDB, and opens editor.html', async () => {
     let createdTabUrl = '';
     const captureVisibleTab = vi.fn().mockResolvedValue(SAMPLE_PNG_DATA_URL);

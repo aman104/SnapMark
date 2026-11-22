@@ -13,9 +13,10 @@
 2. **Background Listeners (`src/background/index.ts`, `src/shared/types.ts`)**:
    - Wired `Alt+Shift+S` (`command: 'capture-selection'`) and runtime `SNAPMARK_TRIGGER_CAPTURE` (`mode: 'selection'`) to pass `interactiveArea: true`.
 3. **Unit Tests (`tests/unit/background-area-capture.test.ts`)**:
-   - Verified interactive area capture orchestration, IndexedDB `cropRectCss` storage, `editor.html` launch, and clean cancellation handling (2/2 tests passing).
+   - Verified interactive area capture orchestration, IndexedDB `cropRectCss` storage, `editor.html` launch, clean cancellation handling, and context-menu text selection routing (3/3 tests passing).
 
 ## Verification
 
 - `npm run typecheck`: 0 errors
-- `npx vitest run tests/unit/background-area-capture.test.ts`: 2/2 tests passed
+- `npm test`: 95/95 tests passed, including 3 area capture tests
+- `npm run build`: passed
