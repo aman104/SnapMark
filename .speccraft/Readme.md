@@ -10,22 +10,41 @@ SpecCraft is a set of agent skills that takes a product from a rough idea to wor
 
 ## Quick start
 
-> **See everything in the browser:** `node .speccraft/viewer/server.mjs --open` starts **SpecCraft Board** on http://localhost:4545 (Node 18+, no installation). It shows the roadmap, the active milestone with its task board, the next step with ready-to-copy commands, every document rendered, review findings, blockers, the progress log, git activity and the live log of autonomous runs. It reloads by itself whenever a file in `.speccraft/` changes. See [SpecCraft Board](#speccraft-board).
+> **See everything in the browser:** `npx speccraft board` (or `.speccraft/board`) starts **SpecCraft Board** and opens it, from any folder of the project. It shows the roadmap, the active milestone with its task board, the next step, every document rendered, review findings, blockers, the progress log, git activity and the live log of autonomous runs. It is also the control panel: pick the agent CLI and model, write your idea, then press **Next** for one step at a time or start the **full autopilot**. See [SpecCraft Board](#speccraft-board).
 
 ### New product
 
-1. Create an empty git repository and run the installer in it: `bash /path/to/product-starter/.speccraft/install.sh` (or clone this starter and work in it directly).
+1. Create a folder and install SpecCraft in it (Node.js 18+ and git needed):
+
+   ```bash
+   mkdir my-product && cd my-product
+   npx speccraft@latest
+   ```
+
+   It creates `.speccraft/`, the skills, `AGENTS.md` and `CLAUDE.md`, initialises git and makes the first commit.
+
+   From a local clone of SpecCraft instead of npm: run `npm link` once in the clone, then `speccraft` in the project folder (and `speccraft board`, `speccraft autopilot`, …). After `git pull` in the clone, `speccraft` updates the project.
 2. Optional: put mockups, screenshots or sketches into `.speccraft/mockup/`.
-3. Run `/00-next` (or just say "next" / "dalej"). It reads the state of the project, shows where you are and runs the right skill. At the start that is `/01-discovery-idea`, which asks for your idea.
-4. Keep running `/00-next`. Say "autopilot" to let it chain steps until it needs you: your idea, approval of the specification, a milestone review, or a blocker.
+3. Open the board with `npx speccraft board`, write your idea, choose the agent and press **Next**, or start the full autopilot.
+4. Or work from your agent or the terminal. Every option reads the state from the files, so you can switch between them at any time:
+
+   | You want to | Run |
+   |---|---|
+   | click through it | SpecCraft Board (`npx speccraft board`): **Next**, or **Start autopilot** |
+   | run each step yourself | the skills one by one: `/01-discovery-idea`, `/02-discovery-idea-roast`, … |
+   | be told the next step and run it | `/00-next` (or just say "next" / "dalej") |
+   | chain steps, stopping whenever you are needed | `/00-next autopilot` |
+   | hand over everything, from the idea to a built first milestone | `npx speccraft autopilot "<your idea>"`, or `/00-next autopilot full <your idea>` in a session |
+
+   See [Autopilot](#autopilot).
 
 ### Existing product
 
 1. From the root of your repository, run the installer:
 
    ```bash
-   bash /path/to/product-starter/.speccraft/install.sh --dry-run   # see what would change
-   bash /path/to/product-starter/.speccraft/install.sh             # install
+   npx speccraft@latest --dry-run   # see what would change
+   npx speccraft@latest             # install
    ```
 
    It installs four things:
@@ -34,7 +53,9 @@ SpecCraft is a set of agent skills that takes a product from a rough idea to wor
    - **workspace:** the `.speccraft/` skeleton, including the board;
    - **agent instructions and git:** the SpecCraft section goes into `AGENTS.md` and `CLAUDE.md`, after your title, with your content kept, and `.speccraft/.runs/` is added to `.gitignore`.
 
-   Run it again at any time to update the toolkit. It only replaces SpecCraft's own files and sections, never your documents, milestones or progress. Then commit the result.
+   Run `npx speccraft@latest` again at any time to update the toolkit, also from a subfolder of the project. It replaces only SpecCraft's own files and sections, removes skills a newer version no longer has, and never touches your documents, milestones, progress, autopilot brief or your own skills. Then commit the result.
+
+   Without npm, from a clone of the SpecCraft repository: `bash /path/to/product-starter/.speccraft/install.sh` does the same.
 2. **To add a feature or fix a bug**, run `/12-feature-advisor` and describe it. It analyzes your code, updates the specification after your approval and adds a milestone, which then runs through the normal loop: tasks, build, independent review, your acceptance.
 3. **To plan a larger change**, run the pipeline from `/01-discovery-idea` (or from `/03-discovery-prd` with a written brief). The planning skills read your code and extend the current stack rather than replacing it.
 
@@ -55,9 +76,10 @@ SpecCraft is a set of agent skills that takes a product from a rough idea to wor
     ├── milestones.md      the milestone plan with statuses
     ├── milestones/        one folder per planned milestone (see below)
     ├── progress.md        project memory shared by all tasks
+    ├── autopilot.md       autopilot settings, your brief, decisions to review
     ├── viewer/            SpecCraft Board: local dashboard of everything below
-    ├── install.sh         installer / updater for other projects (only in the starter)
-    ├── VERSION            toolkit version
+    ├── board              starts SpecCraft Board: one command
+    ├── VERSION            installed SpecCraft version (manifest.json: its skills)
     └── .runs/             logs of autonomous runs (git-ignored)
 ```
 
@@ -91,9 +113,9 @@ Two rules keep the repository clean:
 ## Pipeline
 
 ```text
-ENTRY POINT      00 next — shows the status and runs the right step (or autopilot until a gate)
+ENTRY POINT      00 next — shows the status and runs the right step; autopilot (guided or full)
 
-DISCOVERY        01 idea ──► 02 roast ──► 03 PRD
+DISCOVERY        01 idea ──► 02 roast (one or more rounds) ──► 03 PRD
                                             │
 PLANNING         04 design ──► 05 interface ──► 06 tech stack ──► 07 milestones ──► ⏸ you review the spec
                                                                                          │
@@ -120,7 +142,7 @@ Run steps 01–07 once. Then repeat 08 → 09 → 10 → review for each milesto
 | 07 | `/07-planning-milestones` | Plans v1 as a phased roadmap (look & feel → clickable prototype → foundations → core features → complete features → quality → release). Each milestone has a visible outcome, a demo and exit criteria. | `milestones.md` |
 | 08 | `/08-planning-tasks` | Milestone gate: records your acceptance, or adds rework tasks. Then plans the ordered tasks of the next milestone. | `milestones/Mnn-*/tasks.md`, statuses in `milestones.md` |
 | 09 | `/09-planning-task-details` | Writes a precise implementation plan for every pending task of the active milestone, with acceptance criteria limited to what each task really needs. | `milestones/Mnn-*/NNN-*/implementation-plan.md` |
-| 10 | `/10-execution-initial` | Implements the active milestone task by task, each on its own branch. A reviewer with a fresh context approves every task before it is merged. Then it writes a milestone report, with the spec changes it needs, and stops for your review. | product code, `progress.md`, task and milestone reports |
+| 10 | `/10-execution-tasks` | Implements the active milestone task by task, each on its own branch. A reviewer with a fresh context approves every task before it is merged. Then it writes a milestone report, with the spec changes it needs, and stops for your review. | product code, `progress.md`, task and milestone reports |
 | 11 | `/11-security-researcher` | Reviews the codebase for security issues, applies safe fixes and documents the rest. | fixes, `docs/06-security-report-YYYY-MM-DD.md` |
 | 12 | `/12-feature-advisor` | Turns a feature request or bug report into an impact analysis, spec updates (after your approval) and a new milestone of type `feature` or `fix`. It does not write code. | `docs/07-feature-plan-<name>.md`, spec updates, new milestone in `milestones.md` |
 
@@ -159,7 +181,7 @@ Milestones are where you keep control. The agent may work autonomously inside th
 
 1. **`/08-planning-tasks`** plans the tasks of the next milestone and marks it active.
 2. **`/09-planning-task-details`** writes an implementation plan for each task.
-3. **`/10-execution-initial`** implements and verifies each task, then hands it to an **independent review**: a fresh agent that runs the checks itself, compares the diff with the plan, and approves and merges the task or sends it back with concrete findings (at most 3 rounds). When all tasks are merged, it writes `milestones/Mnn-*/milestone-report.md`, including the **spec changes** the build made necessary, and marks the milestone as awaiting review.
+3. **`/10-execution-tasks`** implements and verifies each task, then hands it to an **independent review**: a fresh agent that runs the checks itself, compares the diff with the plan, and approves and merges the task or sends it back with concrete findings (at most 3 rounds). When all tasks are merged, it writes `milestones/Mnn-*/milestone-report.md`, including the **spec changes** the build made necessary, and marks the milestone as awaiting review.
 4. **You review it.** Follow the demo steps in the report, check the exit criteria and assumptions, and look at the diff.
 5. **You decide.** Tell `/08-planning-tasks` "accept M01": it applies the spec changes to `.speccraft/docs/` (except the ones you struck out in the report), merges the milestone into `main` and plans the next one. To request changes, describe them; they become rework tasks in the same milestone.
 
@@ -212,9 +234,9 @@ main ─────────────────────────
 |---|---|---|
 | Plan a milestone | `/08-planning-tasks` | commits pending spec changes on `main`, creates `milestone/Mnn-slug`, commits the task list |
 | Plan task details | `/09-planning-task-details` | commits the plans on the milestone branch |
-| Each task | `/10-execution-initial` | `task/NNN-slug` from the milestone branch → code, tests and report → verified → `[~]` → independent review → approved: `merge --no-ff` into the milestone branch with `[x]`, task branch deleted; changes requested: back to `[ ]`, same branch continues |
-| Blocked task | `/10-execution-initial` | partial work stays on `task/NNN-slug`; blocker recorded on the milestone branch; resumed later from that branch |
-| Milestone done | `/10-execution-initial` | report + `[?]` committed on the milestone branch; **no merge** |
+| Each task | `/10-execution-tasks` | `task/NNN-slug` from the milestone branch → code, tests and report → verified → `[~]` → independent review → approved: `merge --no-ff` into the milestone branch with `[x]`, task branch deleted; changes requested: back to `[ ]`, same branch continues |
+| Blocked task | `/10-execution-tasks` | partial work stays on `task/NNN-slug`; blocker recorded on the milestone branch; resumed later from that branch |
+| Milestone done | `/10-execution-tasks` | report + `[?]` committed on the milestone branch; **no merge** |
 | You accept | `/08-planning-tasks` "accept Mnn" | `[x]` and spec changes committed, `merge --no-ff` milestone → `main`, milestone branch deleted, next milestone branch created |
 | You request changes | `/08-planning-tasks` | rework tasks added on the same milestone branch |
 
@@ -236,17 +258,110 @@ Pushing branches or opening pull requests is up to you. For example, push `miles
 
 ---
 
+## Autopilot
+
+The autopilot runs the workflow without you, from an idea in a few sentences to a built milestone waiting for your review:
+
+```text
+your brief ─► 01 idea ─► 02 roast, round 1 … N (fixes applied) ─► 03 PRD ─► 04 design ─► 05 interface
+          ─► 06 tech stack ─► 07 roadmap ─► 08 tasks ─► 09 plans ─► build (implement ⇄ independent review)
+          ─► ⏸ you review the milestone
+```
+
+### Three levels
+
+| Mode | Start | Stops at |
+|---|---|---|
+| **Step by step** | `/00-next` | after every step |
+| **Guided autopilot** | `/00-next autopilot` | every point where you are needed: your idea and the discovery questions, the specification review before any code, each milestone review, blockers |
+| **Full autopilot** | `autopilot.sh "<idea>"` or `/00-next autopilot full <idea>` | only where it must: the point you chose (`Stop at`), a milestone review, a blocker, changes it did not make |
+
+In full autopilot nothing is asked. Whenever a skill would ask you, the agent chooses what best fits your brief and records the choice in two places: as an assumption in the document, and as a line in `autopilot.md` → **Decisions to review**. What your brief states is treated as a fixed requirement.
+
+### One decision, three places
+
+Which step comes next is decided by one script, the state engine: `node .agents/skills/00-next/scripts/state.mjs`. It reads `.speccraft/` and git and applies the rules of `00-next`. `/00-next`, `autopilot.sh` and SpecCraft Board all use it, so the board's Next button, the autopilot and an agent session always agree. Run it yourself for a quick status (`--json` gives every milestone and task as JSON).
+
+### Unattended: `autopilot.sh`
+
+```bash
+.agents/skills/00-next/scripts/autopilot.sh "A mobile-first app for climbing gyms: members log the routes they climbed, setters see which routes are popular. Web app first."
+```
+
+Each step runs in a new agent process with a fresh context, like `run-milestone.sh`. The script decides the next step from the files, runs it, commits `.speccraft/` (`docs(autopilot): <skill>`), and moves on. When it reaches the build, it hands over to `run-milestone.sh`. It continues from wherever the project is, so you can run a few skills yourself and then start it, or stop it and continue by hand.
+
+| Option | Purpose |
+|---|---|
+| `"text"`, `--brief`, `--brief-file F` | Your idea. It is saved in `autopilot.md` → Brief. Not needed once `01-Idea.md` exists. |
+| `--stop-at spec` | Stop when the specification and the roadmap are ready, so you can review them before any code. |
+| `--stop-at plan` | Stop when the next milestone has its tasks and implementation plans. |
+| `--stop-at milestone` | Default: build the next milestone and stop when it waits for your review. |
+| `--roast-rounds N` | Maximum roast rounds (default 3, `0` skips the roast). |
+| `--accept Mnn` | Your acceptance of a reviewed milestone: it is accepted, merged into `main`, and the autopilot continues with the next one. |
+| `--max-steps N` | Run at most N steps (`1` = only the next step). |
+| `--dry-run` | Show the status and the next step. |
+| `--feature "text"` | A feature or fix for the existing product: `12-feature-advisor` updates the specification and adds a milestone, then the loop continues. |
+| `--changes "text"` | Your feedback on the milestone waiting for review: it gets rework tasks and is built again. |
+| `--agent`, `--model` | Agent CLI and model (default: `Agent` and `Model` in `autopilot.md`). `--model` is passed as `--model` to Claude Code and `-m` to Codex and Gemini. |
+| `--agent-cmd`, `--timeout`, `--max-retries`, `--retry-wait` | As in `run-milestone.sh`. |
+| `--parallel N`, `--max-tasks N`, `--worktrees-dir D` | Passed to `run-milestone.sh` for the build. |
+
+A typical project:
+
+```bash
+autopilot.sh "<idea>" --stop-at spec   # idea, roast, PRD, design, interface, stack, roadmap
+# read .speccraft/docs/, .speccraft/milestones.md and the decisions to review; edit what you disagree with
+autopilot.sh                           # plan M01 and build it; stops at your review
+# review M01 (milestone-report.md, the demo)
+autopilot.sh --accept M01 --parallel 3 # accept M01, then plan and build M02
+```
+
+(`autopilot.sh` stands for `.agents/skills/00-next/scripts/autopilot.sh`.)
+
+### The roast rounds
+
+The idea goes through several rounds of `02-discovery-idea-roast` before the PRD. Every round researches the market, rates seven dimensions (problem, users, value, competition, v1 scope, business model, risks), applies the fixes to `01-Idea.md` and saves itself in `docs/01-Idea-roast.md`. From the second round on, it checks whether the previous fixes worked.
+
+The roast may narrow your audience, cut v1 features, sharpen the value proposition, and add competitors and risks. It never pivots: a different problem, different users or a different kind of product goes to **Decisions to review** as a recommendation. The rounds stop at `Roast rounds`, or earlier when a round says `Next round needed: no` (nothing material is left that more editing could fix).
+
+### Settings: `autopilot.md`
+
+```markdown
+## Settings
+- Stop at: milestone
+- Roast rounds: 3
+
+## Brief
+<your idea; written there by the script or by /00-next autopilot full>
+
+## Decisions to review
+- 2026-11-21 · 01-discovery-idea · Web app first, mobile later — the brief names no platform
+```
+
+Options of the script override the settings for one run. SpecCraft Board shows the settings, the decisions and the live step on its **Autopilot** page.
+
+### What the autopilot never does
+
+- accept a milestone for you: only you do that (`--accept Mnn` or "accept Mnn" to `08-planning-tasks`);
+- push, or merge into `main` anything other than a milestone you accepted;
+- commit changes it did not make: uncommitted product files stop the run;
+- continue past a blocker: blocked tasks wait for you.
+
+The same safety rules as for overnight runs apply: an unattended agent runs without approval prompts, so use a separate clone or a container with no production credentials (see below).
+
+---
+
 ## Autonomous (overnight) runs
 
-`10-execution-initial` can run a whole milestone unattended. Every step runs in a fresh agent session (implementing a task, reviewing a task, completing the milestone), so the reviewer never shares a context with the implementer.
+`10-execution-tasks` can run a whole milestone unattended. Every step runs in a fresh agent session (implementing a task, reviewing a task, completing the milestone), so the reviewer never shares a context with the implementer.
 
 ```bash
 # from the repository root, with an active milestone and its task plans ready
-.agents/skills/10-execution-initial/scripts/run-milestone.sh                         # Claude Code
-.agents/skills/10-execution-initial/scripts/run-milestone.sh --agent codex           # Codex CLI
-.agents/skills/10-execution-initial/scripts/run-milestone.sh --agent antigravity     # Antigravity CLI (agy)
-.agents/skills/10-execution-initial/scripts/run-milestone.sh --agent gemini          # Gemini CLI
-.agents/skills/10-execution-initial/scripts/run-milestone.sh --agent-cmd "my-agent --yes"
+.agents/skills/10-execution-tasks/scripts/run-milestone.sh                         # Claude Code
+.agents/skills/10-execution-tasks/scripts/run-milestone.sh --agent codex           # Codex CLI
+.agents/skills/10-execution-tasks/scripts/run-milestone.sh --agent antigravity     # Antigravity CLI (agy)
+.agents/skills/10-execution-tasks/scripts/run-milestone.sh --agent gemini          # Gemini CLI
+.agents/skills/10-execution-tasks/scripts/run-milestone.sh --agent-cmd "my-agent --yes"
 ```
 
 Useful options:
@@ -282,7 +397,7 @@ With `--parallel N`, independent tasks are implemented at the same time, each by
 
 Start with `--parallel 2 --max-tasks 4` while you watch. Details and caveats are in `autonomous-run.md` → "Parallel runs".
 
-**Safety:** an unattended agent runs without approval prompts. Use a separate clone, or better a container, with no production credentials. Read `.agents/skills/10-execution-initial/references/autonomous-run.md` before your first night run. It covers the pre-run checklist, isolation levels and how to review the result.
+**Safety:** an unattended agent runs without approval prompts. Use a separate clone, or better a container, with no production credentials. Read `.agents/skills/10-execution-tasks/references/autonomous-run.md` before your first night run. It covers the pre-run checklist, isolation levels and how to review the result.
 
 ---
 
@@ -305,22 +420,74 @@ All three also pick a skill on their own when your request matches its descripti
 ## SpecCraft Board
 
 ```bash
-node .speccraft/viewer/server.mjs --open          # http://localhost:4545
-node .speccraft/viewer/server.mjs --port 5000     # another port
+.speccraft/board                 # start the board of this project and open it in the browser
+.speccraft/board --no-open       # start without opening the browser
+.speccraft/board --read-only     # dashboard only, no controls
+.speccraft/board --port 5000     # a fixed port
+npx speccraft board              # the same from any folder of the project
 ```
 
-A read-only dashboard over the files in `.speccraft/`. It has no dependencies, listens on `127.0.0.1` only, and live-reloads as the agents work.
+With `npm install -g speccraft` the command is just `speccraft board`.
+
+Running it again while the board of the same project is open just reopens the browser tab. Each project gets its own port: the first free one from 4545 up. The board stops with Ctrl+C; runs started from it keep going.
+
+A dashboard over the files in `.speccraft/` and a control panel for the agents. It has no dependencies, listens on `127.0.0.1` only, and updates in place as the agents work. While a run or the autopilot is active, the top bar shows on every page what the agents are doing right now and for how long. While agents work, the logo, the browser tab icon and the tab title move with them, the active milestone in the sidebar spins, and every change (a task merged, sent back or blocked, a milestone started or built, a document written) briefly highlights its card and shows a short notice. The board uses a dark theme. The button at the top left (or the `[` key) collapses the sidebar to a narrow rail of icons; the board remembers the choice.
+
+### Control panel
+
+The top of the Overview drives the whole workflow, so you do not need a terminal:
+
+| Control | What it does |
+|---|---|
+| **Agent** | the agent CLIs found on your `PATH` (Claude Code, Codex, Gemini, Antigravity), with their versions; missing ones are greyed out |
+| **Model** | `default` (the CLI's own default, shown as "CLI default: …" when it is configured in `~/.claude/settings.json`, `~/.codex/config.toml` or `~/.gemini/settings.json`), the Claude aliases `opus`, `sonnet`, `haiku`, or any model name you type. Antigravity has no model option. |
+| **Mode** | **Step by step**: the **Next** button runs exactly one step in a fresh agent process (at the build: one task, implemented and independently reviewed). **Full autopilot**: **Start autopilot** runs until **Stop at** (spec ready, milestone planned, milestone built), optionally with **Parallel** tasks. |
+| **Stop** | ends the run started from the board and every agent it started; finished work stays committed, unfinished work stays on its task branch |
+
+The next-step panel asks for what only you can give:
+
+- **No idea yet:** a text box for the idea. **Start with this idea** saves it as the brief and starts (one step, or the full autopilot).
+- **Milestone waiting for review:** **Accept Mnn** (after a confirmation), or **Request changes** with your feedback, which becomes rework tasks.
+- **Request a feature or a fix** (below the board, once there is a roadmap): runs `12-feature-advisor`, which updates the specification and adds a milestone; in full autopilot it is then planned and built too.
+
+Everything runs through `autopilot.sh` with the agent and model you chose, so a run started from the board behaves exactly like one started in the terminal and keeps running if you close the board. Its output is under "last run" → **log**. The choices are stored per machine in `.speccraft/.runs/board/` (git-ignored).
+
+### Agent chat
+
+The chat button at the top right (or the `]` key) opens a chat with your agent CLI on the right side of the board. It is a real session of Claude Code, Codex, Gemini or Antigravity running in this project, with all the skills, so you can go through the whole flow from the board, from shaping the idea to accepting the last milestone.
+
+- **Agent and model:** pick any CLI the board found and a model (the CLI's default, the Claude aliases `opus`, `sonnet`, `haiku`, or any name you type).
+- **What the agent may do:** *Full access* (edits files and runs commands such as git and tests without asking, like the scripts), *Edits only* (changes files, skips commands that need approval) or *Read only* (answers and plans, changes nothing).
+- **Quick actions** above the message box follow the stage: *Where are we?*, *Next step*, *Shape my idea*, *Write the PRD*, *Plan M03 tasks*, *Build 009*, *Review 007*, *Unblock 008*, *Summarize M03*, *Accept M03*, *Request changes*, *Feature or fix*, *Security review*. Actions ending in "…" put the start of a message in the box for you to finish. "do it in the chat →" next to the next step does the same.
+- **Live:** the reply streams in, every file read, edit and command the agent runs is listed under it, and the whole board shows the work live (stage, task cards, top bar). **■ Stop** ends the turn.
+- **One conversation per chat:** Claude Code and Codex continue their own session with every message; Gemini and Antigravity get the conversation so far as text. Earlier chats are in the list at the top; they are kept per machine in `.speccraft/.runs/chat/` (git-ignored).
+- **Next to everything else:** the Next button, the autopilot and your terminal work on the same files. While a script or the autopilot runs, the chat accepts *Read only* messages; while the chat works, Next and Start autopilot wait.
+
+Each message runs the CLI once, with the same permissions as the scripts when *Full access* is chosen, so the safety notes below apply to the chat too.
+
+### Work in an agent session shows up live too
+
+The board does not only follow the scripts. When you work in Claude Code, Codex or Antigravity yourself (`/00-next`, `/10-execution-tasks`, …), the agent writes what it is doing to `.speccraft/.runs/activity.json` when it starts a step, and removes it at the end (the rule is in `AGENTS.md`). The board then shows the same live state as for a script run: the animated stage, "Now: …", the task card marked *implementing* or *reviewing*, and the top bar.
+
+- **Claude Code** also gets three hooks in `.claude/settings.json` (added by the installer, your own settings are kept): after every tool call the session counts as busy, and when the agent stops and hands the turn back to you, the board shows **Waiting for you**.
+- **Without hooks** (Codex, Antigravity), recent changes to files count as a sign of life. After 15 minutes without any, the board shows **no activity** with a **Clear** button, in case the session ended without cleaning up.
+- **Without the file at all**, a `task/NNN-…` branch with fresh uncommitted changes is still shown as task NNN being implemented.
+
+While a session works, **Next** and **Start autopilot** are disabled, so a script never runs on top of it.
+
+**Safety.** The board starts agents without approval prompts, like the scripts. Only the page served by the board can start or stop them: every request needs a token generated when the server starts, requests from other sites and other host names are refused, and the server listens on `127.0.0.1` only. Start it with `--read-only` to hide all controls, e.g. when you only want to watch a run.
 
 | Page | What it shows |
 |---|---|
-| **Overview** | the phase line, the **next step** with copy-ready commands for Claude Code, Codex and Antigravity, the active milestone with "What you will see" and task progress, what needs your attention (reviews, blockers, open assumptions, uncommitted changes), recent progress and git activity, the live run log |
+| **Overview** | where the project is: the six stages (specification, roadmap, milestone tasks, task plans, build, your review) with the current one highlighted, then one panel for that stage showing what is being done now or what comes next. Specification: every document in order, done, in progress or to do. Roadmap and milestone tasks: the milestones and the one to plan next. Task plans: which tasks have their implementation plan. Build: the active milestone with its task board and the agents at work. Your review: exit criteria, accept or request changes. The agent, model, mode and the **Next** / **Start autopilot** button sit at the bottom of that panel. Below: the live log, the roadmap line, what needs attention, recent activity, the specification documents and a box to request a feature or a fix |
 | **Roadmap** | every phase with its milestones, outcomes and progress, plus the coverage table |
-| **Milestone** | goal, scope, demo, exit criteria (checked off), a task board (pending, in review, done, blocked), the milestone report, screenshots and run summaries |
+| **Milestone** | goal, scope, demo, exit criteria (checked off), a task board (pending, in progress, blocked, done; the tasks agents are working on right now are marked live), the milestone report, screenshots and run summaries |
 | **Task** | the implementation plan, the report, the independent reviews and the blocker, plus parallel safety and dependencies |
 | **Specification** | the documents 01–05 and reports, rendered, with a table of contents; colors from `03-Design.md` shown as swatches |
-| **Progress log, Runs, Mockups** | `progress.md`; the logs of autonomous runs, including active workers; your mockups as a gallery |
+| **Autopilot** | settings, your brief, the decisions to review and the step running now (opened from the overview's decisions and the top bar, `#/autopilot`) |
+| **Progress log, Runs, Mockups** | `progress.md`; the logs of autonomous runs, including active workers; your mockups as a gallery (Runs opens from "live log →"; Runs and Mockups are not in the sidebar: `#/runs`, `#/mockups`) |
 
-The board never writes anything. Everything it shows comes from the markdown files, so it always matches what the agents see.
+Everything the board shows comes from the markdown files, so it always matches what the agents see. The only files it writes itself are the brief in `autopilot.md` and its own settings; everything else is done by the agents it starts.
 
 ---
 

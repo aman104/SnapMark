@@ -8,13 +8,15 @@ description: define the ordered, numbered implementation tasks for the next mile
 ## Repository layout
 
 - All paths are relative to the repository root. The workflow workspace is `.speccraft/`:
-  - `.speccraft/docs/` — product documents: `01-Idea.md`, `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports and feature plans
+  - `.speccraft/docs/` — product documents: `01-Idea.md` (with its roast `01-Idea-roast.md`), `02-General-PRD.md`, `03-Design.md`, `04-Interface-spec.md`, `05-Tech-Stack.md`, security reports and feature plans
   - `.speccraft/mockup/` — mockups, screenshots, sketches and other references supplied by the user (input only; ignore `.gitkeep`)
   - `.speccraft/milestones.md` — the ordered milestone plan with milestone statuses
   - `.speccraft/milestones/[Mnn]-[slug]/` — one folder per planned milestone: its `tasks.md` (task list with statuses), one `[NNN]-[slug]/` folder per task (`implementation-plan.md`, `report.md`, `review.md`, `blocker.md`), `milestone-report.md` and run summaries
   - `.speccraft/progress.md` — project memory shared by all tasks: commands, structure, conventions, decisions, log
+  - `.speccraft/autopilot.md` — autopilot settings, the operator's brief and the decisions the autopilot made in place of the operator
   - `.speccraft/.runs/` — logs of autonomous runs (git-ignored)
-  - `.speccraft/viewer/` — the local dashboard (`node .speccraft/viewer/server.mjs`); tooling, never modify it
+  - `.speccraft/viewer/` — SpecCraft Board, the local dashboard (`.speccraft/board`); tooling, never modify it
+  - `.speccraft/board` — starts SpecCraft Board; tooling, never modify it
 - The product itself lives directly in the repository root, laid out as defined in `.speccraft/docs/05-Tech-Stack.md` (source, tests, manifests and lockfiles, configuration, migrations, `.env.example`, `README.md`, CI such as `.github/workflows/`). It can be any kind of product: web or mobile app, API, backend service, CLI, library/SDK, browser extension, desktop app, game, data or ML pipeline, multi-package workspace, and so on.
 - If the repository already contains product code, treat it as the existing product: build on its structure and conventions instead of scaffolding a new one.
 - Keep workflow and product apart: no product code, dependencies or build output in `.speccraft/`, `.agents/` or `.claude/`, and no workflow documents in the product tree. Do not modify `.agents/` or `.claude/` unless the user asks. `AGENTS.md` and `CLAUDE.md` in the repository root are shared agent instructions: keep their SpecCraft section (between the `speccraft:start` / `speccraft:end` markers) intact and add product-specific instructions only below it.
@@ -22,14 +24,14 @@ description: define the ordered, numbered implementation tasks for the next mile
 
 ## Overview
 
-Plan the tasks of **one milestone at a time**. Read the milestone definition from `.speccraft/milestones.md`, break its scope into an ordered list of tasks, create the milestone folder `.speccraft/milestones/[Mnn]-[slug]/` and write the tasks to its `tasks.md`. The order of tasks is the order in which the `10-execution-initial` skill will execute them.
+Plan the tasks of **one milestone at a time**. Read the milestone definition from `.speccraft/milestones.md`, break its scope into an ordered list of tasks, create the milestone folder `.speccraft/milestones/[Mnn]-[slug]/` and write the tasks to its `tasks.md`. The order of tasks is the order in which the `10-execution-tasks` skill will execute them.
 
 Planning one milestone at a time means every milestone is planned against the real codebase and the operator's feedback from the previous milestone, not against assumptions made weeks earlier.
 
 Downstream skills:
 
 - `09-planning-task-details` creates a detailed implementation plan for every pending task of the active milestone
-- `10-execution-initial` executes the tasks of the active milestone and hands the milestone over for review
+- `10-execution-tasks` executes the tasks of the active milestone and hands the milestone over for review
 
 ## Required inputs
 
@@ -47,7 +49,7 @@ If `.speccraft/milestones.md` is missing, stop and tell the user to run `07-plan
 Read the milestone statuses in `.speccraft/milestones.md` (`[ ]` planned, `[>]` active, `[?]` awaiting review, `[x]` accepted) and act on the first matching case:
 
 1. **A milestone is `[?]` (awaiting review).** The operator decides:
-   - **Accepted:** the operator explicitly accepted it in this conversation (e.g. "accept M01", "akceptuję M01"). Change its status to `[x]`, fill in "Operator decision" in its `milestone-report.md` (accepted, date), apply its "Spec changes" to `.speccraft/docs/` (see "Spec sync"), merge the milestone into the base branch (see "Git"), then continue with case 3.
+   - **Accepted:** the operator explicitly accepted it in this conversation (e.g. "accept M01", "akceptuję M01"), or the prompt states that the operator started the autopilot with `--accept M01`. Change its status to `[x]`, fill in "Operator decision" in its `milestone-report.md` (accepted, date), apply its "Spec changes" to `.speccraft/docs/` (see "Spec sync"), merge the milestone into the base branch (see "Git"), then continue with case 3.
    - **Changes requested:** the operator asks for changes in this conversation, or wrote feedback in the "Operator decision" section of `milestone-report.md`. Go to "Rework tasks" below.
    - **No decision:** ask the operator to review the milestone using its `milestone-report.md`, and stop. Never accept a milestone on the operator's behalf.
 2. **A milestone is `[>]` (active).**
@@ -79,11 +81,11 @@ When the operator requests changes to a milestone that is `[?]` or `[>]`:
 
 ## Git
 
-Applies when the project is a git repository with at least one commit. Without git, skip these steps and suggest `git init` to the operator, because autonomous runs require git. Branch model (details in `10-execution-initial` → "Git workflow"):
+Applies when the project is a git repository with at least one commit. Without git, skip these steps and suggest `git init` to the operator, because autonomous runs require git. Branch model (details in `10-execution-tasks` → "Git workflow"):
 
 - the base branch (`main`, or the one recorded in `progress.md` → "Git") holds accepted milestones only;
 - `milestone/[Mnn]-[slug]` (same name as the milestone folder) holds one milestone;
-- `task/[NNN]-[slug]` branches are created and merged by `10-execution-initial`.
+- `task/[NNN]-[slug]` branches are created and merged by `10-execution-tasks`.
 
 **Accepting a milestone** (gate case 1):
 
@@ -102,7 +104,7 @@ If the operator set `[x]` by hand and a `milestone/[Mnn]-[slug]` branch of an ac
 
 If the merge conflicts (e.g. someone committed to the base branch in the meantime), run `git merge --abort`, explain the conflicting files to the operator and stop. Never resolve conflicts in product code without the operator. Never push: publishing the base branch is the operator's decision.
 
-**Spec sync.** The milestone report has a "Spec changes" table, collected by `10-execution-initial` from the task reports and decisions. When the operator accepts:
+**Spec sync.** The milestone report has a "Spec changes" table, collected by `10-execution-tasks` from the task reports and decisions. When the operator accepts:
 
 - Apply every row to `.speccraft/docs/`, except rows the operator rejected or changed in "Feedback". Edit only the named section and keep the document's structure.
 - Add a change-log entry where the document has one (e.g. `01-Idea.md`).
@@ -186,12 +188,12 @@ Tests, security and observability are part of the task where the code is written
 ├── tasks.md                          task list with statuses (this skill)
 ├── 001-scaffold-nextjs-project/      one folder per task
 │   ├── implementation-plan.md        09-planning-task-details
-│   ├── report.md                     10-execution-initial, implementer
-│   ├── review.md                     10-execution-initial, independent reviewer
-│   └── blocker.md                    10-execution-initial, when blocked
+│   ├── report.md                     10-execution-tasks, implementer
+│   ├── review.md                     10-execution-tasks, independent reviewer
+│   └── blocker.md                    10-execution-tasks, when blocked
 ├── 002-implement-design-tokens/
 ├── ...
-├── milestone-report.md               10-execution-initial, at milestone completion
+├── milestone-report.md               10-execution-tasks, at milestone completion
 └── run-summary-[run-id].md           run-milestone.sh, after an autonomous run
 ```
 
@@ -209,7 +211,7 @@ The file contains a title line and task lines only:
 
 - **Title:** `# Mnn - Name`, the same id and name as in `.speccraft/milestones.md`, without the status.
 - **Task line:** `[status] NNN - Task name - Description`.
-  - `[ ]` pending, `[~]` waiting for independent review, `[x]` reviewed and merged, `[!]` blocked (all set by `10-execution-initial`). This skill always writes `[ ]`.
+  - `[ ]` pending, `[~]` waiting for independent review, `[x]` reviewed and merged, `[!]` blocked (all set by `10-execution-tasks`). This skill always writes `[ ]`.
   - `NNN`: three digits, zero-padded, starting from `001`. Numbering is **global across milestones** and has no gaps: if M01 ended with task 008, M02 starts with 009. Global numbers keep task ids, folder names, commit messages (`feat(task-NNN)`) and dependencies between milestones unambiguous.
   - `Task name`: short imperative name, max ~8 words, without ` - ` inside.
   - `Description`: 3–4 sentences on one line. Say what to build, which documents/sections it implements (e.g. `PRD FR-3`, `Interface-spec "Project Dashboard"`), what the result is, and how to recognize it as done.
@@ -241,7 +243,7 @@ Reply with:
 - the milestone that is now active, and its number of tasks
 - the specification documents updated from "Spec changes" (if accepted)
 - the git state: merged milestone (if accepted) and the current milestone branch
-- the next step: run `09-planning-task-details`, then `10-execution-initial` or the autonomous run script
+- the next step: run `09-planning-task-details`, then `10-execution-tasks` or the autonomous run script
 
 ## Quality bar
 
