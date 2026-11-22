@@ -152,6 +152,7 @@ describe('Task 023: PRD §7 Edge-Case Hardening & §10-11 Privacy, Permissions a
           },
         },
       ])
+      .mockResolvedValueOnce([{ result: 0 }])
       // 4. restoreFullPageScrollInDom in finally block
       .mockResolvedValueOnce([{ result: true }]);
 
@@ -188,7 +189,7 @@ describe('Task 023: PRD §7 Edge-Case Hardening & §10-11 Privacy, Permissions a
     expect(session.frames).toHaveLength(1);
     expect(session.totalHeightCss).toBe(800);
     // Restore was still called in finally
-    expect(executeScript).toHaveBeenCalledTimes(5);
+    expect(executeScript).toHaveBeenCalledTimes(6);
 
     // Editor consumes the session and leaves 0 lingering records in IndexedDB
     const root = document.getElementById('editor-app')!;

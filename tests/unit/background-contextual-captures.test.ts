@@ -246,7 +246,8 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
           return [
             {
               result: {
-                actualScrollY: targetY,
+                // Simulate a browser where the immediate measurement is stale.
+                actualScrollY: targetY === 900 ? 0 : targetY,
                 viewportWidthCss: 1440,
                 viewportHeightCss: 900,
               },

@@ -81,10 +81,10 @@ describe('Task 016: Full-page scroll DOM controller & fixed/sticky header suppre
       queueMicrotask(() => callback(0));
       return callbacks;
     });
-    await expect(settleFullPageScrollInDom(0)).rejects.toThrow('Nie udało się przewinąć');
+    await expect(settleFullPageScrollInDom()).resolves.toBe(320);
     expect(callbacks).toBe(2);
     window.scrollTo(0, 0);
-    await expect(settleFullPageScrollInDom(0)).resolves.toBe(0);
+    await expect(settleFullPageScrollInDom()).resolves.toBe(0);
     vi.unstubAllGlobals();
   });
 

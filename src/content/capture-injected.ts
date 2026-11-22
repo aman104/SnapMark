@@ -600,13 +600,9 @@ export function stepFullPageScrollInDom(targetScrollY: number): {
 }
 
 /** Wait for scroll position and paint before a frame is captured. */
-export async function settleFullPageScrollInDom(targetScrollY: number): Promise<number> {
+export async function settleFullPageScrollInDom(_targetScrollY?: number): Promise<number> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-  const actual = Math.round(window.scrollY || window.pageYOffset || document.documentElement?.scrollTop || 0);
-  if (Math.abs(actual - targetScrollY) > 1) {
-    throw new Error(`Nie udało się przewinąć strony do pozycji ${targetScrollY} (aktualnie ${actual}).`);
-  }
-  return actual;
+  return Math.round(window.scrollY || window.pageYOffset || document.documentElement?.scrollTop || 0);
 }
 
 /**

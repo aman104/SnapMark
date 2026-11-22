@@ -573,10 +573,6 @@ export async function captureFullPageScroll(
             ? stepInfo.actualScrollY
             : targetY;
 
-        // If the page failed to advance scroll (e.g., locked internal SPA container), stop early to avoid duplicate frames
-        if (actualScrollY === lastActualScrollY) {
-          break;
-        }
       }
 
       const settledResults = await chrome.scripting.executeScript({
@@ -585,7 +581,11 @@ export async function captureFullPageScroll(
         args: [targetY],
       });
       const settledY = settledResults?.[0]?.result;
-      if (typeof settledY !== 'number' || Math.abs(settledY - targetY) > 1) {
+      if (typeof settledY !== 'number') {
+        throw new Error('Nie udało się potwierdzić pozycji przewijania strony.');
+      }
+      if (i > 0 && settledY === lastActualScrollY) break;
+      if (Math.abs(settledY - targetY) > 1) {
         throw new Error('Nie udało się potwierdzić pozycji przewijania strony.');
       }
       actualScrollY = settledY;
