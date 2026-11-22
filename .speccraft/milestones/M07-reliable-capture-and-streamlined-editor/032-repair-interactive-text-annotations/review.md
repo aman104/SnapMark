@@ -13,3 +13,7 @@ Typecheck, 113 tests and build passed. Moving focus from textarea to a toolbar b
 ## Round 4 — changes requested — 2026-11-22
 
 Typecheck, 114 tests and build passed. Right-click or double-click outside text can cancel pending toolbar refresh without rendering; preserve pending refresh for interactions that do not render.
+
+## Round 5 — changes requested — 2026-11-22
+
+Typecheck, 115 tests and build passed. Delayed selection refresh may replace a keyboard-focused toolbar control, and arbitrary timing may interrupt double-click. Refresh toolbar without replacing canvas or losing focus.
