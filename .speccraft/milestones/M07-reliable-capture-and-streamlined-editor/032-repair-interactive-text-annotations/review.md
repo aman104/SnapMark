@@ -21,3 +21,7 @@ Typecheck, 115 tests and build passed. Delayed selection refresh may replace a k
 ## Round 6 — changes requested — 2026-11-22
 
 Typecheck, 116 tests and build passed. After a text commit via toolbar, delayed full render can remove the focused button without restoring focus. Refresh the toolbar while preserving focus and test the complete mouse/keyboard sequence.
+
+## Round 7 — changes requested — 2026-11-22
+
+Typecheck, 116 tests and build passed. Tool/color click triggers full render and loses focus after a text commit; preserve the activated control and add regression coverage.
