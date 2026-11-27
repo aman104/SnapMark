@@ -22,4 +22,4 @@
 
 [x] 045 - Rework M08 screen area selection parity with Crop tool (8 resize handles, drag-to-move, floating Apply/Cancel bar, Enter/Esc) - Upgrade selectAreaOverlayInDom() in src/content/capture-injected.ts so selecting a screen area behaves identically to the editor Crop tool: after dragging a rectangle, keep it adjustable with 8 resize handles (corners & edges), drag-inside to move with grab/grabbing cursor, live pixel dimensions badge, and floating Cancel / Apply buttons at the bottom-right corner (plus Enter to apply and Escape to cancel). Update unit and Chromium E2E tests.
 
-[ ] 046 - Rework M08 single-click text commit and deselect - Clear selectedAnnotationId when committing text via canvas click-off or Enter (preserving selection only when committing via a toolbar control click) so adding text requires only a single click outside to finish and deselect.
+[x] 046 - Rework M08 single-click text commit and deselect - Clear selectedAnnotationId when committing text via canvas click-off or Enter (preserving selection only when committing via a toolbar control click) so adding text requires only a single click outside to finish and deselect.

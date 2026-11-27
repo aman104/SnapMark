@@ -273,20 +273,22 @@ export function initEditor(
         if (trimmed.length === 0) {
           pushHistorySnapshot();
           state.annotations.splice(idx, 1);
-          state.selectedAnnotationId = state.annotations[0]?.id ?? null;
-        } else if (
-          existing.text !== trimmed ||
-          existing.color !== draft.color ||
-          existing.styleMode !== draft.styleMode
-        ) {
-          pushHistorySnapshot();
-          state.annotations[idx] = {
-            ...existing,
-            text: trimmed,
-            color: draft.color,
-            styleMode: draft.styleMode,
-          };
-          state.selectedAnnotationId = existing.id;
+          state.selectedAnnotationId = null;
+        } else {
+          if (
+            existing.text !== trimmed ||
+            existing.color !== draft.color ||
+            existing.styleMode !== draft.styleMode
+          ) {
+            pushHistorySnapshot();
+            state.annotations[idx] = {
+              ...existing,
+              text: trimmed,
+              color: draft.color,
+              styleMode: draft.styleMode,
+            };
+          }
+          state.selectedAnnotationId = toolbarTarget ? existing.id : null;
         }
       }
     } else if (trimmed.length > 0) {
@@ -303,7 +305,7 @@ export function initEditor(
         styleMode: draft.styleMode,
       };
       state.annotations.push(newText);
-      state.selectedAnnotationId = newText.id;
+      state.selectedAnnotationId = toolbarTarget ? newText.id : null;
     }
 
     if (toolbarTarget) {

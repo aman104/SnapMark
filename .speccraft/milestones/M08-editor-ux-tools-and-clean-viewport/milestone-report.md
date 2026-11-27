@@ -51,6 +51,8 @@
    - **Zmiana rozmiaru zaznaczonej ramki kadrowania (8 uchwytów)**: 4 narożniki i 4 krawędzie ramki kadrowania pozwalają płynnie zmieniać jej rozmiar z odpowiednimi kursorami (`nwse-resize`, `nesw-resize`, `ns-resize`, `ew-resize`).
 13. **Pełna spójność `Select screen area` z narzędziem Crop (Task `045`)**:
    - Nakładka zaznaczania obszaru na stronie (`selectAreaOverlayInDom()` w `src/content/capture-injected.ts`) działa teraz identycznie jak Crop w edytorze: po zaznaczeniu prostokąta pozostaje aktywna z 8 uchwytami zmiany rozmiaru, możliwością przesuwania wewnątrz ramki (`grab` / `grabbing`), pigułką rozmiaru `W × H px` oraz pływającymi przyciskami `Cancel` / `Apply` w prawym dolnym rogu (oraz `Enter` / `Esc`).
+14. **Odznaczenie tekstu jednym kliknięciem (Task `046`)**:
+   - Zatwierdzenie tekstu przez odklik na płótnie lub `Enter` od razu odznacza napis (`selectedAnnotationId = null`), bez konieczności drugiego kliknięcia.
 
 ## Verification
 
@@ -58,4 +60,4 @@
 - `npm test`: **32 test files, 145 tests passed**
 - `npm run build`: clean Vite build (`dist/`)
 - `npm run test:e2e`: **4/4 Vitest E2E + 8/8 real Chromium extension workflows passed**
-- `npm run package`: `snapmark-extension.zip` (40 240 bytes)
+- `npm run package`: `snapmark-extension.zip` (40 241 bytes)
