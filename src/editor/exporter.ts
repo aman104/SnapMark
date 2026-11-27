@@ -21,6 +21,7 @@ export function createFlattenedExportCanvas(
   annotations: AnnotationItem[],
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
 ): HTMLCanvasElement {
   const exportCanvas = document.createElement('canvas');
   renderCanvasStage(
@@ -30,6 +31,9 @@ export function createFlattenedExportCanvas(
     null,
     baseImage,
     placedFrames,
+    1,
+    cropOffsetCss,
+    null,
   );
   return exportCanvas;
 }
@@ -71,6 +75,7 @@ export async function exportFlattenedPngDownload(
   annotations: AnnotationItem[],
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
 ): Promise<{
   filename: string;
   blob: Blob;
@@ -81,6 +86,7 @@ export async function exportFlattenedPngDownload(
     annotations,
     baseImage,
     placedFrames,
+    cropOffsetCss,
   );
   const blob = await canvasToPngBlob(canvas);
   const filename = metadata.filename;
@@ -131,12 +137,14 @@ export async function exportFlattenedToClipboard(
   annotations: AnnotationItem[],
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
 ): Promise<Blob> {
   const canvas = createFlattenedExportCanvas(
     metadata,
     annotations,
     baseImage,
     placedFrames,
+    cropOffsetCss,
   );
   const blob = await canvasToPngBlob(canvas);
 

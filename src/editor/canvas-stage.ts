@@ -4,6 +4,7 @@ import type {
   AnnotationItem,
   ArrowAnnotation,
   CaptureSession,
+  CssRect,
   LineAnnotation,
   MockCaptureMetadata,
   PenAnnotation,
@@ -137,6 +138,7 @@ function createFallback2DContext(): CanvasRenderingContext2D {
     save: noop,
     restore: noop,
     scale: noop,
+    translate: noop,
     clearRect: noop,
     fillRect: noop,
     strokeRect: noop,
@@ -524,6 +526,8 @@ export function renderCanvasStage(
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
   displayScale = 1,
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
+  cropDraftRect: CssRect | null = null,
 ): void {
   const physicalWidth = Math.round(metadata.cssWidth * metadata.dpr);
   const physicalHeight = Math.round(metadata.cssHeight * metadata.dpr);
@@ -543,6 +547,14 @@ export function renderCanvasStage(
     (pf) => pf.drawable !== null,
   );
 
+  const offsetPxX = Math.round((cropOffsetCss?.x ?? 0) * metadata.dpr);
+  const offsetPxY = Math.round((cropOffsetCss?.y ?? 0) * metadata.dpr);
+
+  ctx.save();
+  if (offsetPxX !== 0 || offsetPxY !== 0) {
+    ctx.translate(-offsetPxX, -offsetPxY);
+  }
+
   if (hasValidPlacedDrawables) {
     for (const pf of placedFrames) {
       if (!pf.drawable) continue;
@@ -560,18 +572,23 @@ export function renderCanvasStage(
       );
     }
   } else if (baseImage) {
-    ctx.drawImage(baseImage, 0, 0, physicalWidth, physicalHeight);
+    const baseImg = baseImage as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number };
+    const drawW = baseImg.naturalWidth || baseImg.width || physicalWidth;
+    const drawH = baseImg.naturalHeight || baseImg.height || physicalHeight;
+    ctx.drawImage(baseImage, 0, 0, drawW, drawH);
   } else {
     // Base screenshot bitmap fallback (prototype / JSDOM test environments)
     renderMockScreenshotBackdrop(
       ctx,
-      metadata.cssWidth,
-      metadata.cssHeight,
+      metadata.cssWidth + (cropOffsetCss?.x ?? 0),
+      metadata.cssHeight + (cropOffsetCss?.y ?? 0),
       metadata.dpr,
       metadata.mode,
       metadata.highlightApplied,
     );
   }
+
+  ctx.restore();
 
   // Vector overlay pass scaled by devicePixelRatio
   ctx.save();
@@ -590,6 +607,20 @@ export function renderCanvasStage(
     } else if (item.type === 'pen') {
       drawPenAnnotation(ctx, item, isSelected);
     }
+  }
+
+  // Interactive crop selection overlay (never passed during export)
+  if (cropDraftRect && cropDraftRect.width > 0 && cropDraftRect.height > 0) {
+    const { x, y, width, height } = cropDraftRect;
+    ctx.fillStyle = 'rgba(15, 17, 21, 0.55)';
+    ctx.fillRect(0, 0, metadata.cssWidth, y);
+    ctx.fillRect(0, y + height, metadata.cssWidth, Math.max(0, metadata.cssHeight - (y + height)));
+    ctx.fillRect(0, y, x, height);
+    ctx.fillRect(x + width, y, Math.max(0, metadata.cssWidth - (x + width)), height);
+
+    ctx.strokeStyle = '#FF3B30';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, height);
   }
 
   ctx.restore();
