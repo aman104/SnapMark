@@ -326,3 +326,15 @@ Because `popup.html` and `editor.html` are separate extension documents, they sh
   - **Compact Window (`< 1100px`)**: Toolbar automatically hides `<kbd>` shortcut badges inside buttons and compacts metadata filename length (`max-width: 160px; text-overflow: ellipsis`) so all 4 clusters remain on a single row without horizontal overflow.
 - **Cross-OS Keyboard Shortcut Parity (macOS vs Windows/Linux)**:
   - The editor listens for `(event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z'` so both `Ctrl + Z` (Windows/Linux) and `Cmd + Z` (macOS) trigger Undo seamlessly.
+
+---
+
+## 9. Evolution Updates (`editor-ux-tools-and-clean-viewport` — M08)
+
+- **Popup (`popup.html`)**: Stopka z przełącznikiem `#toggle-highlight` (*„Podświetl zaznaczony tekst na żółto / Tymczasowy marker przed zrzutem”*) zostaje usunięta; popup kończy się na wskazówce dla obrazków PPM.
+- **Editor Toolbar (`editor.html`)**:
+  - Narzędzia rysowania i edycji: **Strzałka (`1`)**, **Linia / Marker (`2`)**, **Tekst (`3`)**, **Kroki (`4`)**, **Pisak (`5`)** oraz **Kadruj (`C`)**.
+  - Kolejność grubości w `#stroke-width-picker`: **Gruba (`8px`)** → **Średnia (`4px`)** → **Cienka (`2px`)** (domyślnie `8px`).
+  - W trybie **Kadruj (`crop`)** pasek kontekstowy wyświetla przyciski **Zastosuj (`Enter`)** i **Anuluj (`Esc`)**.
+- **Editor Stage Fit-to-Width**:
+  - `.editor-stage` używa kompaktowego paddingu (`12px`) i skaluje podgląd `<canvas>` proporcjonalnie (`displayScale = Math.min(1, availableWidth / cssWidth)`) tak, aby nie pojawiał się poziomy pasek przewijania.

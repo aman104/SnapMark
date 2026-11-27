@@ -13,6 +13,7 @@
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | done |
 | 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | done |
 | 8+. Evolution | M07 | Reliable full-page capture and a compact, usable annotation editor | done |
+| 8+. Evolution | M08 | Clean viewport capture (no scrollbar), fit-to-width editor without horizontal scroll, interactive Crop tool, numbered Step badges (`1, 2, 3...`), freehand Pen tool, default thick (`8px`) stroke order (`8/4/2`), and popup cleanup | planned |
 
 ## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
@@ -227,6 +228,32 @@
 - **Depends on:** M06
 - **Estimated size:** 4–6 tasks
 
+## [ ] M08 - Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen
+- **Phase:** 8+ — Evolution
+- **Type:** feature
+- **What you will see:** Zrzut widocznego ekranu nie zawiera już paska przewijania strony; w edytorze zrzut mieści się w szerokości ekranu bez poziomego scrolla; możesz kadrować gotowy zrzut (`Kadruj`), stawiać ponumerowane kółka kroków (`1`, `2`, `3`...) w wybranym kolorze tła, rysować odręcznie pisakiem (`Pisak`), grubości linii/strzałek są w kolejności od grubej (`8px` domyślnie), a z popupu zniknęła zbędna opcja żółtego podświetlania tekstu.
+- **Source:** `docs/07-feature-plan-editor-ux-tools-and-clean-viewport.md`
+- **Goal:** Zrealizować wszystkie 7 usprawnień przechwytywania, podglądu i narzędzi adnotacji (`FR-09`–`FR-15`) bez regresji istniejących funkcji.
+- **Scope:**
+  - Ukrywanie paska przewijania podczas `captureVisibleViewport` z przywróceniem w `finally` (`PRD FR-09`)
+  - Usunięcie przełącznika żółtego podświetlenia tekstu z `popup.html` i odwrócenie kolejności grubości (`8px` domyślnie → `4px` → `2px`) (`PRD FR-14`, `FR-15`)
+  - Podgląd fit-to-width w `.editor-stage` bez poziomego scrolla przy zachowaniu dokładnego mapowania współrzędnych i eksportu w pełnym Retina DPI (`PRD FR-10`)
+  - Narzędzie **Kroki (`4`)** (numerowane kółka `1, 2, 3...` z wybranym kolorem tła i kontrastową cyfrą) oraz narzędzie **Pisak (`5`)** (ręczne rysowanie/zakreślanie) (`PRD FR-12`, `FR-13`)
+  - Narzędzie **Kadruj (`C`)** w edytorze z przycinaniem obrazu, przesuwaniem adnotacji, eksportem wykadrowanego PNG i cofaniem `Ctrl+Z` (`PRD FR-11`)
+- **Out of scope:**
+  - Narzędzie Blur/Pixelate i eksport do PDF
+- **Demo for the operator:**
+  - Zrób zrzut widocznego ekranu (brak scrollbara na zrzucie) → sprawdź brak poziomego scrolla w `editor.html` → przytnij zrzut narzędziem **Kadruj** → postaw kroki `1`, `2`, `3` narzędziem **Kroki** → zakreśl fragment odręcznie **Pisakiem** → narysuj grubą (`8px`) strzałkę → pobierz PNG.
+- **Exit criteria:**
+  - [ ] Zrzut widocznego ekranu ukrywa pasek przewijania na czas `captureVisibleTab` i przywraca go w `finally`
+  - [ ] Edytor dopasowuje podgląd zrzutu do dostępnej szerokości bez poziomego scrolla, a rysowanie i eksport PNG zachowują pełną precyzję HiDPI
+  - [ ] Narzędzie **Kadruj (`C`)** przycina zrzut, przesuwa adnotacje, eksportuje przycięty obraz i wspiera `Ctrl+Z`
+  - [ ] Narzędzie **Kroki (`4`)** wstawia numerowane kółka `1, 2, 3...` z wybranym kolorem tła i automatycznym kontrastem cyfry, a **Pisak (`5`)** pozwala rysować odręcznie
+  - [ ] Kolejność grubości to `8px / 4px / 2px` z domyślną grubością `8px`, a opcja żółtego podświetlenia zniknęła z popupu
+  - [ ] Wszystkie testy jednostkowe, E2E, typecheck, build i pakowanie przechodzą (`npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package`)
+- **Depends on:** M07
+- **Estimated size:** 5 tasks
+
 ## Coverage
 
 | Requirement / screen | Milestone |
@@ -247,3 +274,4 @@
 | `PRD §8` User Settings & Configuration in `chrome.storage.local` | M02 |
 | `PRD §7, §10, §11` Edge cases (`MAX_CANVAS_HEIGHT`, restricted pages, rate-limit retry), non-functional requirements, Playwright E2E & Web Store release package | M05 (hardening & E2E), unit criteria in M02–M04 |
 | `PRD FR-01–FR-08` reliable capture and streamlined editor | M07 |
+| `PRD FR-09–FR-15` clean viewport capture, fit-to-width editor, crop, step badges, freehand pen, stroke defaults, popup cleanup | M08 |

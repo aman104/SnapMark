@@ -358,3 +358,17 @@ Elementy świadomie wykluczone z wersji v1 w celu zachowania maksymalnej lekkoś
 2. **Faza 2 — Publikacja w Chrome Web Store i dystrybucja Open-Source / Społecznościowa**:
    - Przygotowanie paczki `.zip` spełniającej wymogi *Single Purpose Policy* oraz *Minimal Permissions* (brak `<all_urls>` przyspiesza proces recenzji w Chrome Web Store do minimum).
    - Udostępnienie dla pierwszej grupy docelowej (developerzy, QA, PM-owie) jako lekkiej, prywatnej alternatywy dla ciężkich wtyczek chmurowych.
+
+---
+
+## 15. Evolution Requirements (`editor-ux-tools-and-clean-viewport` — M08)
+
+Dodatkowe wymagania funkcjonalne i UX zatwierdzone w planie `07-feature-plan-editor-ux-tools-and-clean-viewport.md`:
+
+- **FR-09 (Czysty zrzut widocznego ekranu bez scrollbara)**: Podczas wykonywania zrzutu widocznego ekranu (`captureVisibleViewport`) skrypt wstrzykiwany na żądanie tymczasowo ukrywa wizualnie paski przewijania (`scrollbar-width: none !important`, `::-webkit-scrollbar { display: none !important; }`) bez zmiany pozycji scrolla, a w bloku `finally` gwarantuje ich przywrócenie.
+- **FR-10 (Podgląd bez poziomego scrolla — Fit-to-Width)**: Scena edytora `.editor-stage` używa minimalnego marginesu (`12px`) i automatycznie dopasowuje szerokość podglądu `<canvas>` do dostępnej szerokości okna (`displayScale = Math.min(1, availableWidth / cssWidth)`), eliminując poziomy pasek przewijania. Współrzędne myszy i nakładka tekstowa są precyzyjnie mapowane na logiczne piksele CSS, a eksport PNG zawsze renderuje się w 100% fizycznej rozdzielczości Retina.
+- **FR-11 (Kadrowanie zrzutu w edytorze — Crop Tool)**: Pasek narzędzi edytora udostępnia narzędzie **Kadruj (`C`)**, pozwalające zaznaczyć prostokątny obszar bezpośrednio na zrzucie i zatwierdzić go (`Zastosuj` / `Enter`) lub anulować (`Esc`). Przycięcie przesuwa istniejące adnotacje wektorowe, eksportuje wykadrowany obraz w pełnym DPI i jest rejestrowane w historii `Ctrl+Z`.
+- **FR-12 (Numerowane znaczniki kroków `1, 2, 3...`)**: Narzędzie **Kroki (`4`)** wstawia po kliknięciu na płótno ponumerowane kółka (`1`, `2`, `3`, `4`...) w wybranym kolorze tła z automatycznie kontrastową cyfrą (białą lub ciemną). Kółka automatycznie inkrementują numer, wspierają zaznaczanie, przesuwanie, zmianę koloru po wstawieniu, `Ctrl+Z` oraz `Delete`.
+- **FR-13 (Pisak / rysowanie odręczne)**: Narzędzie **Pisak (`5`)** umożliwia swobodne ręczne rysowanie i zakreślanie na zrzucie (`PenAnnotation` z tablicą punktów `points[]`, aktywnym kolorem i grubością linii), z obsługą hit-testingu, przesuwania, zmiany stylu po narysowaniu, `Ctrl+Z` oraz `Delete`.
+- **FR-14 (Domyślna gruba linia `8px` i odwrócona kolejność grubości)**: Kontrolka wyboru grubości linii i strzałek wyświetla opcje w kolejności od najgrubszej: **Gruba (`8px`)** → **Średnia (`4px`)** → **Cienka (`2px`)**, a domyślną grubością jest **`8px`**.
+- **FR-15 (Usunięcie przełącznika żółtego podświetlenia z popupu)**: Stopka z opcją *„Podświetl zaznaczony tekst na żółto / Tymczasowy marker przed zrzutem”* zostaje usunięta z `popup.html`, a nakładanie tymczasowego żółtego markera zostaje wyłączone (zastępuje wcześniejszą opcję z `§4.1` i `§8`).
