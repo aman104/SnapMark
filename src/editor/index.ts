@@ -30,6 +30,7 @@ import type {
 } from '../shared/types';
 import {
   buildSessionCompositePlacements,
+  computeFitToWidthScale,
   decodeBlobToDrawable,
   type FramePlacementPlan,
   hitTestAnnotations,
@@ -280,6 +281,15 @@ export function initEditor(
     notifyAndRender();
   }
 
+  function getStageDisplayScale(): number {
+    const stage = container.querySelector<HTMLElement>('#editor-stage');
+    const stageWidth = stage?.clientWidth ?? 0;
+    if (stageWidth <= 24) {
+      return 1;
+    }
+    return computeFitToWidthScale(state.metadata.cssWidth, stageWidth - 24);
+  }
+
   function redrawCanvasOnly(): void {
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
@@ -290,6 +300,7 @@ export function initEditor(
         state.selectedAnnotationId,
         baseDrawable,
         placedFrameDrawables,
+        getStageDisplayScale(),
       );
     }
   }
@@ -674,6 +685,7 @@ export function initEditor(
     `;
 
     syncDownloadUi();
+    const displayScale = getStageDisplayScale();
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
       renderCanvasStage(
@@ -683,13 +695,22 @@ export function initEditor(
         state.selectedAnnotationId,
         baseDrawable,
         placedFrameDrawables,
+        displayScale,
       );
     }
 
     const overlayLayer = container.querySelector<HTMLElement>(
       '#text-overlay-layer',
     );
-    renderTextOverlayLayer(overlayLayer, activeTextDraft, {
+    const scaledTextDraft = activeTextDraft
+      ? {
+          ...activeTextDraft,
+          x: Math.round(activeTextDraft.x * displayScale),
+          y: Math.round(activeTextDraft.y * displayScale),
+          fontSize: Math.max(12, Math.round(activeTextDraft.fontSize * displayScale)),
+        }
+      : null;
+    renderTextOverlayLayer(overlayLayer, scaledTextDraft, {
       onInput: (text) => {
         if (activeTextDraft) {
           activeTextDraft.text = text;
@@ -1087,10 +1108,8 @@ export function initEditor(
     canvas?.addEventListener('mouseup', handleCanvasMouseUp);
     canvas?.addEventListener('dblclick', handleCanvasDoubleClick);
     canvas?.addEventListener('click', (event: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const cssX = event.clientX - rect.left;
-      const cssY = event.clientY - rect.top;
-      const hit = hitTestAnnotations(state.annotations, cssX, cssY);
+      const pt = getCanvasCssPoint(canvas, event);
+      const hit = hitTestAnnotations(state.annotations, pt.x, pt.y);
       if (hit && hit.id !== state.selectedAnnotationId) {
         state.selectedAnnotationId = hit.id;
         syncToolbarWithSelectedAnnotation();
@@ -1132,9 +1151,11 @@ export function initEditor(
       return { x: event.clientX, y: event.clientY };
     }
     const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? state.metadata.cssWidth / rect.width : 1;
+    const scaleY = rect.height > 0 ? state.metadata.cssHeight / rect.height : 1;
     return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
+      x: (event.clientX - rect.left) * scaleX,
+      y: (event.clientY - rect.top) * scaleY,
     };
   }
 
@@ -1474,6 +1495,7 @@ export function initEditor(
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('mousemove', handleCanvasMouseMove);
     window.addEventListener('mouseup', handleCanvasMouseUp);
+    window.addEventListener('resize', redrawCanvasOnly);
     window.addEventListener('paste', (event: ClipboardEvent) => {
       if (closingAfterDownload) {
         event.preventDefault();
