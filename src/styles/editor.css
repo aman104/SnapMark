@@ -158,6 +158,28 @@
   pointer-events: none;
 }
 
+#crop-actions-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.crop-floating-actions {
+  position: absolute;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background-color: rgba(15, 17, 21, 0.92);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-100%);
+  white-space: nowrap;
+}
+
 .step-number-control {
   display: inline-flex;
   align-items: center;
