@@ -133,4 +133,57 @@ describe('Task 040: M08 polish — stable canvas, pen endpoint handles, icon-onl
     const newestText = texts[texts.length - 1];
     expect(newestText?.styleMode).toBe('plain');
   });
+
+  it('Task 041: deselects active step before adding next, removes Shift hint, right-aligns Close (X), orders Line thickness after switch, and updates move cursor', () => {
+    const css = fs.readFileSync(path.resolve(process.cwd(), 'src/styles/editor.css'), 'utf-8');
+    expect(css).toMatch(/\.toolbar-right-group\s*\{[^}]*margin-left:\s*auto/s);
+
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+
+    // Close (X) button is the last button in the toolbar
+    const toolbarButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('.editor-toolbar button'));
+    expect(toolbarButtons[toolbarButtons.length - 1]?.id).toBe('btn-close-editor');
+
+    // Line + Underline: no Shift hint, stroke width picker comes after subtype switch
+    controller.setTool('line');
+    controller.setLineSubtype('underline');
+    expect(container.querySelector('#shift-axis-hint')).toBeNull();
+    const subtypePicker = container.querySelector('#line-subtype-picker')!;
+    const strokePicker = container.querySelector('#stroke-width-picker')!;
+    expect(
+      Boolean(
+        subtypePicker.compareDocumentPosition(strokePicker) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+
+    // Step tool: first click places step 1 (selected), second click on empty space deselects, third click places step 2
+    controller.setTool('step');
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 60, clientY: 60, button: 0 }));
+    expect(controller.getState().annotations.filter((a) => a.type === 'step')).toHaveLength(1);
+    expect(controller.getState().selectedAnnotationId).not.toBeNull();
+
+    // Hover over placed step -> cursor becomes 'grab'
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
+    expect(canvas.style.cursor).toBe('grab');
+
+    // Mousedown + drag on placed step -> cursor becomes 'grabbing'
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 60, clientY: 60, button: 0 }));
+    expect(canvas.style.cursor).toBe('grabbing');
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 90, clientY: 80 }));
+    expect(canvas.style.cursor).toBe('grabbing');
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 90, clientY: 80 }));
+    expect(canvas.style.cursor).toBe('grab');
+
+    // Click empty area -> deselects step 1 (still 1 step)
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 250, clientY: 250, button: 0 }));
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+    expect(controller.getState().annotations.filter((a) => a.type === 'step')).toHaveLength(1);
+
+    // Next click on empty area -> adds step 2
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 250, clientY: 250, button: 0 }));
+    expect(controller.getState().annotations.filter((a) => a.type === 'step')).toHaveLength(2);
+  });
 });

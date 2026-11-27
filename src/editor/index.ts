@@ -475,9 +475,6 @@ export function initEditor(
             Highlighter
           </button>
         </div>
-        <span id="shift-axis-hint" class="shift-hint-pill" title="Hold Shift to lock horizontal axis">
-          <kbd class="kbd-badge">Shift</kbd> = straight
-        </span>
       `
         : '';
 
@@ -517,8 +514,8 @@ export function initEditor(
       <div id="color-picker" class="color-swatch-tray" role="group" aria-label="Annotation color palette">
         ${swatchesHtml}
       </div>
-      ${strokeWidthHtml}
       ${lineSubtypeHtml}
+      ${strokeWidthHtml}
       ${textStyleHtml}
     `;
   }
@@ -842,9 +839,13 @@ export function initEditor(
     state.cropDraftRect = null;
     previousToolBeforeCrop = tool;
     state.activeTool = tool;
-    const matching = state.annotations.find((item) => item.type === tool);
-    if (matching) {
-      state.selectedAnnotationId = matching.id;
+    if (tool === 'step') {
+      state.selectedAnnotationId = null;
+    } else {
+      const matching = state.annotations.find((item) => item.type === tool);
+      if (matching) {
+        state.selectedAnnotationId = matching.id;
+      }
     }
     void updateUserSettings({ activeTool: tool });
     notifyAndRender();
@@ -1350,6 +1351,42 @@ export function initEditor(
     };
   }
 
+  function updateCanvasCursor(
+    canvas: HTMLCanvasElement | null,
+    pt?: Point2D,
+  ): void {
+    if (!canvas) {
+      return;
+    }
+    if (
+      activeInteraction?.kind === 'move' ||
+      activeInteraction?.kind === 'handle'
+    ) {
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+    if (activeInteraction) {
+      canvas.style.cursor = 'crosshair';
+      return;
+    }
+    if (pt && state.activeTool !== 'crop') {
+      if (state.selectedAnnotationId) {
+        const selectedItem = state.annotations.find(
+          (item) => item.id === state.selectedAnnotationId,
+        );
+        if (hitTestEndpointHandle(selectedItem, pt.x, pt.y)) {
+          canvas.style.cursor = 'grab';
+          return;
+        }
+      }
+      if (hitTestAnnotations(state.annotations, pt.x, pt.y)) {
+        canvas.style.cursor = 'grab';
+        return;
+      }
+    }
+    canvas.style.cursor = state.activeTool === 'text' ? 'text' : 'crosshair';
+  }
+
   function handleCanvasMouseDown(event: MouseEvent): void {
     if (event.button !== 0) {
       return;
@@ -1394,6 +1431,7 @@ export function initEditor(
           handle: hitHandle,
           snapshotPushed: false,
         };
+        updateCanvasCursor(canvas, pt);
         return;
       }
     }
@@ -1409,6 +1447,7 @@ export function initEditor(
         lastPoint: pt,
         snapshotPushed: false,
       };
+      updateCanvasCursor(canvas, pt);
       redrawCanvasOnly();
       return;
     }
@@ -1431,8 +1470,15 @@ export function initEditor(
       return;
     }
 
-    // 3b. When Step tool is active, immediately place a numbered circle badge at (pt.x, pt.y)
+    // 3b. When Step tool is active: if something is selected, deselect first; next click places the next numbered badge
     if (state.activeTool === 'step') {
+      if (state.selectedAnnotationId !== null) {
+        state.selectedAnnotationId = null;
+        redrawCanvasOnly();
+        refreshToolbarOnly();
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
       pushHistorySnapshot();
       annotationSeq += 1;
       const stepNumber = getNextStepNumber(state.annotations);
@@ -1449,6 +1495,7 @@ export function initEditor(
       state.selectedAnnotationId = newStep.id;
       redrawCanvasOnly();
       refreshToolbarOnly();
+      updateCanvasCursor(canvas, pt);
       return;
     }
 
@@ -1478,13 +1525,21 @@ export function initEditor(
   }
 
   function handleCanvasMouseMove(event: MouseEvent): void {
-    if (!activeInteraction || event === lastProcessedMoveEvent) {
+    if (event === lastProcessedMoveEvent) {
       return;
     }
     lastProcessedMoveEvent = event;
 
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    if (!activeInteraction) {
+      if (canvas && event.target === canvas) {
+        updateCanvasCursor(canvas, getCanvasCssPoint(canvas, event));
+      }
+      return;
+    }
+
     const pt = getCanvasCssPoint(canvas, event);
+    updateCanvasCursor(canvas, pt);
 
     if (activeInteraction.kind === 'crop') {
       const clampedX = Math.max(0, Math.min(state.metadata.cssWidth, pt.x));
@@ -1663,6 +1718,8 @@ export function initEditor(
       state.selectedAnnotationId = null;
     }
     activeInteraction = null;
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    updateCanvasCursor(canvas, canvas ? getCanvasCssPoint(canvas, event) : undefined);
     redrawCanvasOnly();
     refreshToolbarOnly();
   }

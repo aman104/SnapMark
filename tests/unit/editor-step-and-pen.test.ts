@@ -23,13 +23,25 @@ describe('Task 037: Numbered Step Badges (1, 2, 3...) and Freehand Pen Drawing (
       .dispatchEvent(
         new MouseEvent('mousedown', { clientX: 80, clientY: 90, button: 0 }),
       );
-    // Place step 2 at (200, 120)
+    // First click on empty canvas deselects step 1 without adding step 2
+    container
+      .querySelector<HTMLCanvasElement>('#editor-canvas')!
+      .dispatchEvent(
+        new MouseEvent('mousedown', { clientX: 150, clientY: 100, button: 0 }),
+      );
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+    // Next click places step 2 at (200, 120)
     container
       .querySelector<HTMLCanvasElement>('#editor-canvas')!
       .dispatchEvent(
         new MouseEvent('mousedown', { clientX: 200, clientY: 120, button: 0 }),
       );
-    // Place step 3 at (320, 160)
+    // Deselect step 2, then place step 3 at (320, 160)
+    container
+      .querySelector<HTMLCanvasElement>('#editor-canvas')!
+      .dispatchEvent(
+        new MouseEvent('mousedown', { clientX: 260, clientY: 140, button: 0 }),
+      );
     container
       .querySelector<HTMLCanvasElement>('#editor-canvas')!
       .dispatchEvent(

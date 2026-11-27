@@ -29,11 +29,17 @@
    - **Domyślne ustawienia narzędzi**: **Line** domyślnie ma średnią grubość (`4px`), **Text** domyślnie tryb `Plain`, a **Arrow** i **Pen** pozostają grube (`8px`).
    - **Czysty przycisk `Undo`**: usunięto odznakę `Ctrl+Z` oraz licznik elementów do cofnięcia (`#undo-count`).
    - **Cały interfejs w języku angielskim**: przetłumaczono wszystkie teksty UI w popupie, edytorze, nakładce zaznaczania, menu kontekstowym, komunikatach błędów i `public/manifest.json`.
+9. **Dopracowanie UX edytora (Task `041`)**:
+   - **Odkliknięcie numeru kroku przed kolejnym**: kliknięcie w puste miejsce przy zaznaczonym kroku najpierw go odznacza, a dopiero następny klik dodaje kolejny numer (`1, 2, 3...`).
+   - **Usunięcie napisu `Shift = straight`** z paska narzędzi.
+   - **Przycisk zamknięcia `X` zawsze po prawej stronie topbara** (`margin-left: auto` na `.toolbar-right-group` i `#btn-close-editor`).
+   - **Kolejność kontrolek dla `Line` + `Underline`**: przełącznik `Underline / Highlighter` pojawia się przed wyborem grubości (`Thick / Medium / Thin`).
+   - **Kursor podczas przenoszenia elementów**: `grab` przy najechaniu na element/uchwyt i `grabbing` w trakcie przeciągania.
 
 ## Verification
 
 - `npm run typecheck`: 0 errors
-- `npm test`: **32 test files, 141 tests passed**
+- `npm test`: **32 test files, 142 tests passed**
 - `npm run build`: clean Vite build (`dist/`)
 - `npm run test:e2e`: **4/4 Vitest E2E + 8/8 real Chromium extension workflows passed**
-- `npm run package`: `snapmark-extension.zip` (36 887 bytes)
+- `npm run package`: `snapmark-extension.zip` (37 008 bytes)

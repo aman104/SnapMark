@@ -34,20 +34,28 @@ describe('Task 005: Vector editor 56px top toolbar and contextual controls', () 
     const container = document.createElement('div');
     const controller = initEditor(container);
 
-    // Switch to Linia / Marker (Tool 2)
+    // Switch to Line / Highlighter (Tool 2)
     container.querySelector<HTMLButtonElement>('#tool-line')?.click();
     expect(controller.getState().activeTool).toBe('line');
     expect(container.querySelector('#line-subtype-picker')).not.toBeNull();
-    expect(container.querySelector('#shift-axis-hint')?.textContent).toContain(
-      'Shift',
-    );
+    expect(container.querySelector('#shift-axis-hint')).toBeNull();
 
-    // Switch subtype from Zakreślacz to Podkreślenie -> reveals stroke width picker
+    // Switch subtype from Highlighter to Underline -> reveals stroke width picker AFTER subtype switch
     container
       .querySelector<HTMLButtonElement>('[data-line-subtype="underline"]')
       ?.click();
     expect(controller.getState().lineSubtype).toBe('underline');
-    expect(container.querySelector('#stroke-width-picker')).not.toBeNull();
+    const subtypePicker = container.querySelector('#line-subtype-picker');
+    const strokePicker = container.querySelector('#stroke-width-picker');
+    expect(strokePicker).not.toBeNull();
+    expect(
+      Boolean(
+        subtypePicker &&
+          strokePicker &&
+          subtypePicker.compareDocumentPosition(strokePicker) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
 
     // Switch to Tekst via keyboard shortcut "3"
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '3' }));
