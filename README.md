@@ -109,7 +109,7 @@ Buduje kompletną paczkę rozszerzenia Manifest V3 do katalogu `dist/` (`manifes
 | `Alt + Shift + F` | Globalny (Chrome) | Zrzut całej strony ze scrollem (**Tryb 4: Full-Page Scroll**) |
 | `Alt + Shift + S` | Globalny (Chrome) | Interaktywne zaznaczenie obszaru ekranu |
 | `Esc` | Popup (podczas scrolla) | Natychmiast anuluje zrzut całej strony i przywraca DOM |
-| `1` / `2` / `3` | Edytor (`editor.html`) | Przełącza narzędzie: **1 = Strzałka**, **2 = Linia / Marker**, **3 = Tekst** |
+| `1` / `2` / `3` / `4` / `5` / `C` | Edytor (`editor.html`) | Przełącza narzędzie: **1 = Strzałka**, **2 = Linia / Marker**, **3 = Tekst**, **4 = Kroki (1, 2, 3...)**, **5 = Pisak**, **C = Kadruj** |
 | `Shift` (przytrzymany) | Edytor (`editor.html`) | Wymusza idealnie poziomą linię (`y2 = y1`) przy rysowaniu i edycji uchwytów |
 | `Ctrl + Z` / `Cmd + Z` | Edytor (`editor.html`) | Cofa ostatnią operację z historii (`UndoHistoryStack`) |
 | `Delete` / `Backspace` | Edytor (`editor.html`) | Usuwa zaznaczony obiekt wektorowy z płótna |

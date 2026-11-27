@@ -93,12 +93,10 @@ describe('SnapMark Chrome Extension Manifest V3 — End-to-End Suite (tests/e2e/
     expect(popup.getState()).toBe('restricted');
     expect(popupRoot.querySelector('#restricted-banner')).not.toBeNull();
 
-    // Switch to normal ready state, toggle yellow highlight switch, and verify persistence
+    // Switch to normal ready state and verify yellow highlight toggle has been removed (FR-15)
     popup.setState('default');
+    expect(popupRoot.querySelector('#toggle-highlight')).toBeNull();
     expect(popup.isHighlightEnabled()).toBe(false);
-
-    popupRoot.querySelector<HTMLButtonElement>('#toggle-highlight')?.click();
-    expect(popup.isHighlightEnabled()).toBe(true);
 
     // Trigger full-page scroll progress and cancel with Escape
     popupRoot.querySelector<HTMLButtonElement>('#btn-capture-fullpage')?.click();
