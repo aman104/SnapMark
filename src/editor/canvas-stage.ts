@@ -6,6 +6,8 @@ import type {
   CaptureSession,
   LineAnnotation,
   MockCaptureMetadata,
+  PenAnnotation,
+  StepAnnotation,
   TextAnnotation,
 } from '../shared/types';
 import { getArrowheadDimensions, hitTestAnnotationBody } from './vector-engine';
@@ -321,6 +323,97 @@ function drawTextAnnotation(
   ctx.restore();
 }
 
+export function drawStepAnnotation(
+  ctx: CanvasRenderingContext2D,
+  item: StepAnnotation,
+  isSelected: boolean,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+  ctx.fillStyle = item.color;
+  ctx.fill();
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = item.color === '#FFFFFF' ? '#1C1C1E' : '#FFFFFF';
+  ctx.stroke();
+
+  const isLightFill = item.color === '#FFFFFF' || item.color === '#FFCC00';
+  ctx.fillStyle = isLightFill ? '#1C1C1E' : '#FFFFFF';
+  ctx.font = `700 ${Math.round(item.radius * 1.05)}px -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(item.stepNumber), item.x, item.y + 0.5);
+
+  if (isSelected) {
+    ctx.beginPath();
+    ctx.arc(item.x, item.y, item.radius + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+export function drawPenAnnotation(
+  ctx: CanvasRenderingContext2D,
+  item: PenAnnotation,
+  isSelected: boolean,
+): void {
+  if (item.points.length === 0) {
+    return;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = item.color;
+  ctx.fillStyle = item.color;
+  ctx.lineWidth = item.strokeWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const first = item.points[0]!;
+  if (item.points.length === 1) {
+    ctx.beginPath();
+    ctx.arc(first.x, first.y, item.strokeWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < item.points.length; i += 1) {
+      const pt = item.points[i]!;
+      ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+  }
+
+  if (isSelected) {
+    let minX = first.x;
+    let maxX = first.x;
+    let minY = first.y;
+    let maxY = first.y;
+    for (const pt of item.points) {
+      if (pt.x < minX) minX = pt.x;
+      if (pt.x > maxX) maxX = pt.x;
+      if (pt.y < minY) minY = pt.y;
+      if (pt.y > maxY) maxY = pt.y;
+    }
+    const pad = Math.max(6, item.strokeWidth / 2 + 4);
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(
+      minX - pad,
+      minY - pad,
+      Math.max(12, maxX - minX + pad * 2),
+      Math.max(12, maxY - minY + pad * 2),
+    );
+  }
+
+  ctx.restore();
+}
+
 export function hitTestAnnotations(
   annotations: AnnotationItem[],
   cssX: number,
@@ -492,6 +585,10 @@ export function renderCanvasStage(
       drawLineAnnotation(ctx, item, isSelected);
     } else if (item.type === 'text') {
       drawTextAnnotation(ctx, item, isSelected);
+    } else if (item.type === 'step') {
+      drawStepAnnotation(ctx, item, isSelected);
+    } else if (item.type === 'pen') {
+      drawPenAnnotation(ctx, item, isSelected);
     }
   }
 

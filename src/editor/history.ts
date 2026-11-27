@@ -1,7 +1,11 @@
 import type { AnnotationItem } from '../shared/types';
 
 export function cloneAnnotationList(items: AnnotationItem[]): AnnotationItem[] {
-  return items.map((item) => ({ ...item }));
+  return items.map((item) =>
+    item.type === 'pen'
+      ? { ...item, points: item.points.map((p) => ({ ...p })) }
+      : { ...item },
+  );
 }
 
 /**
