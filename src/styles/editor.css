@@ -52,6 +52,7 @@
 }
 
 .toolbar-right-group {
+  margin-left: auto;
   max-width: 100%;
 }
 
@@ -75,6 +76,9 @@
   .toolbar-right-group .toolbar-cluster {
     flex: 1;
     min-width: 0;
+  }
+  #btn-close-editor {
+    margin-left: auto;
   }
   #btn-undo > span {
     display: none;
