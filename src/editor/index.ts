@@ -19,6 +19,7 @@ import type {
   AnnotationItem,
   ArrowAnnotation,
   CaptureMode,
+  CssRect,
   EditorPrototypeState,
   EditorTool,
   LineAnnotation,
@@ -71,6 +72,8 @@ export interface EditorState {
   warningDismissed: boolean;
   isLiveCapture: boolean;
   framePlacements: FramePlacementPlan[];
+  cropOffsetCss: { x: number; y: number };
+  cropDraftRect: CssRect | null;
 }
 
 export interface InitEditorOptions {
@@ -124,6 +127,10 @@ type ActiveCanvasInteraction =
       newId: string;
       points: Point2D[];
       snapshotPushed: boolean;
+    }
+  | {
+      kind: 'crop';
+      startPoint: Point2D;
     };
 
 export function initEditor(
@@ -164,12 +171,15 @@ export function initEditor(
     warningDismissed: false,
     isLiveCapture: Boolean(captureIdParam),
     framePlacements: [],
+    cropOffsetCss: { x: 0, y: 0 },
+    cropDraftRect: null,
   };
 
   let baseDrawable: CanvasImageSource | null = null;
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
+  let previousToolBeforeCrop: Exclude<EditorTool, 'crop'> = 'arrow';
   let toolbarRefreshPending = false;
   let toolbarPointerDown = false;
   let downloadInProgress = false;
@@ -194,14 +204,31 @@ export function initEditor(
     container.setAttribute('aria-busy', closing ? 'true' : 'false');
   }
 
+  interface StageGeometrySnapshot {
+    cssWidth: number;
+    cssHeight: number;
+    cropOffsetCss: { x: number; y: number };
+  }
+  const geometryHistoryStack: Array<StageGeometrySnapshot | null> =
+    state.historyStack.map(() => null);
+
   const historyManager = new UndoHistoryStack(state.historyStack);
 
   function syncHistoryState(): void {
     state.historyStack = historyManager.getSnapshots();
   }
 
-  function pushHistorySnapshot(): void {
+  function pushHistorySnapshot(includeGeometry = false): void {
     historyManager.pushSnapshot(state.annotations);
+    geometryHistoryStack.push(
+      includeGeometry
+        ? {
+            cssWidth: state.metadata.cssWidth,
+            cssHeight: state.metadata.cssHeight,
+            cropOffsetCss: { ...state.cropOffsetCss },
+          }
+        : null,
+    );
     syncHistoryState();
   }
 
@@ -311,6 +338,8 @@ export function initEditor(
         baseDrawable,
         placedFrameDrawables,
         getStageDisplayScale(),
+        state.cropOffsetCss,
+        state.cropDraftRect,
       );
     }
   }
@@ -362,6 +391,25 @@ export function initEditor(
   }
 
   function renderContextualPropertiesHtml(): string {
+    if (state.activeTool === 'crop') {
+      const hasValidCrop =
+        state.cropDraftRect !== null &&
+        state.cropDraftRect.width >= 8 &&
+        state.cropDraftRect.height >= 8;
+      const cropLabel = hasValidCrop && state.cropDraftRect
+        ? `${Math.round(state.cropDraftRect.width)}×${Math.round(state.cropDraftRect.height)} px`
+        : 'Przeciągnij obszar';
+      return `
+        <span class="shift-hint-pill" id="crop-dimensions-label">${cropLabel}</span>
+        <button type="button" id="btn-apply-crop" class="btn-primary" ${hasValidCrop ? '' : 'disabled'}>
+          Zastosuj
+        </button>
+        <button type="button" id="btn-cancel-crop" class="btn-secondary">
+          Anuluj
+        </button>
+      `;
+    }
+
     const swatchesHtml = ANNOTATION_COLORS.map(
       (swatch) => `
         <button
@@ -625,6 +673,21 @@ export function initEditor(
                 <span>Pisak</span>
                 <kbd class="kbd-badge">5</kbd>
               </button>
+
+              <button
+                type="button"
+                id="tool-crop"
+                aria-label="Kadruj"
+                class="toolbar-tool-btn ${state.activeTool === 'crop' ? 'is-active' : ''}"
+                aria-pressed="${state.activeTool === 'crop' ? 'true' : 'false'}"
+                title="Kadruj zrzut (C)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4.5 2v9.5H14M2 4.5h9.5V14" />
+                </svg>
+                <span>Kadruj</span>
+                <kbd class="kbd-badge">C</kbd>
+              </button>
             </div>
           </div>
 
@@ -738,6 +801,8 @@ export function initEditor(
         baseDrawable,
         placedFrameDrawables,
         displayScale,
+        state.cropOffsetCss,
+        state.cropDraftRect,
       );
     }
 
@@ -773,12 +838,61 @@ export function initEditor(
     if (activeTextDraft && tool !== 'text') {
       commitActiveTextDraft();
     }
+    if (tool === 'crop') {
+      if (state.activeTool !== 'crop') {
+        previousToolBeforeCrop = state.activeTool;
+      }
+      state.activeTool = 'crop';
+      state.selectedAnnotationId = null;
+      state.cropDraftRect = null;
+      notifyAndRender();
+      return;
+    }
+    state.cropDraftRect = null;
+    previousToolBeforeCrop = tool;
     state.activeTool = tool;
     const matching = state.annotations.find((item) => item.type === tool);
     if (matching) {
       state.selectedAnnotationId = matching.id;
     }
     void updateUserSettings({ activeTool: tool });
+    notifyAndRender();
+  }
+
+  function applyCrop(): void {
+    const rect = state.cropDraftRect;
+    if (!rect || rect.width < 8 || rect.height < 8) {
+      return;
+    }
+    const cropX = Math.max(0, Math.round(rect.x));
+    const cropY = Math.max(0, Math.round(rect.y));
+    const cropW = Math.max(8, Math.min(state.metadata.cssWidth - cropX, Math.round(rect.width)));
+    const cropH = Math.max(8, Math.min(state.metadata.cssHeight - cropY, Math.round(rect.height)));
+
+    pushHistorySnapshot(true);
+    state.annotations = state.annotations.map((item) =>
+      moveAnnotationByDelta(item, -cropX, -cropY),
+    );
+    state.cropOffsetCss = {
+      x: state.cropOffsetCss.x + cropX,
+      y: state.cropOffsetCss.y + cropY,
+    };
+    state.metadata = {
+      ...state.metadata,
+      cssWidth: cropW,
+      cssHeight: cropH,
+    };
+    state.cropDraftRect = null;
+    state.activeTool = previousToolBeforeCrop;
+    state.selectedAnnotationId = null;
+    notifyAndRender();
+  }
+
+  function cancelCrop(): void {
+    state.cropDraftRect = null;
+    if (state.activeTool === 'crop') {
+      state.activeTool = previousToolBeforeCrop;
+    }
     notifyAndRender();
   }
 
@@ -856,8 +970,18 @@ export function initEditor(
     if (!previous) {
       return;
     }
+    const prevGeometry = geometryHistoryStack.pop() ?? null;
     syncHistoryState();
     state.annotations = previous;
+    if (prevGeometry) {
+      state.metadata = {
+        ...state.metadata,
+        cssWidth: prevGeometry.cssWidth,
+        cssHeight: prevGeometry.cssHeight,
+      };
+      state.cropOffsetCss = { ...prevGeometry.cropOffsetCss };
+      state.cropDraftRect = null;
+    }
     if (
       state.selectedAnnotationId &&
       !state.annotations.some((item) => item.id === state.selectedAnnotationId)
@@ -1000,6 +1124,18 @@ export function initEditor(
       ?.addEventListener('click', () => setTool('pen'));
 
     container
+      .querySelector<HTMLButtonElement>('#tool-crop')
+      ?.addEventListener('click', () => setTool('crop'));
+
+    container
+      .querySelector<HTMLButtonElement>('#btn-apply-crop')
+      ?.addEventListener('click', applyCrop);
+
+    container
+      .querySelector<HTMLButtonElement>('#btn-cancel-crop')
+      ?.addEventListener('click', cancelCrop);
+
+    container
       .querySelectorAll<HTMLButtonElement>('.color-swatch')
       .forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -1070,6 +1206,7 @@ export function initEditor(
           state.annotations,
           baseDrawable,
           placedFrameDrawables,
+          state.cropOffsetCss,
         ).then(async () => {
           const canClose = (): boolean => !activeTextDraft && !activeInteraction && JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) === exportedState;
           if (!canClose()) {
@@ -1225,6 +1362,26 @@ export function initEditor(
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     const pt = getCanvasCssPoint(canvas, event);
 
+    // 0. Crop tool mode: drag to define crop rectangle
+    if (state.activeTool === 'crop') {
+      const clampedStart = {
+        x: Math.max(0, Math.min(state.metadata.cssWidth, pt.x)),
+        y: Math.max(0, Math.min(state.metadata.cssHeight, pt.y)),
+      };
+      state.cropDraftRect = {
+        x: clampedStart.x,
+        y: clampedStart.y,
+        width: 0,
+        height: 0,
+      };
+      activeInteraction = {
+        kind: 'crop',
+        startPoint: clampedStart,
+      };
+      redrawCanvasOnly();
+      return;
+    }
+
     // 1. Check if user grabbed an endpoint handle (x1, y1) or (x2, y2) of the selected arrow/line
     if (state.selectedAnnotationId) {
       const selectedItem = state.annotations.find(
@@ -1328,6 +1485,19 @@ export function initEditor(
 
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     const pt = getCanvasCssPoint(canvas, event);
+
+    if (activeInteraction.kind === 'crop') {
+      const clampedX = Math.max(0, Math.min(state.metadata.cssWidth, pt.x));
+      const clampedY = Math.max(0, Math.min(state.metadata.cssHeight, pt.y));
+      state.cropDraftRect = {
+        x: Math.min(activeInteraction.startPoint.x, clampedX),
+        y: Math.min(activeInteraction.startPoint.y, clampedY),
+        width: Math.abs(clampedX - activeInteraction.startPoint.x),
+        height: Math.abs(clampedY - activeInteraction.startPoint.y),
+      };
+      redrawCanvasOnly();
+      return;
+    }
 
     if (activeInteraction.kind === 'handle') {
       const targetId = activeInteraction.itemId;
@@ -1601,6 +1771,19 @@ export function initEditor(
       return;
     }
 
+    if (state.activeTool === 'crop') {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyCrop();
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelCrop();
+        return;
+      }
+    }
+
     if (!event.ctrlKey && !event.metaKey && !event.altKey) {
       if (event.key === '1') {
         setTool('arrow');
@@ -1612,6 +1795,8 @@ export function initEditor(
         setTool('step');
       } else if (event.key === '5') {
         setTool('pen');
+      } else if (event.key.toLowerCase() === 'c') {
+        setTool('crop');
       }
     }
   };
