@@ -2,6 +2,7 @@
 .agents/
 .claude/
 .speccraft/
+AGENTS.md
 
 # Dependencies & Build Output
 node_modules/
