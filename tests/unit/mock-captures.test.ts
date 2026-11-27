@@ -21,7 +21,7 @@ describe('Task 003: Shared types, constants, and mock capture fixtures', () => {
       selectionPaddingPx: 20,
       activeTool: 'arrow',
       activeColor: '#FF3B30',
-      strokeWidth: 4,
+      strokeWidth: 8,
       textStyleMode: 'background',
     });
     expect(SELECTION_PADDING_PX).toBe(20);
@@ -38,7 +38,7 @@ describe('Task 003: Shared types, constants, and mock capture fixtures', () => {
       '#FFFFFF',
       '#1C1C1E',
     ]);
-    expect(STROKE_WIDTHS.map((s) => s.value)).toEqual([2, 4, 8]);
+    expect(STROKE_WIDTHS.map((s) => s.value)).toEqual([8, 4, 2]);
   });
 
   it('parses popup prototype states from URL search strings with safe fallback', () => {

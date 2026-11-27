@@ -1,6 +1,4 @@
-import { DEFAULT_USER_SETTINGS } from '../shared/constants';
 import { parsePopupStateFromSearch } from '../shared/mock-captures';
-import { loadUserSettings, updateUserSettings } from '../shared/settings';
 import type {
   CancelScrollCaptureRequest,
   PopupPrototypeState,
@@ -47,8 +45,6 @@ export function renderPopup(
 
   let currentState: PopupPrototypeState =
     parsePopupStateFromSearch(initialSearch);
-  let highlightSelectionBeforeCapture: boolean =
-    DEFAULT_USER_SETTINGS.highlightSelectionBeforeCapture;
   let currentFrame = 3;
   let totalFrames = 8;
   let progressStatusText =
@@ -177,23 +173,6 @@ export function renderPopup(
           </aside>
         `
         }
-
-        <footer class="popup-footer">
-          <div class="popup-setting-label-group" id="label-toggle-highlight">
-            <span class="popup-setting-title">Podświetl zaznaczony tekst na żółto</span>
-            <span class="popup-setting-caption">Tymczasowy marker przed zrzutem</span>
-          </div>
-          <button
-            type="button"
-            id="toggle-highlight"
-            class="toggle-switch"
-            role="switch"
-            aria-checked="${highlightSelectionBeforeCapture ? 'true' : 'false'}"
-            aria-labelledby="label-toggle-highlight"
-          >
-            <span class="toggle-switch-thumb"></span>
-          </button>
-        </footer>
       </div>
     `;
 
@@ -230,11 +209,6 @@ export function renderPopup(
     );
     const selectionBtn = container.querySelector<HTMLButtonElement>(
       '#btn-capture-selection',
-    );
-    const toggleHighlightBtn =
-      container.querySelector<HTMLButtonElement>('#toggle-highlight');
-    const toggleHighlightLabel = container.querySelector<HTMLElement>(
-      '#label-toggle-highlight',
     );
     const cancelScrollBtn =
       container.querySelector<HTMLButtonElement>('#btn-cancel-scroll');
@@ -303,23 +277,8 @@ export function renderPopup(
         closePopupWindow();
         return;
       }
-      const highlightFlag = highlightSelectionBeforeCapture ? '1' : '0';
-      navigate(`editor.html?mode=selection&highlight=${highlightFlag}`);
+      navigate('editor.html?mode=selection');
     });
-
-    const toggleHighlight = (): void => {
-      highlightSelectionBeforeCapture = !highlightSelectionBeforeCapture;
-      toggleHighlightBtn?.setAttribute(
-        'aria-checked',
-        highlightSelectionBeforeCapture ? 'true' : 'false',
-      );
-      void updateUserSettings({
-        highlightSelectionBeforeCapture,
-      });
-    };
-
-    toggleHighlightBtn?.addEventListener('click', toggleHighlight);
-    toggleHighlightLabel?.addEventListener('click', toggleHighlight);
 
     cancelScrollBtn?.addEventListener('click', () => {
       if (
@@ -344,10 +303,6 @@ export function renderPopup(
   }
 
   async function hydrateSettingsAndActiveTab(): Promise<void> {
-    const savedSettings = await loadUserSettings();
-    highlightSelectionBeforeCapture =
-      savedSettings.highlightSelectionBeforeCapture;
-
     if (
       !explicitStateOverride &&
       typeof chrome !== 'undefined' &&
@@ -432,7 +387,7 @@ export function renderPopup(
       currentState = nextState;
       render();
     },
-    isHighlightEnabled: () => highlightSelectionBeforeCapture,
+    isHighlightEnabled: () => false,
     ready,
   };
 }

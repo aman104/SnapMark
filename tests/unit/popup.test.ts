@@ -38,8 +38,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
       container.querySelector('.image-hint-strip')?.textContent,
     ).toContain('PPM na dowolnym obrazku');
 
-    const toggle = container.querySelector('#toggle-highlight');
-    expect(toggle?.getAttribute('aria-checked')).toBe('false');
+    expect(container.querySelector('#toggle-highlight')).toBeNull();
   });
 
   it('renders the no-selection state with muted disabled selection card', () => {
@@ -65,7 +64,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
-  it('toggles yellow highlight switch, persists it in settings, and navigates to editor.html', async () => {
+  it('omits yellow highlight toggle and navigates to editor.html for selection and viewport modes', async () => {
     const container = document.createElement('div');
     const onNavigate = vi.fn();
     const controller = renderPopup(container, {
@@ -74,36 +73,13 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     });
     await controller.ready;
 
-    const toggle =
-      container.querySelector<HTMLButtonElement>('#toggle-highlight');
+    expect(container.querySelector('#toggle-highlight')).toBeNull();
     expect(controller.isHighlightEnabled()).toBe(false);
-
-    toggle?.click();
-    expect(controller.isHighlightEnabled()).toBe(true);
-    expect(toggle?.getAttribute('aria-checked')).toBe('true');
-
-    // Allow the async updateUserSettings() write microtask to complete
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Re-mounting a fresh popup instance loads the persisted highlight setting
-    const secondContainer = document.createElement('div');
-    const secondController = renderPopup(secondContainer, {
-      initialSearch: '?state=default',
-    });
-    await secondController.ready;
-    expect(secondController.isHighlightEnabled()).toBe(true);
-    expect(
-      secondContainer
-        .querySelector('#toggle-highlight')
-        ?.getAttribute('aria-checked'),
-    ).toBe('true');
 
     container
       .querySelector<HTMLButtonElement>('#btn-capture-selection')
       ?.click();
-    expect(onNavigate).toHaveBeenCalledWith(
-      'editor.html?mode=selection&highlight=1',
-    );
+    expect(onNavigate).toHaveBeenCalledWith('editor.html?mode=selection');
 
     container
       .querySelector<HTMLButtonElement>('#btn-capture-viewport')
