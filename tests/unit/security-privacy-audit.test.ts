@@ -115,7 +115,7 @@ describe('Task 023: PRD §7 Edge-Case Hardening & §10-11 Privacy, Permissions a
         fakeTab,
         new CaptureRateLimiter({ minIntervalMs: 0 }),
       ),
-    ).rejects.toThrow('Najpierw zaznacz fragment tekstu na stronie.');
+    ).rejects.toThrow('Select some text on the page first.');
 
     expect(setBadgeText).toHaveBeenCalledWith({ text: '!' });
     expect(createTab).not.toHaveBeenCalled();

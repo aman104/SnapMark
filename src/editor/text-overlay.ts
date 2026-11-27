@@ -38,8 +38,8 @@ export function renderTextOverlayLayer(
   textarea.id = 'active-text-input';
   textarea.className = `canvas-text-input is-style-${draft.styleMode}`;
   textarea.setAttribute('data-style-mode', draft.styleMode);
-  textarea.setAttribute('aria-label', 'Pole tekstowe adnotacji');
-  textarea.placeholder = 'Wpisz tekst...';
+  textarea.setAttribute('aria-label', 'Annotation text input');
+  textarea.placeholder = 'Type text...';
   textarea.value = draft.text;
 
   textarea.style.left = `${draft.x}px`;

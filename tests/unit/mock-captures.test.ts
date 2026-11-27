@@ -22,7 +22,7 @@ describe('Task 003: Shared types, constants, and mock capture fixtures', () => {
       activeTool: 'arrow',
       activeColor: '#FF3B30',
       strokeWidth: 8,
-      textStyleMode: 'background',
+      textStyleMode: 'plain',
     });
     expect(SELECTION_PADDING_PX).toBe(20);
     expect(SCROLL_CAPTURE_THROTTLE_MS).toBe(550);

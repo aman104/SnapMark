@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SnapMark",
   "version": "0.1.0",
-  "description": "Szybkie zrzuty kontekstowe z lekkim edytorem adnotacji",
+  "description": "Fast contextual screenshots with a lightweight vector annotation editor",
   "permissions": [
     "activeTab",
     "contextMenus",
@@ -35,19 +35,19 @@
       "suggested_key": {
         "default": "Alt+Shift+V"
       },
-      "description": "Zrzut widocznego ekranu (Viewport)"
+      "description": "Capture visible screen (Viewport)"
     },
     "capture-fullpage": {
       "suggested_key": {
         "default": "Alt+Shift+F"
       },
-      "description": "Zrzut całej strony ze scrollem"
+      "description": "Capture full page with scrolling"
     },
     "capture-selection": {
       "suggested_key": {
         "default": "Alt+Shift+S"
       },
-      "description": "Zrzut zaznaczonego fragmentu tekstu"
+      "description": "Capture selected screen area"
     }
   }
 }

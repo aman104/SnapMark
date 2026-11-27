@@ -56,7 +56,8 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     button.click();
     expect(downloads).toBe(1);
     expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Tekst przed pobraniem')).toBe(true);
-    await vi.waitFor(() => expect(container.querySelector('#undo-count')?.textContent).toBe(String(historyBefore + 1)));
+    await vi.waitFor(() => expect(controller.getState().historyStack.length).toBe(historyBefore + 1));
+    expect(container.querySelector<HTMLButtonElement>('#btn-undo')?.disabled).toBe(false);
     expect(document.activeElement?.id).toBe('btn-download-png');
     container.remove();
   });
@@ -124,7 +125,8 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     const historyBefore = controller.getState().historyStack.length;
     container.querySelector<HTMLButtonElement>('#btn-download-png')!.focus();
     await Promise.resolve();
-    expect(container.querySelector('#undo-count')?.textContent).toBe(String(historyBefore + 1));
+    expect(controller.getState().historyStack.length).toBe(historyBefore + 1);
+    expect(container.querySelector<HTMLButtonElement>('#btn-undo')?.disabled).toBe(false);
     expect(document.activeElement?.id).toBe('btn-download-png');
     expect(controller.getState().annotations.some((item) => item.type === 'text' && item.text === 'Tekst z klawiatury')).toBe(true);
     container.remove();

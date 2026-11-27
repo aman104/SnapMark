@@ -1,5 +1,6 @@
 import {
   ANNOTATION_COLORS,
+  DEFAULT_LINE_STROKE_WIDTH,
   DEFAULT_TEXT_FONT_SIZE_CSS,
   DEFAULT_USER_SETTINGS,
   HIGHLIGHTER_ALPHA,
@@ -65,6 +66,7 @@ export interface EditorState {
   lineSubtype: LineSubtype;
   activeColor: AnnotationColor;
   strokeWidth: StrokeWidth;
+  lineStrokeWidth: StrokeWidth;
   textStyleMode: TextStyleMode;
   annotations: AnnotationItem[];
   historyStack: AnnotationItem[][];
@@ -161,6 +163,7 @@ export function initEditor(
     lineSubtype: 'highlighter',
     activeColor: DEFAULT_USER_SETTINGS.activeColor,
     strokeWidth: DEFAULT_USER_SETTINGS.strokeWidth,
+    lineStrokeWidth: DEFAULT_LINE_STROKE_WIDTH,
     textStyleMode: DEFAULT_USER_SETTINGS.textStyleMode,
     annotations: cloneAnnotations(initialAnnotations),
     historyStack:
@@ -365,7 +368,7 @@ export function initEditor(
         selected.strokeWidth === 4 ||
         selected.strokeWidth === 8
       ) {
-        state.strokeWidth = selected.strokeWidth;
+        state.lineStrokeWidth = selected.strokeWidth;
       }
     } else if (selected.type === 'text') {
       state.textStyleMode = selected.styleMode;
@@ -398,14 +401,14 @@ export function initEditor(
         state.cropDraftRect.height >= 8;
       const cropLabel = hasValidCrop && state.cropDraftRect
         ? `${Math.round(state.cropDraftRect.width)}×${Math.round(state.cropDraftRect.height)} px`
-        : 'Przeciągnij obszar';
+        : 'Drag area to crop';
       return `
         <span class="shift-hint-pill" id="crop-dimensions-label">${cropLabel}</span>
         <button type="button" id="btn-apply-crop" class="btn-primary" ${hasValidCrop ? '' : 'disabled'}>
-          Zastosuj
+          Apply
         </button>
         <button type="button" id="btn-cancel-crop" class="btn-secondary">
-          Anuluj
+          Cancel
         </button>
       `;
     }
@@ -418,7 +421,7 @@ export function initEditor(
           data-color="${swatch.hex}"
           style="background-color: ${swatch.hex};"
           title="${swatch.label}"
-          aria-label="Kolor ${swatch.label}"
+          aria-label="Color ${swatch.label}"
           aria-pressed="${state.activeColor === swatch.hex ? 'true' : 'false'}"
         ></button>
       `,
@@ -429,16 +432,19 @@ export function initEditor(
       state.activeTool === 'pen' ||
       (state.activeTool === 'line' && state.lineSubtype === 'underline');
 
+    const activeWidthForTool =
+      state.activeTool === 'line' ? state.lineStrokeWidth : state.strokeWidth;
+
     const strokeWidthHtml = showStrokeWidth
       ? `
-        <div id="stroke-width-picker" class="segmented-control" role="group" aria-label="Grubość linii">
+        <div id="stroke-width-picker" class="segmented-control" role="group" aria-label="Stroke width">
           ${STROKE_WIDTHS.map(
             (sw) => `
               <button
                 type="button"
-                class="segmented-option ${state.strokeWidth === sw.value ? 'is-active' : ''}"
+                class="segmented-option ${activeWidthForTool === sw.value ? 'is-active' : ''}"
                 data-stroke-width="${sw.value}"
-                aria-pressed="${state.strokeWidth === sw.value ? 'true' : 'false'}"
+                aria-pressed="${activeWidthForTool === sw.value ? 'true' : 'false'}"
               >
                 ${sw.shortLabel}
               </button>
@@ -451,14 +457,14 @@ export function initEditor(
     const lineSubtypeHtml =
       state.activeTool === 'line'
         ? `
-        <div id="line-subtype-picker" class="segmented-control" role="group" aria-label="Tryb linii i markera">
+        <div id="line-subtype-picker" class="segmented-control" role="group" aria-label="Line and highlighter mode">
           <button
             type="button"
             class="segmented-option ${state.lineSubtype === 'underline' ? 'is-active' : ''}"
             data-line-subtype="underline"
             aria-pressed="${state.lineSubtype === 'underline' ? 'true' : 'false'}"
           >
-            Podkreślenie
+            Underline
           </button>
           <button
             type="button"
@@ -466,11 +472,11 @@ export function initEditor(
             data-line-subtype="highlighter"
             aria-pressed="${state.lineSubtype === 'highlighter' ? 'true' : 'false'}"
           >
-            Zakreślacz
+            Highlighter
           </button>
         </div>
-        <span id="shift-axis-hint" class="shift-hint-pill" title="Przytrzymaj klawisz Shift, aby wymusić idealny poziom">
-          <kbd class="kbd-badge">Shift</kbd> = poziom
+        <span id="shift-axis-hint" class="shift-hint-pill" title="Hold Shift to lock horizontal axis">
+          <kbd class="kbd-badge">Shift</kbd> = straight
         </span>
       `
         : '';
@@ -478,14 +484,14 @@ export function initEditor(
     const textStyleHtml =
       state.activeTool === 'text'
         ? `
-        <div id="text-style-picker" class="segmented-control" role="group" aria-label="Tryb czytelności tekstu">
+        <div id="text-style-picker" class="segmented-control" role="group" aria-label="Text readability mode">
           <button
             type="button"
             class="segmented-option ${state.textStyleMode === 'background' ? 'is-active' : ''}"
             data-text-style="background"
             aria-pressed="${state.textStyleMode === 'background' ? 'true' : 'false'}"
           >
-            Tło
+            Background
           </button>
           <button
             type="button"
@@ -493,7 +499,7 @@ export function initEditor(
             data-text-style="outline"
             aria-pressed="${state.textStyleMode === 'outline' ? 'true' : 'false'}"
           >
-            Obrys
+            Outline
           </button>
           <button
             type="button"
@@ -501,14 +507,14 @@ export function initEditor(
             data-text-style="plain"
             aria-pressed="${state.textStyleMode === 'plain' ? 'true' : 'false'}"
           >
-            Czysty
+            Plain
           </button>
         </div>
       `
         : '';
 
     return `
-      <div id="color-picker" class="color-swatch-tray" role="group" aria-label="Paleta kolorów adnotacji">
+      <div id="color-picker" class="color-swatch-tray" role="group" aria-label="Annotation color palette">
         ${swatchesHtml}
       </div>
       ${strokeWidthHtml}
@@ -528,17 +534,17 @@ export function initEditor(
             </svg>
           </div>
           <h1 id="empty-state-heading" class="empty-state-title">
-            Brak aktywnego zrzutu na płótnie
+            No active screenshot on canvas
           </h1>
           <p class="empty-state-description">
-            Zrzuty tymczasowe są usuwane z pamięci zaraz po wczytaniu dla ochrony prywatności. Wykonaj nowy zrzut z menu kontekstowego (PPM), popupu wtyczki lub wklej obraz bezpośrednio ze schowka.
+            Temporary captures are deleted from memory immediately after loading for privacy. Take a new capture from the extension popup, right-click menu, or paste an image from your clipboard.
           </p>
           <div class="empty-state-actions">
             <button type="button" id="btn-paste-clipboard" class="btn-primary">
-              Wklej ze schowka (Ctrl+V)
+              Paste from clipboard (Ctrl+V)
             </button>
             <button type="button" id="btn-open-file" class="btn-secondary">
-              Wczytaj plik PNG/JPG...
+              Open PNG/JPG file...
             </button>
             <input type="file" id="input-open-file" accept="image/*" hidden />
           </div>
@@ -554,10 +560,10 @@ export function initEditor(
         <div class="editor-banner-region">
           <div id="max-height-banner" class="status-banner is-warning" role="status">
             <span>
-              Osiągnięto maksymalną bezpieczną wysokość płótna w pełnej rozdzielczości Retina. Zrzut został zapisany do tej wysokości.
+              Maximum safe Retina canvas height reached. The screenshot was saved up to this height.
             </span>
             <button type="button" id="btn-dismiss-warning" class="banner-dismiss-btn">
-              Zamknij
+              Dismiss
             </button>
           </div>
         </div>
@@ -578,9 +584,9 @@ export function initEditor(
     const hasSelection = state.selectedAnnotationId !== null;
     const isEmptyState = state.prototypeState === 'empty';
     return `
-        <header class="editor-toolbar" role="toolbar" aria-label="Pasek narzędzi edytora SnapMark">
+        <header class="editor-toolbar" role="toolbar" aria-label="SnapMark editor toolbar">
           <div class="toolbar-left-group">
-            <!-- Cluster 1: Brand & Capture Metadata -->
+            <!-- Cluster 1: Brand -->
             <div class="toolbar-cluster" id="cluster-brand-meta">
               <div class="brand-badge">
                 <span class="brand-logo" aria-hidden="true">
@@ -591,102 +597,89 @@ export function initEditor(
                 </span>
                 <span class="brand-title">SnapMark</span>
               </div>
-
             </div>
 
             <span class="toolbar-divider" aria-hidden="true"></span>
 
-            <!-- Cluster 2: Primary Vector Tools -->
-            <div class="toolbar-cluster" id="cluster-primary-tools" role="group" aria-label="Narzędzia rysowania">
+            <!-- Cluster 2: Primary Vector Tools (Icon-Only) -->
+            <div class="toolbar-cluster" id="cluster-primary-tools" role="group" aria-label="Drawing tools">
               <button
                 type="button"
                 id="tool-arrow"
-                aria-label="Strzałka"
+                aria-label="Arrow"
                 class="toolbar-tool-btn ${state.activeTool === 'arrow' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'arrow' ? 'true' : 'false'}"
-                title="Strzałka wektorowa (1)"
+                title="Arrow (1)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 13L13 3M13 3H7M13 3v6" />
                 </svg>
-                <span>Strzałka</span>
-                <kbd class="kbd-badge">1</kbd>
               </button>
 
               <button
                 type="button"
                 id="tool-line"
-                aria-label="Linia / Marker"
+                aria-label="Line / Highlighter"
                 class="toolbar-tool-btn ${state.activeTool === 'line' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'line' ? 'true' : 'false'}"
-                title="Podkreślenie i zakreślacz (2)"
+                title="Underline & Highlighter (2)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M2.5 13.5h11M4 9.5l5.5-5.5 2.5 2.5L6.5 12H4V9.5z" />
                 </svg>
-                <span>Linia / Marker</span>
-                <kbd class="kbd-badge">2</kbd>
               </button>
 
               <button
                 type="button"
                 id="tool-text"
-                aria-label="Tekst"
+                aria-label="Text"
                 class="toolbar-tool-btn ${state.activeTool === 'text' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'text' ? 'true' : 'false'}"
-                title="Pole tekstowe (3)"
+                title="Text (3)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 3.5h10M8 3.5v9M5.5 12.5h5" />
                 </svg>
-                <span>Tekst</span>
-                <kbd class="kbd-badge">3</kbd>
               </button>
 
               <button
                 type="button"
                 id="tool-step"
-                aria-label="Kroki"
+                aria-label="Step numbers"
                 class="toolbar-tool-btn ${state.activeTool === 'step' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'step' ? 'true' : 'false'}"
-                title="Numerowane kroki 1, 2, 3... (4)"
+                title="Step numbers 1, 2, 3... (4)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <circle cx="8" cy="8" r="6" />
                   <path d="M7.2 5.7L8.3 5v6" />
                 </svg>
-                <span>Kroki</span>
-                <kbd class="kbd-badge">4</kbd>
               </button>
 
               <button
                 type="button"
                 id="tool-pen"
-                aria-label="Pisak"
+                aria-label="Pen"
                 class="toolbar-tool-btn ${state.activeTool === 'pen' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'pen' ? 'true' : 'false'}"
-                title="Pisak — rysowanie odręczne (5)"
+                title="Freehand Pen (5)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M11.5 2.5l2 2-7.5 7.5-3 .8.8-3 7.7-7.3z" />
                 </svg>
-                <span>Pisak</span>
-                <kbd class="kbd-badge">5</kbd>
               </button>
 
               <button
                 type="button"
                 id="tool-crop"
-                aria-label="Kadruj"
+                aria-label="Crop"
                 class="toolbar-tool-btn ${state.activeTool === 'crop' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'crop' ? 'true' : 'false'}"
-                title="Kadruj zrzut (C)"
+                title="Crop screenshot (C)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M4.5 2v9.5H14M2 4.5h9.5V14" />
                 </svg>
-                <span>Kadruj</span>
-                <kbd class="kbd-badge">C</kbd>
               </button>
             </div>
           </div>
@@ -708,17 +701,15 @@ export function initEditor(
               <button
                 type="button"
                 id="btn-undo"
-                aria-label="Cofnij ostatnią zmianę"
+                aria-label="Undo"
                 class="btn-secondary"
                 ${canUndo ? '' : 'disabled'}
-                title="Cofnij ostatnią zmianę (Ctrl+Z)"
+                title="Undo last change"
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3.5 6.5h6a3.5 3.5 0 1 1 0 7H6M3.5 6.5L6 4M3.5 6.5L6 9" />
                 </svg>
-                <span>Cofnij</span>
-                <kbd class="kbd-badge">Ctrl+Z</kbd>
-                <span id="undo-count" class="undo-count-badge">${state.historyStack.length}</span>
+                <span>Undo</span>
               </button>
 
               <button
@@ -726,8 +717,8 @@ export function initEditor(
                 id="btn-delete-selected"
                 class="btn-danger-ghost"
                 ${hasSelection ? '' : 'disabled'}
-                title="Usuń zaznaczony obiekt (Delete / Backspace)"
-                aria-label="Usuń zaznaczony obiekt"
+                title="Delete selected annotation (Delete / Backspace)"
+                aria-label="Delete selected annotation"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.5 4.5l.6 8.5a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8.5" />
@@ -740,15 +731,15 @@ export function initEditor(
                 class="btn-primary"
                 ${isEmptyState ? 'disabled' : ''}
                 aria-disabled="${isEmptyState || downloadInProgress ? 'true' : 'false'}"
-                title="Pobierz spłaszczony plik PNG"
+                title="Download flattened PNG"
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M8 2.5v7.5m0 0L5.5 7.5M8 10l2.5-2.5M3 12.5h10" />
                 </svg>
-                <span>Pobierz PNG</span>
+                <span>Download PNG</span>
               </button>
 
-              <button type="button" id="btn-close-editor" class="btn-secondary" title="Zamknij edytor" aria-label="Zamknij edytor">
+              <button type="button" id="btn-close-editor" class="btn-secondary" title="Close editor" aria-label="Close editor">
                 <span aria-hidden="true">✕</span>
               </button>
             </div>
@@ -912,7 +903,11 @@ export function initEditor(
   }
 
   function setStrokeWidth(width: StrokeWidth): void {
-    state.strokeWidth = width;
+    if (state.activeTool === 'line') {
+      state.lineStrokeWidth = width;
+    } else {
+      state.strokeWidth = width;
+    }
     if (state.selectedAnnotationId) {
       const target = state.annotations.find(
         (item) => item.id === state.selectedAnnotationId,
@@ -927,8 +922,11 @@ export function initEditor(
         target.strokeWidth = width;
       }
     }
-    void updateUserSettings({ strokeWidth: width });
-    notifyAndRender();
+    if (state.activeTool !== 'line') {
+      void updateUserSettings({ strokeWidth: width });
+    }
+    redrawCanvasOnly();
+    refreshToolbarOnly();
   }
 
   function setLineSubtype(subtype: LineSubtype): void {
@@ -944,7 +942,7 @@ export function initEditor(
         target.strokeWidth =
           subtype === 'highlighter'
             ? HIGHLIGHTER_STROKE_WIDTH_CSS
-            : state.strokeWidth;
+            : state.lineStrokeWidth;
       }
     }
     notifyAndRender();
@@ -1026,7 +1024,7 @@ export function initEditor(
 
   async function loadImageBlob(
     blob: Blob,
-    sourceLabel = 'schowek',
+    sourceLabel = 'clipboard',
   ): Promise<void> {
     const decoded = await decodeBlobToDrawable(blob, 1280, 800);
     baseDrawable = decoded.drawable;
@@ -1058,10 +1056,10 @@ export function initEditor(
     if (status) {
       status.hidden = downloadError === null;
       status.textContent = downloadError === 'close'
-        ? 'PNG został pobrany, ale nie udało się zamknąć karty.'
+        ? 'PNG downloaded, but the tab could not be closed.'
         : downloadError === 'changed'
-          ? 'PNG został pobrany. Nowe zmiany nie są w pliku — pobierz ponownie.'
-          : downloadError === 'download' ? 'Nie udało się pobrać PNG. Spróbuj ponownie.' : '';
+          ? 'PNG downloaded. New edits are not included — download again.'
+          : downloadError === 'download' ? 'Failed to download PNG. Please try again.' : '';
     }
     container.querySelector<HTMLButtonElement>('#btn-download-png')?.setAttribute('aria-disabled', downloadInProgress || state.prototypeState === 'empty' ? 'true' : 'false');
   }
@@ -1248,7 +1246,7 @@ export function initEditor(
                 const imgType = item.types.find((t) => t.startsWith('image/'));
                 if (imgType) {
                   const blob = await item.getType(imgType);
-                  await loadImageBlob(blob, 'schowek');
+                  await loadImageBlob(blob, 'clipboard');
                   return;
                 }
               }
@@ -1305,7 +1303,8 @@ export function initEditor(
       if (hit && hit.id !== state.selectedAnnotationId) {
         state.selectedAnnotationId = hit.id;
         syncToolbarWithSelectedAnnotation();
-        notifyAndRender();
+        redrawCanvasOnly();
+        refreshToolbarOnly();
       }
     });
   }
@@ -1448,7 +1447,8 @@ export function initEditor(
       };
       state.annotations.push(newStep);
       state.selectedAnnotationId = newStep.id;
-      notifyAndRender();
+      redrawCanvasOnly();
+      refreshToolbarOnly();
       return;
     }
 
@@ -1625,7 +1625,7 @@ export function initEditor(
             strokeWidth:
               state.lineSubtype === 'highlighter'
                 ? HIGHLIGHTER_STROKE_WIDTH_CSS
-                : state.strokeWidth,
+                : state.lineStrokeWidth,
             alpha:
               state.lineSubtype === 'highlighter' ? HIGHLIGHTER_ALPHA : 1.0,
           };
@@ -1659,17 +1659,12 @@ export function initEditor(
       return;
     }
     lastProcessedUpEvent = event;
-    const isUnmovedSelection = (activeInteraction.kind === 'move' || activeInteraction.kind === 'handle') && !activeInteraction.snapshotPushed;
     if (activeInteraction.kind === 'draw' && !activeInteraction.snapshotPushed) {
       state.selectedAnnotationId = null;
     }
     activeInteraction = null;
-    if (isUnmovedSelection) {
-      // Update selection controls without replacing the canvas between clicks.
-      refreshToolbarOnly();
-    } else {
-      notifyAndRender();
-    }
+    redrawCanvasOnly();
+    refreshToolbarOnly();
   }
 
   async function hydrateFromStorageAndIndexedDb(): Promise<void> {
@@ -1818,7 +1813,7 @@ export function initEditor(
         if (item && item.type.startsWith('image/')) {
           const file = item.getAsFile();
           if (file) {
-            void loadImageBlob(file, 'schowek');
+            void loadImageBlob(file, 'clipboard');
             break;
           }
         }

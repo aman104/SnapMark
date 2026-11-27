@@ -391,26 +391,11 @@ export function drawPenAnnotation(
   }
 
   if (isSelected) {
-    let minX = first.x;
-    let maxX = first.x;
-    let minY = first.y;
-    let maxY = first.y;
-    for (const pt of item.points) {
-      if (pt.x < minX) minX = pt.x;
-      if (pt.x > maxX) maxX = pt.x;
-      if (pt.y < minY) minY = pt.y;
-      if (pt.y > maxY) maxY = pt.y;
+    const last = item.points[item.points.length - 1] ?? first;
+    drawEndpointHandle(ctx, first.x, first.y);
+    if (item.points.length > 1) {
+      drawEndpointHandle(ctx, last.x, last.y);
     }
-    const pad = Math.max(6, item.strokeWidth / 2 + 4);
-    ctx.strokeStyle = '#3B82F6';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 3]);
-    ctx.strokeRect(
-      minX - pad,
-      minY - pad,
-      Math.max(12, maxX - minX + pad * 2),
-      Math.max(12, maxY - minY + pad * 2),
-    );
   }
 
   ctx.restore();

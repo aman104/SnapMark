@@ -767,7 +767,7 @@ export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult
     const hintPill = document.createElement('div');
     hintPill.setAttribute('data-snapmark-area-hint', 'true');
     hintPill.textContent =
-      'Przeciągnij myszą, aby zaznaczyć fragment ekranu • Esc anuluje';
+      'Drag to select a screen area • Press Esc to cancel';
     hintPill.style.cssText = [
       'position: fixed !important',
       'top: 16px !important',
