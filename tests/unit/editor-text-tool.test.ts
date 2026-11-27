@@ -195,9 +195,13 @@ describe('Interactive In-Canvas Textarea Overlay, Double-Click Editing, Dragging
     expect(createdText.color).toBe('#34C759');
     expect(createdText.styleMode).toBe('outline');
 
-    // Spawn another text draft and cancel with Escape
+    // Click empty area to deselect committed text, then click again to spawn another text draft and cancel with Escape
     const canvas2 =
       container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas2.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 50, clientY: 50, button: 0 }),
+    );
+    expect(controller.getState().selectedAnnotationId).toBeNull();
     canvas2.dispatchEvent(
       new MouseEvent('mousedown', { clientX: 50, clientY: 50, button: 0 }),
     );

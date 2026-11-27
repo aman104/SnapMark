@@ -35,11 +35,17 @@
    - **Przycisk zamknięcia `X` zawsze po prawej stronie topbara** (`margin-left: auto` na `.toolbar-right-group` i `#btn-close-editor`).
    - **Kolejność kontrolek dla `Line` + `Underline`**: przełącznik `Underline / Highlighter` pojawia się przed wyborem grubości (`Thick / Medium / Thin`).
    - **Kursor podczas przenoszenia elementów**: `grab` przy najechaniu na element/uchwyt i `grabbing` w trakcie przeciągania.
+10. **Kolejne dopracowanie edytora (Task `042`)**:
+   - **Rozmiar kadrowanego obszaru w pikselach na żywo**: wyświetlana pigułka `W × H px` bezpośrednio na ramce kadrowania oraz aktualizacja na żywo w topbarze podczas przeciągania.
+   - **Brak automatycznego zaznaczania istniejących elementów przy wyborze narzędzia**: przełączenie narzędzia w toolboxie zawsze czyści bieżące zaznaczenie.
+   - **Brak przesunięcia tekstu po zatwierdzeniu**: skompensowano padding i obramowanie pola tekstowego (`transform: translate(-11.5px, -8px)`), dzięki czemu tekst po odkliku zostaje dokładnie w tym samym miejscu.
+   - **Odklikiwanie każdego dodanego elementu**: kliknięcie w puste miejsce (oraz `Esc`) odznacza dodany element w każdym narzędziu (strzałka, linia, tekst, kroki, pisak).
+   - **Edycja numeru dodanego kroku**: kontrolka `− [nr] +` na pasku narzędzi dla zaznaczonego kroku (z obsługą `Undo`) oraz szybka edycja po dwukliku na numerze.
 
 ## Verification
 
 - `npm run typecheck`: 0 errors
-- `npm test`: **32 test files, 142 tests passed**
+- `npm test`: **32 test files, 143 tests passed**
 - `npm run build`: clean Vite build (`dist/`)
 - `npm run test:e2e`: **4/4 Vitest E2E + 8/8 real Chromium extension workflows passed**
-- `npm run package`: `snapmark-extension.zip` (37 008 bytes)
+- `npm run package`: `snapmark-extension.zip` (37 769 bytes)

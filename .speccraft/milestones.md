@@ -228,7 +228,7 @@
 - **Depends on:** M06
 - **Estimated size:** 4–6 tasks
 
-## [>] M08 - Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen
+## [?] M08 - Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen
 - **Phase:** 8+ — Evolution
 - **Type:** feature
 - **What you will see:** Zrzut widocznego ekranu nie zawiera już paska przewijania strony; w edytorze zrzut mieści się w szerokości ekranu bez poziomego scrolla; możesz kadrować gotowy zrzut (`Kadruj`), stawiać ponumerowane kółka kroków (`1`, `2`, `3`...) w wybranym kolorze tła, rysować odręcznie pisakiem (`Pisak`), grubości linii/strzałek są w kolejności od grubej (`8px` domyślnie), a z popupu zniknęła zbędna opcja żółtego podświetlania tekstu.
