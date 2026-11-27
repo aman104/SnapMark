@@ -607,6 +607,31 @@ export function renderCanvasStage(
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, width, height);
 
+    // 8 resize handles (4 corners + 4 edge midpoints)
+    if (width >= 8 && height >= 8) {
+      const handleSize = 8;
+      const half = handleSize / 2;
+      const midX = x + width / 2;
+      const midY = y + height / 2;
+      const handles: Array<[number, number]> = [
+        [x, y],
+        [midX, y],
+        [x + width, y],
+        [x + width, midY],
+        [x + width, y + height],
+        [midX, y + height],
+        [x, y + height],
+        [x, midY],
+      ];
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#FF3B30';
+      ctx.lineWidth = 1.5;
+      for (const [hx, hy] of handles) {
+        ctx.fillRect(hx - half, hy - half, handleSize, handleSize);
+        ctx.strokeRect(hx - half, hy - half, handleSize, handleSize);
+      }
+    }
+
     // Live pixel dimensions pill on the crop frame
     const dimLabel = `${Math.round(width)} × ${Math.round(height)} px`;
     ctx.font = "600 12px -apple-system, BlinkMacSystemFont, 'Inter', monospace";

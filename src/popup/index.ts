@@ -43,6 +43,16 @@ export function renderPopup(
       }
     });
 
+  const isMacPlatform =
+    typeof navigator !== 'undefined' &&
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '');
+
+  const shortcuts: Record<'capture-viewport' | 'capture-fullpage' | 'capture-selection', string> = {
+    'capture-viewport': isMacPlatform ? 'Ctrl+Shift+V' : 'Alt+Shift+V',
+    'capture-fullpage': isMacPlatform ? 'Ctrl+Shift+F' : 'Alt+Shift+F',
+    'capture-selection': isMacPlatform ? 'Ctrl+Shift+S' : 'Alt+Shift+S',
+  };
+
   let currentState: PopupPrototypeState =
     parsePopupStateFromSearch(initialSearch);
   let currentFrame = 3;
@@ -119,7 +129,7 @@ export function renderPopup(
                   <span class="popup-card-subtitle">Instant capture of the current viewport</span>
                 </span>
               </span>
-              <kbd class="kbd-badge">Alt+Shift+V</kbd>
+              <kbd class="kbd-badge">${shortcuts['capture-viewport']}</kbd>
             </button>
 
             <button type="button" id="btn-capture-fullpage" class="popup-action-card">
@@ -133,7 +143,7 @@ export function renderPopup(
                   <span class="popup-card-subtitle">Stitches frames and hides floating headers</span>
                 </span>
               </span>
-              <kbd class="kbd-badge">Alt+Shift+F</kbd>
+              <kbd class="kbd-badge">${shortcuts['capture-fullpage']}</kbd>
             </button>
 
             <button
@@ -157,7 +167,7 @@ export function renderPopup(
                   </span>
                 </span>
               </span>
-              <kbd class="kbd-badge">Alt+Shift+S</kbd>
+              <kbd class="kbd-badge">${shortcuts['capture-selection']}</kbd>
             </button>
           </main>
 
@@ -323,6 +333,29 @@ export function renderPopup(
         }
       } catch {
         // Ignore tab query errors outside extension runtime
+      }
+    }
+
+    if (
+      typeof chrome !== 'undefined' &&
+      chrome.commands &&
+      typeof chrome.commands.getAll === 'function'
+    ) {
+      try {
+        const commands = await chrome.commands.getAll();
+        for (const cmd of commands) {
+          if (
+            cmd.name &&
+            cmd.shortcut &&
+            (cmd.name === 'capture-viewport' ||
+              cmd.name === 'capture-fullpage' ||
+              cmd.name === 'capture-selection')
+          ) {
+            shortcuts[cmd.name] = cmd.shortcut;
+          }
+        }
+      } catch {
+        // Ignore command query errors outside extension runtime
       }
     }
 

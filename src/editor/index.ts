@@ -14,7 +14,7 @@ import {
   getMockCaptureMetadata,
   parseEditorStateFromSearch,
 } from '../shared/mock-captures';
-import { loadUserSettings, updateUserSettings } from '../shared/settings';
+import { updateUserSettings } from '../shared/settings';
 import type {
   AnnotationColor,
   AnnotationItem,
@@ -104,6 +104,8 @@ function cloneAnnotations(items: AnnotationItem[]): AnnotationItem[] {
   return cloneAnnotationList(items);
 }
 
+type CropResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
 type ActiveCanvasInteraction =
   | {
       kind: 'handle';
@@ -137,6 +139,12 @@ type ActiveCanvasInteraction =
   | {
       kind: 'crop-move';
       lastPoint: Point2D;
+    }
+  | {
+      kind: 'crop-resize';
+      handle: CropResizeHandle;
+      originRect: CssRect;
+      startPoint: Point2D;
     };
 
 export function initEditor(
@@ -964,10 +972,8 @@ export function initEditor(
 
   function cancelCrop(): void {
     state.cropDraftRect = null;
-    if (state.activeTool === 'crop') {
-      state.activeTool = previousToolBeforeCrop;
-    }
-    notifyAndRender();
+    redrawCanvasOnly();
+    refreshToolbarOnly();
   }
 
   function setColor(color: AnnotationColor): void {
@@ -1501,11 +1507,51 @@ export function initEditor(
     };
   }
 
+  function hitTestCropHandle(
+    rect: CssRect | null,
+    pt: Point2D,
+    tolerance = 10,
+  ): CropResizeHandle | null {
+    if (!rect || rect.width < 8 || rect.height < 8) {
+      return null;
+    }
+    const { x, y, width, height } = rect;
+    const midX = x + width / 2;
+    const midY = y + height / 2;
+    const points: Array<[CropResizeHandle, number, number]> = [
+      ['nw', x, y],
+      ['ne', x + width, y],
+      ['se', x + width, y + height],
+      ['sw', x, y + height],
+      ['n', midX, y],
+      ['e', x + width, midY],
+      ['s', midX, y + height],
+      ['w', x, midY],
+    ];
+    for (const [role, hx, hy] of points) {
+      if (Math.hypot(pt.x - hx, pt.y - hy) <= tolerance) {
+        return role;
+      }
+    }
+    return null;
+  }
+
+  function getCursorForCropHandle(handle: CropResizeHandle): string {
+    if (handle === 'nw' || handle === 'se') return 'nwse-resize';
+    if (handle === 'ne' || handle === 'sw') return 'nesw-resize';
+    if (handle === 'n' || handle === 's') return 'ns-resize';
+    return 'ew-resize';
+  }
+
   function updateCanvasCursor(
     canvas: HTMLCanvasElement | null,
     pt?: Point2D,
   ): void {
     if (!canvas) {
+      return;
+    }
+    if (activeInteraction?.kind === 'crop-resize') {
+      canvas.style.cursor = getCursorForCropHandle(activeInteraction.handle);
       return;
     }
     if (
@@ -1522,6 +1568,11 @@ export function initEditor(
     }
     if (pt && state.activeTool === 'crop' && state.cropDraftRect) {
       const r = state.cropDraftRect;
+      const handle = hitTestCropHandle(r, pt);
+      if (handle) {
+        canvas.style.cursor = getCursorForCropHandle(handle);
+        return;
+      }
       if (
         r.width >= 8 &&
         r.height >= 8 &&
@@ -1563,9 +1614,20 @@ export function initEditor(
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     const pt = getCanvasCssPoint(canvas, event);
 
-    // 0. Crop tool mode: drag inside existing crop rect to move it, or drag outside to draw a new crop rectangle
+    // 0. Crop tool mode: resize handles, drag inside to move, or drag outside to draw a new crop rectangle
     if (state.activeTool === 'crop') {
       const existingRect = state.cropDraftRect;
+      const cropHandle = hitTestCropHandle(existingRect, pt);
+      if (cropHandle && existingRect) {
+        activeInteraction = {
+          kind: 'crop-resize',
+          handle: cropHandle,
+          originRect: { ...existingRect },
+          startPoint: pt,
+        };
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
       if (
         existingRect &&
         existingRect.width >= 8 &&
@@ -1729,6 +1791,49 @@ export function initEditor(
 
     const pt = getCanvasCssPoint(canvas, event);
     updateCanvasCursor(canvas, pt);
+
+    if (activeInteraction.kind === 'crop-resize') {
+      const { handle, originRect, startPoint } = activeInteraction;
+      const dx = pt.x - startPoint.x;
+      const dy = pt.y - startPoint.y;
+      const minSize = 16;
+      let left = originRect.x;
+      let top = originRect.y;
+      let right = originRect.x + originRect.width;
+      let bottom = originRect.y + originRect.height;
+
+      if (handle.includes('w')) {
+        left = Math.max(0, Math.min(right - minSize, originRect.x + dx));
+      }
+      if (handle.includes('e')) {
+        right = Math.min(
+          state.metadata.cssWidth,
+          Math.max(left + minSize, originRect.x + originRect.width + dx),
+        );
+      }
+      if (handle.includes('n')) {
+        top = Math.max(0, Math.min(bottom - minSize, originRect.y + dy));
+      }
+      if (handle.includes('s')) {
+        bottom = Math.min(
+          state.metadata.cssHeight,
+          Math.max(top + minSize, originRect.y + originRect.height + dy),
+        );
+      }
+
+      state.cropDraftRect = {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      };
+      const dimLabel = container.querySelector<HTMLElement>('#crop-dimensions-label');
+      if (dimLabel) {
+        dimLabel.textContent = `${Math.round(state.cropDraftRect.width)}×${Math.round(state.cropDraftRect.height)} px`;
+      }
+      redrawCanvasOnly();
+      return;
+    }
 
     if (activeInteraction.kind === 'crop-move') {
       const rect = state.cropDraftRect;
@@ -1948,11 +2053,13 @@ export function initEditor(
 
   async function hydrateFromStorageAndIndexedDb(): Promise<void> {
     if (captureIdParam) {
-      const savedSettings = await loadUserSettings();
-      state.activeTool = savedSettings.activeTool;
-      state.activeColor = savedSettings.activeColor;
-      state.strokeWidth = savedSettings.strokeWidth;
-      state.textStyleMode = savedSettings.textStyleMode;
+      // Every new screenshot starts with fresh default toolbar selections
+      state.activeTool = DEFAULT_USER_SETTINGS.activeTool;
+      state.activeColor = DEFAULT_USER_SETTINGS.activeColor;
+      state.strokeWidth = DEFAULT_USER_SETTINGS.strokeWidth;
+      state.lineStrokeWidth = DEFAULT_LINE_STROKE_WIDTH;
+      state.lineSubtype = 'highlighter';
+      state.textStyleMode = DEFAULT_USER_SETTINGS.textStyleMode;
 
       const session = await consumeCaptureSession(captureIdParam);
       if (!session || session.frames.length === 0) {
