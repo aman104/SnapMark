@@ -20,7 +20,7 @@ describe('Task 005: Vector editor 56px top toolbar and contextual controls', () 
     expect(arrowBtn?.classList.contains('is-active')).toBe(true);
     expect(controller.getState().activeTool).toBe('arrow');
     expect(controller.getState().activeColor).toBe('#FF3B30');
-    expect(controller.getState().strokeWidth).toBe(4);
+    expect(controller.getState().strokeWidth).toBe(8);
 
     const activeSwatch = container.querySelector('.color-swatch.is-active');
     expect(activeSwatch?.getAttribute('data-color')).toBe('#FF3B30');

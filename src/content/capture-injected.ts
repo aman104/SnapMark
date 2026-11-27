@@ -959,3 +959,56 @@ export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult
     document.body.appendChild(overlay);
   });
 }
+
+/**
+ * Self-contained DOM helper injected before Visible Viewport Capture (`FR-09`)
+ * to hide browser scrollbars visually without altering scroll position.
+ */
+export function hideViewportScrollbarInDom(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof document === 'undefined') {
+      resolve(false);
+      return;
+    }
+
+    document
+      .querySelectorAll('[data-snapmark-viewport-scrollbar-style]')
+      .forEach((node) => node.remove());
+
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-snapmark-viewport-scrollbar-style', 'true');
+    styleEl.textContent = [
+      'html, body { scrollbar-width: none !important; -ms-overflow-style: none !important; }',
+      'html::-webkit-scrollbar, body::-webkit-scrollbar, ::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }',
+    ].join('\n');
+    (document.head || document.documentElement).appendChild(styleEl);
+
+    const isJsdom =
+      typeof navigator !== 'undefined' &&
+      /jsdom/i.test(navigator.userAgent ?? '');
+
+    if (
+      !isJsdom &&
+      typeof window !== 'undefined' &&
+      typeof window.requestAnimationFrame === 'function'
+    ) {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => resolve(true));
+      });
+    } else {
+      resolve(true);
+    }
+  });
+}
+
+/**
+ * Self-contained DOM cleanup helper guaranteed to run in a finally block after Visible Viewport Capture.
+ */
+export function restoreViewportScrollbarInDom(): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  document
+    .querySelectorAll('[data-snapmark-viewport-scrollbar-style]')
+    .forEach((node) => node.remove());
+}

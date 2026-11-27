@@ -44,7 +44,7 @@
 - [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
 - [M06] `[x]` accepted — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (3/3 tasks done)
 - [M07] `[x]` accepted (2026-11-22) — Feature: Reliable capture and streamlined editor (6/6 tasks done). All planned milestones are accepted; further work needs a new milestone from `12-feature-advisor`.
-- [M08] `[>]` in progress — Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen (0/5 tasks done)
+- [M08] `[>]` in progress — Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen (1/5 tasks done)
 
 ## Decisions and deviations
 - none
@@ -112,3 +112,4 @@
 - [034] [x] 2026-11-22 — Added and independently verified real Chromium extension workflow and package checks.
 - [M07] [?] 2026-11-22 — Ready for operator review; real Chromium workflow passed with documented limitations.
 - [M07] [x] 2026-11-22 — Accepted by operator (`--accept M07`), spec changes applied to `02-General-PRD.md`, `04-Interface-spec.md` and `05-Tech-Stack.md`, merged into main. Roadmap complete: no `[ ]` milestone left to plan.
+- [035] [x] 2026-11-27 — Hidden viewport scrollbars during capture (`finally` restored), removed yellow highlight toggle from popup, and set default stroke width to `8px` (`8 / 4 / 2`).

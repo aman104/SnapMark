@@ -21,9 +21,9 @@ export interface StrokeWidthOption {
 }
 
 export const STROKE_WIDTHS: readonly StrokeWidthOption[] = [
-  { value: 2, shortLabel: 'Cienka (2px)', label: 'Cienka 2px' },
-  { value: 4, shortLabel: 'Średnia (4px)', label: 'Średnia 4px' },
   { value: 8, shortLabel: 'Gruba (8px)', label: 'Gruba 8px' },
+  { value: 4, shortLabel: 'Średnia (4px)', label: 'Średnia 4px' },
+  { value: 2, shortLabel: 'Cienka (2px)', label: 'Cienka 2px' },
 ] as const;
 
 export const DEFAULT_USER_SETTINGS: Readonly<UserSettings> = {
@@ -31,7 +31,7 @@ export const DEFAULT_USER_SETTINGS: Readonly<UserSettings> = {
   selectionPaddingPx: 20,
   activeTool: 'arrow',
   activeColor: '#FF3B30',
-  strokeWidth: 4,
+  strokeWidth: 8,
   textStyleMode: 'background',
 };
 

@@ -3,11 +3,13 @@ import {
   cleanupSelectionHighlightInDom,
   type FullPageScrollPlan,
   hideFixedAndStickyElementsInDom,
+  hideViewportScrollbarInDom,
   type ImageMeasurementResult,
   measureSelectionInDom,
   measureTargetImageInDom,
   prepareFullPageScrollInDom,
   restoreFullPageScrollInDom,
+  restoreViewportScrollbarInDom,
   settleFullPageScrollInDom,
   selectAreaOverlayInDom,
   type SelectionMeasurementResult,
@@ -237,11 +239,42 @@ export async function captureVisibleViewport(
   const sourceUrl = assertTabUrlAllowed(tab);
   const metrics = await readTabViewportMetrics(tab);
 
-  const dataUrl = await rateLimiter.schedule(async () => {
-    return await chrome.tabs.captureVisibleTab(tab.windowId, {
-      format: 'png',
+  const canRunScripting =
+    typeof tab.id === 'number' &&
+    typeof chrome !== 'undefined' &&
+    Boolean(chrome.scripting) &&
+    typeof chrome.scripting.executeScript === 'function';
+
+  let dataUrl: string;
+  try {
+    if (canRunScripting && typeof tab.id === 'number') {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: hideViewportScrollbarInDom,
+        });
+      } catch {
+        // Proceed with capture if scripting is unavailable on the page
+      }
+    }
+
+    dataUrl = await rateLimiter.schedule(async () => {
+      return await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: 'png',
+      });
     });
-  });
+  } finally {
+    if (canRunScripting && typeof tab.id === 'number') {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: restoreViewportScrollbarInDom,
+        });
+      } catch {
+        // Ignore cleanup errors if tab was closed
+      }
+    }
+  }
 
   const blob = dataUrlToBlob(dataUrl);
   const id = `cap_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`;
