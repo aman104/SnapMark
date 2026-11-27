@@ -1,5 +1,7 @@
-# SpecCraft autonomous run logs
-.speccraft/.runs/
+# Local AI agent & workflow directories
+.agents/
+.claude/
+.speccraft/
 
 # Dependencies & Build Output
 node_modules/
