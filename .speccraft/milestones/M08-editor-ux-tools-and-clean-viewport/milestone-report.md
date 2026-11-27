@@ -44,11 +44,16 @@
 11. **Usprawnienia kadrowania (Task `043`)**:
    - **Pływające przyciski `Cancel` / `Apply` w prawym dolnym rogu kadrowanego obszaru**: pojawiają się od razu pod prawym dolnym rogiem ramki kadrowania (z klamrowaniem do krawędzi płótna).
    - **Przesuwanie zaznaczonego obszaru kadrowania**: złapanie wewnątrz zaznaczonej ramki kadrowania (`grab` / `grabbing`) pozwala płynnie przesuwać ją w obrębie zrzutu bez zmiany rozmiaru.
+12. **Reset ustawień na nowy zrzut, skróty macOS i zmiana rozmiaru ramki kadrowania (Task `044`)**:
+   - **Świeże ustawienia domyślne przy każdym nowym screenie**: otwarcie nowego zrzutu w edytorze zawsze resetuje wybory z topbara do wartości domyślnych (`Arrow`, `#FF3B30`, `8px` / `4px` dla linii, `Plain` dla tekstu).
+   - **Skróty klawiszowe na macOS**: dodano dedykowane skróty `"mac": "MacCtrl+Shift+V/F/S"` w `public/manifest.json` (unikające konfliktów Option+Shift na macOS) oraz dynamiczne wyświetlanie przypisanych skrótów w `popup.html` przez `chrome.commands.getAll()`.
+   - **Pozostawienie aktywnego narzędzia Crop po `Cancel` / `Esc`**: anulowanie ramki kadrowania czyści zaznaczenie, ale utrzymuje narzędzie `Crop` zaznaczone w topbarze.
+   - **Zmiana rozmiaru zaznaczonej ramki kadrowania (8 uchwytów)**: 4 narożniki i 4 krawędzie ramki kadrowania pozwalają płynnie zmieniać jej rozmiar z odpowiednimi kursorami (`nwse-resize`, `nesw-resize`, `ns-resize`, `ew-resize`).
 
 ## Verification
 
 - `npm run typecheck`: 0 errors
-- `npm test`: **32 test files, 144 tests passed**
+- `npm test`: **32 test files, 145 tests passed**
 - `npm run build`: clean Vite build (`dist/`)
 - `npm run test:e2e`: **4/4 Vitest E2E + 8/8 real Chromium extension workflows passed**
-- `npm run package`: `snapmark-extension.zip` (38 295 bytes)
+- `npm run package`: `snapmark-extension.zip` (38 960 bytes)

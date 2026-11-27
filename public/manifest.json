@@ -33,19 +33,22 @@
   "commands": {
     "capture-viewport": {
       "suggested_key": {
-        "default": "Alt+Shift+V"
+        "default": "Alt+Shift+V",
+        "mac": "MacCtrl+Shift+V"
       },
       "description": "Capture visible screen (Viewport)"
     },
     "capture-fullpage": {
       "suggested_key": {
-        "default": "Alt+Shift+F"
+        "default": "Alt+Shift+F",
+        "mac": "MacCtrl+Shift+F"
       },
       "description": "Capture full page with scrolling"
     },
     "capture-selection": {
       "suggested_key": {
-        "default": "Alt+Shift+S"
+        "default": "Alt+Shift+S",
+        "mac": "MacCtrl+Shift+S"
       },
       "description": "Capture selected screen area"
     }

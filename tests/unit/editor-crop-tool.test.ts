@@ -90,7 +90,8 @@ describe('Task 038: Interactive Crop Tool with Annotation Shifting, HiDPI Export
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 
-    expect(controller.getState().activeTool).toBe('arrow');
+    // Cancelling crop clears the draft rectangle while keeping Crop tool active in the topbar
+    expect(controller.getState().activeTool).toBe('crop');
     expect(controller.getState().cropDraftRect).toBeNull();
     expect(controller.getState().metadata.cssWidth).toBe(960);
     expect(controller.getState().metadata.cssHeight).toBe(580);
@@ -146,7 +147,47 @@ describe('Task 038: Interactive Crop Tool with Annotation Shifting, HiDPI Export
     canvas2.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 90 }));
     expect(container.querySelector('#btn-floating-cancel-crop')).not.toBeNull();
     container.querySelector<HTMLButtonElement>('#btn-floating-cancel-crop')?.click();
-    expect(controller.getState().activeTool).not.toBe('crop');
+    expect(controller.getState().activeTool).toBe('crop');
+    expect(controller.getState().cropDraftRect).toBeNull();
     expect(container.querySelector('#crop-floating-actions')).toBeNull();
+  });
+
+  it('Task 044: resizes an existing crop selection via corner and edge handles with resize cursors', () => {
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+
+    controller.setTool('crop');
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+
+    // Draw initial 200x150 crop box at (100, 100) -> (300, 250)
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 300, clientY: 250 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 300, clientY: 250 }));
+
+    // Hover bottom-right corner handle (300, 250) -> nwse-resize
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 300, clientY: 250 }));
+    expect(canvas.style.cursor).toBe('nwse-resize');
+
+    // Drag SE handle by (+50, +40) -> size becomes 250x190
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 300, clientY: 250, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 350, clientY: 290 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 350, clientY: 290 }));
+    expect(controller.getState().cropDraftRect).toEqual({
+      x: 100,
+      y: 100,
+      width: 250,
+      height: 190,
+    });
+
+    // Drag NW handle (100, 100) by (+20, +10) -> (120, 110), size 230x180
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 120, clientY: 110 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 120, clientY: 110 }));
+    expect(controller.getState().cropDraftRect).toEqual({
+      x: 120,
+      y: 110,
+      width: 230,
+      height: 180,
+    });
   });
 });
