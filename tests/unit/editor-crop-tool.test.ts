@@ -95,4 +95,58 @@ describe('Task 038: Interactive Crop Tool with Annotation Shifting, HiDPI Export
     expect(controller.getState().metadata.cssWidth).toBe(960);
     expect(controller.getState().metadata.cssHeight).toBe(580);
   });
+
+  it('Task 043: renders floating Apply/Cancel buttons at bottom-right of crop box and allows dragging the crop area to reposition it', () => {
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+
+    controller.setTool('crop');
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+
+    // Draw a 200x150 crop box at (50, 60) -> (250, 210)
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 50, clientY: 60, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 250, clientY: 210 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 250, clientY: 210 }));
+
+    // Floating Apply and Cancel buttons are visible in #crop-actions-overlay
+    const floatingBar = container.querySelector<HTMLElement>('#crop-floating-actions');
+    expect(floatingBar).not.toBeNull();
+    expect(container.querySelector('#btn-floating-apply-crop')).not.toBeNull();
+    expect(container.querySelector('#btn-floating-cancel-crop')).not.toBeNull();
+
+    // Hover inside crop box -> cursor becomes 'grab'
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 150, clientY: 130 }));
+    expect(canvas.style.cursor).toBe('grab');
+
+    // Drag inside crop box by (+40, +30) -> moves crop rect to (90, 90) preserving 200x150 size
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 150, clientY: 130, button: 0 }));
+    expect(canvas.style.cursor).toBe('grabbing');
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 190, clientY: 160 }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 190, clientY: 160 }));
+
+    expect(controller.getState().cropDraftRect).toEqual({
+      x: 90,
+      y: 90,
+      width: 200,
+      height: 150,
+    });
+
+    // Clicking floating Apply applies the moved crop region
+    container.querySelector<HTMLButtonElement>('#btn-floating-apply-crop')?.click();
+    expect(controller.getState().metadata.cssWidth).toBe(200);
+    expect(controller.getState().metadata.cssHeight).toBe(150);
+    expect(controller.getState().cropOffsetCss).toEqual({ x: 90, y: 90 });
+    expect(container.querySelector('#crop-floating-actions')).toBeNull();
+
+    // Enter crop again, draw a box, and cancel via floating Cancel button
+    controller.setTool('crop');
+    const canvas2 = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    canvas2.dispatchEvent(new MouseEvent('mousedown', { clientX: 10, clientY: 10, button: 0 }));
+    canvas2.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 90 }));
+    canvas2.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 90 }));
+    expect(container.querySelector('#btn-floating-cancel-crop')).not.toBeNull();
+    container.querySelector<HTMLButtonElement>('#btn-floating-cancel-crop')?.click();
+    expect(controller.getState().activeTool).not.toBe('crop');
+    expect(container.querySelector('#crop-floating-actions')).toBeNull();
+  });
 });

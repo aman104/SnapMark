@@ -133,6 +133,10 @@ type ActiveCanvasInteraction =
   | {
       kind: 'crop';
       startPoint: Point2D;
+    }
+  | {
+      kind: 'crop-move';
+      lastPoint: Point2D;
     };
 
 export function initEditor(
@@ -330,6 +334,62 @@ export function initEditor(
     return computeFitToWidthScale(state.metadata.cssWidth, stageWidth - 24);
   }
 
+  function syncFloatingCropActions(): void {
+    const overlay = container.querySelector<HTMLElement>('#crop-actions-overlay');
+    if (!overlay) {
+      return;
+    }
+    const rect = state.cropDraftRect;
+    if (
+      state.activeTool !== 'crop' ||
+      !rect ||
+      rect.width < 8 ||
+      rect.height < 8
+    ) {
+      overlay.innerHTML = '';
+      return;
+    }
+
+    const displayScale = getStageDisplayScale();
+    const canvasDisplayW = Math.round(state.metadata.cssWidth * displayScale);
+    const canvasDisplayH = Math.round(state.metadata.cssHeight * displayScale);
+    const rightPx = Math.round((rect.x + rect.width) * displayScale);
+    const bottomPx = Math.round((rect.y + rect.height) * displayScale);
+    const anchorLeft = Math.max(150, Math.min(canvasDisplayW - 4, rightPx));
+    const anchorTop =
+      bottomPx + 46 <= canvasDisplayH
+        ? bottomPx + 8
+        : Math.max(4, bottomPx - 44);
+
+    let bar = overlay.querySelector<HTMLElement>('#crop-floating-actions');
+    if (!bar) {
+      overlay.innerHTML = `
+        <div id="crop-floating-actions" class="crop-floating-actions" role="group" aria-label="Crop actions">
+          <button type="button" id="btn-floating-cancel-crop" class="btn-secondary">Cancel</button>
+          <button type="button" id="btn-floating-apply-crop" class="btn-primary">Apply</button>
+        </div>
+      `;
+      bar = overlay.querySelector<HTMLElement>('#crop-floating-actions');
+      bar?.addEventListener('mousedown', (e) => e.stopPropagation());
+      bar
+        ?.querySelector<HTMLButtonElement>('#btn-floating-apply-crop')
+        ?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          applyCrop();
+        });
+      bar
+        ?.querySelector<HTMLButtonElement>('#btn-floating-cancel-crop')
+        ?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          cancelCrop();
+        });
+    }
+    if (bar) {
+      bar.style.left = `${anchorLeft}px`;
+      bar.style.top = `${anchorTop}px`;
+    }
+  }
+
   function redrawCanvasOnly(): void {
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
@@ -345,6 +405,7 @@ export function initEditor(
         state.cropDraftRect,
       );
     }
+    syncFloatingCropActions();
   }
 
   function syncToolbarWithSelectedAnnotation(): void {
@@ -598,6 +659,7 @@ export function initEditor(
       <div class="canvas-wrapper" id="canvas-wrapper">
         <canvas id="editor-canvas"></canvas>
         <div id="text-overlay-layer"></div>
+        <div id="crop-actions-overlay"></div>
       </div>
     `;
   }
@@ -846,6 +908,7 @@ export function initEditor(
     });
 
     bindToolbarAndStageEvents();
+    syncFloatingCropActions();
   }
 
   function setTool(tool: EditorTool): void {
@@ -1447,7 +1510,8 @@ export function initEditor(
     }
     if (
       activeInteraction?.kind === 'move' ||
-      activeInteraction?.kind === 'handle'
+      activeInteraction?.kind === 'handle' ||
+      activeInteraction?.kind === 'crop-move'
     ) {
       canvas.style.cursor = 'grabbing';
       return;
@@ -1455,6 +1519,20 @@ export function initEditor(
     if (activeInteraction) {
       canvas.style.cursor = 'crosshair';
       return;
+    }
+    if (pt && state.activeTool === 'crop' && state.cropDraftRect) {
+      const r = state.cropDraftRect;
+      if (
+        r.width >= 8 &&
+        r.height >= 8 &&
+        pt.x >= r.x &&
+        pt.x <= r.x + r.width &&
+        pt.y >= r.y &&
+        pt.y <= r.y + r.height
+      ) {
+        canvas.style.cursor = 'grab';
+        return;
+      }
     }
     if (pt && state.activeTool !== 'crop') {
       if (state.selectedAnnotationId) {
@@ -1485,8 +1563,25 @@ export function initEditor(
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     const pt = getCanvasCssPoint(canvas, event);
 
-    // 0. Crop tool mode: drag to define crop rectangle
+    // 0. Crop tool mode: drag inside existing crop rect to move it, or drag outside to draw a new crop rectangle
     if (state.activeTool === 'crop') {
+      const existingRect = state.cropDraftRect;
+      if (
+        existingRect &&
+        existingRect.width >= 8 &&
+        existingRect.height >= 8 &&
+        pt.x >= existingRect.x &&
+        pt.x <= existingRect.x + existingRect.width &&
+        pt.y >= existingRect.y &&
+        pt.y <= existingRect.y + existingRect.height
+      ) {
+        activeInteraction = {
+          kind: 'crop-move',
+          lastPoint: pt,
+        };
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
       const clampedStart = {
         x: Math.max(0, Math.min(state.metadata.cssWidth, pt.x)),
         y: Math.max(0, Math.min(state.metadata.cssHeight, pt.y)),
@@ -1634,6 +1729,24 @@ export function initEditor(
 
     const pt = getCanvasCssPoint(canvas, event);
     updateCanvasCursor(canvas, pt);
+
+    if (activeInteraction.kind === 'crop-move') {
+      const rect = state.cropDraftRect;
+      if (rect) {
+        const dx = pt.x - activeInteraction.lastPoint.x;
+        const dy = pt.y - activeInteraction.lastPoint.y;
+        const maxX = Math.max(0, state.metadata.cssWidth - rect.width);
+        const maxY = Math.max(0, state.metadata.cssHeight - rect.height);
+        state.cropDraftRect = {
+          ...rect,
+          x: Math.max(0, Math.min(maxX, rect.x + dx)),
+          y: Math.max(0, Math.min(maxY, rect.y + dy)),
+        };
+        activeInteraction.lastPoint = pt;
+        redrawCanvasOnly();
+      }
+      return;
+    }
 
     if (activeInteraction.kind === 'crop') {
       const clampedX = Math.max(0, Math.min(state.metadata.cssWidth, pt.x));

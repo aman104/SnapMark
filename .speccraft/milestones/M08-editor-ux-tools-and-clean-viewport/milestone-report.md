@@ -41,11 +41,14 @@
    - **Brak przesunięcia tekstu po zatwierdzeniu**: skompensowano padding i obramowanie pola tekstowego (`transform: translate(-11.5px, -8px)`), dzięki czemu tekst po odkliku zostaje dokładnie w tym samym miejscu.
    - **Odklikiwanie każdego dodanego elementu**: kliknięcie w puste miejsce (oraz `Esc`) odznacza dodany element w każdym narzędziu (strzałka, linia, tekst, kroki, pisak).
    - **Edycja numeru dodanego kroku**: kontrolka `− [nr] +` na pasku narzędzi dla zaznaczonego kroku (z obsługą `Undo`) oraz szybka edycja po dwukliku na numerze.
+11. **Usprawnienia kadrowania (Task `043`)**:
+   - **Pływające przyciski `Cancel` / `Apply` w prawym dolnym rogu kadrowanego obszaru**: pojawiają się od razu pod prawym dolnym rogiem ramki kadrowania (z klamrowaniem do krawędzi płótna).
+   - **Przesuwanie zaznaczonego obszaru kadrowania**: złapanie wewnątrz zaznaczonej ramki kadrowania (`grab` / `grabbing`) pozwala płynnie przesuwać ją w obrębie zrzutu bez zmiany rozmiaru.
 
 ## Verification
 
 - `npm run typecheck`: 0 errors
-- `npm test`: **32 test files, 143 tests passed**
+- `npm test`: **32 test files, 144 tests passed**
 - `npm run build`: clean Vite build (`dist/`)
 - `npm run test:e2e`: **4/4 Vitest E2E + 8/8 real Chromium extension workflows passed**
-- `npm run package`: `snapmark-extension.zip` (37 769 bytes)
+- `npm run package`: `snapmark-extension.zip` (38 295 bytes)
