@@ -44,16 +44,50 @@ describe('Task 026: On-demand Interactive Screen Area Selection Overlay (selectA
       new MouseEvent('mouseup', { clientX: 120, clientY: 160 }),
     );
 
+    // Overlay stays open with 8 resize handles and floating Apply/Cancel buttons (Crop parity)
+    expect(document.querySelectorAll('[data-snapmark-area-handle]')).toHaveLength(8);
+    const applyBtn = document.querySelector<HTMLButtonElement>('[data-snapmark-area-apply]');
+    const cancelBtn = document.querySelector<HTMLButtonElement>('[data-snapmark-area-cancel]');
+    expect(applyBtn).not.toBeNull();
+    expect(cancelBtn).not.toBeNull();
+
+    // Move selection by (+30, +20) by dragging inside (250, 250) -> (280, 270)
+    overlay!.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 250, clientY: 250, button: 0 }),
+    );
+    window.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: 280, clientY: 270 }),
+    );
+    window.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 280, clientY: 270 }),
+    );
+    // Selection is now at (150, 180) with size 400x250 -> SE corner at (550, 430)
+
+    // Resize SE corner by (+20, +10) -> size becomes 420x260
+    overlay!.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 550, clientY: 430, button: 0 }),
+    );
+    window.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: 570, clientY: 440 }),
+    );
+    window.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 570, clientY: 440 }),
+    );
+    expect(dimBadge?.textContent).toBe('420 × 260 px');
+
+    // Click Apply button to confirm selection
+    applyBtn!.click();
+
     const result = await selectionPromise;
     expect(result.cancelled).toBe(false);
     expect(result.dpr).toBe(2);
     expect(result.viewportWidthCss).toBe(1440);
     expect(result.viewportHeightCss).toBe(900);
     expect(result.cropRectCss).toEqual({
-      x: 120,
-      y: 160,
-      width: 400,
-      height: 250,
+      x: 150,
+      y: 180,
+      width: 420,
+      height: 260,
     });
 
     // Guaranteed DOM cleanup before captureVisibleTab fires
