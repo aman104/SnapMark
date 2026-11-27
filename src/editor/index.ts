@@ -24,6 +24,8 @@ import type {
   LineAnnotation,
   LineSubtype,
   MockCaptureMetadata,
+  PenAnnotation,
+  StepAnnotation,
   StrokeWidth,
   TextAnnotation,
   TextStyleMode,
@@ -45,7 +47,9 @@ import {
 } from './text-overlay';
 import {
   applyShiftHorizontalLock,
+  DEFAULT_STEP_RADIUS_CSS,
   type EndpointHandleRole,
+  getNextStepNumber,
   hitTestEndpointHandle,
   moveAnnotationByDelta,
   type Point2D,
@@ -113,6 +117,12 @@ type ActiveCanvasInteraction =
       tool: 'arrow' | 'line';
       newId: string;
       startPoint: Point2D;
+      snapshotPushed: boolean;
+    }
+  | {
+      kind: 'pen';
+      newId: string;
+      points: Point2D[];
       snapshotPushed: boolean;
     };
 
@@ -317,7 +327,7 @@ export function initEditor(
     }
     state.activeTool = selected.type;
     state.activeColor = selected.color;
-    if (selected.type === 'arrow') {
+    if (selected.type === 'arrow' || selected.type === 'pen') {
       state.strokeWidth = selected.strokeWidth;
     } else if (selected.type === 'line') {
       state.lineSubtype = selected.subtype;
@@ -368,6 +378,7 @@ export function initEditor(
 
     const showStrokeWidth =
       state.activeTool === 'arrow' ||
+      state.activeTool === 'pen' ||
       (state.activeTool === 'line' && state.lineSubtype === 'underline');
 
     const strokeWidthHtml = showStrokeWidth
@@ -583,6 +594,37 @@ export function initEditor(
                 <span>Tekst</span>
                 <kbd class="kbd-badge">3</kbd>
               </button>
+
+              <button
+                type="button"
+                id="tool-step"
+                aria-label="Kroki"
+                class="toolbar-tool-btn ${state.activeTool === 'step' ? 'is-active' : ''}"
+                aria-pressed="${state.activeTool === 'step' ? 'true' : 'false'}"
+                title="Numerowane kroki 1, 2, 3... (4)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6" />
+                  <path d="M7.2 5.7L8.3 5v6" />
+                </svg>
+                <span>Kroki</span>
+                <kbd class="kbd-badge">4</kbd>
+              </button>
+
+              <button
+                type="button"
+                id="tool-pen"
+                aria-label="Pisak"
+                class="toolbar-tool-btn ${state.activeTool === 'pen' ? 'is-active' : ''}"
+                aria-pressed="${state.activeTool === 'pen' ? 'true' : 'false'}"
+                title="Pisak — rysowanie odręczne (5)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M11.5 2.5l2 2-7.5 7.5-3 .8.8-3 7.7-7.3z" />
+                </svg>
+                <span>Pisak</span>
+                <kbd class="kbd-badge">5</kbd>
+              </button>
             </div>
           </div>
 
@@ -761,7 +803,12 @@ export function initEditor(
       const target = state.annotations.find(
         (item) => item.id === state.selectedAnnotationId,
       );
-      if (target && (target.type === 'arrow' || target.type === 'line')) {
+      if (
+        target &&
+        (target.type === 'arrow' ||
+          target.type === 'line' ||
+          target.type === 'pen')
+      ) {
         pushHistorySnapshot();
         target.strokeWidth = width;
       }
@@ -943,6 +990,14 @@ export function initEditor(
     container
       .querySelector<HTMLButtonElement>('#tool-text')
       ?.addEventListener('click', () => setTool('text'));
+
+    container
+      .querySelector<HTMLButtonElement>('#tool-step')
+      ?.addEventListener('click', () => setTool('step'));
+
+    container
+      .querySelector<HTMLButtonElement>('#tool-pen')
+      ?.addEventListener('click', () => setTool('pen'));
 
     container
       .querySelectorAll<HTMLButtonElement>('.color-swatch')
@@ -1220,6 +1275,38 @@ export function initEditor(
       return;
     }
 
+    // 3b. When Step tool is active, immediately place a numbered circle badge at (pt.x, pt.y)
+    if (state.activeTool === 'step') {
+      pushHistorySnapshot();
+      annotationSeq += 1;
+      const stepNumber = getNextStepNumber(state.annotations);
+      const newStep: StepAnnotation = {
+        id: `ann_step_${Date.now()}_${annotationSeq}`,
+        type: 'step',
+        x: pt.x,
+        y: pt.y,
+        stepNumber,
+        color: state.activeColor,
+        radius: DEFAULT_STEP_RADIUS_CSS,
+      };
+      state.annotations.push(newStep);
+      state.selectedAnnotationId = newStep.id;
+      notifyAndRender();
+      return;
+    }
+
+    // 3c. When Pen tool is active, start a freehand pen stroke
+    if (state.activeTool === 'pen') {
+      annotationSeq += 1;
+      activeInteraction = {
+        kind: 'pen',
+        newId: `ann_pen_${Date.now()}_${annotationSeq}`,
+        points: [pt],
+        snapshotPushed: false,
+      };
+      return;
+    }
+
     // 4. Otherwise start drawing a new Arrow or 2-in-1 Line/Highlighter
     if (state.activeTool === 'arrow' || state.activeTool === 'line') {
       annotationSeq += 1;
@@ -1287,6 +1374,40 @@ export function initEditor(
         activeInteraction.lastPoint = pt;
         redrawCanvasOnly();
       }
+      return;
+    }
+
+    if (activeInteraction.kind === 'pen') {
+      const lastPt =
+        activeInteraction.points[activeInteraction.points.length - 1];
+      if (lastPt && Math.hypot(pt.x - lastPt.x, pt.y - lastPt.y) < 2) {
+        return;
+      }
+      activeInteraction.points.push(pt);
+      if (!activeInteraction.snapshotPushed) {
+        pushHistorySnapshot();
+        activeInteraction.snapshotPushed = true;
+        const newPen: PenAnnotation = {
+          id: activeInteraction.newId,
+          type: 'pen',
+          points: activeInteraction.points.map((p) => ({ ...p })),
+          color: state.activeColor,
+          strokeWidth: state.strokeWidth,
+        };
+        state.annotations.push(newPen);
+        state.selectedAnnotationId = newPen.id;
+      } else {
+        const penId = activeInteraction.newId;
+        const idx = state.annotations.findIndex((item) => item.id === penId);
+        const existing = idx >= 0 ? state.annotations[idx] : undefined;
+        if (existing && existing.type === 'pen') {
+          state.annotations[idx] = {
+            ...existing,
+            points: activeInteraction.points.map((p) => ({ ...p })),
+          };
+        }
+      }
+      redrawCanvasOnly();
       return;
     }
 
@@ -1487,6 +1608,10 @@ export function initEditor(
         setTool('line');
       } else if (event.key === '3') {
         setTool('text');
+      } else if (event.key === '4') {
+        setTool('step');
+      } else if (event.key === '5') {
+        setTool('pen');
       }
     }
   };

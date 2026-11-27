@@ -4,7 +4,7 @@
 
 export type CaptureMode = 'selection' | 'image' | 'viewport' | 'fullpage';
 
-export type EditorTool = 'arrow' | 'line' | 'text';
+export type EditorTool = 'arrow' | 'line' | 'text' | 'step' | 'pen' | 'crop';
 
 export type LineSubtype = 'underline' | 'highlighter';
 
@@ -83,10 +83,35 @@ export interface TextAnnotation {
   styleMode: TextStyleMode;
 }
 
+export interface StepAnnotation {
+  id: string;
+  type: 'step';
+  x: number;
+  y: number;
+  stepNumber: number;
+  color: AnnotationColor;
+  radius: number;
+}
+
+export interface PenPoint {
+  x: number;
+  y: number;
+}
+
+export interface PenAnnotation {
+  id: string;
+  type: 'pen';
+  points: PenPoint[];
+  color: AnnotationColor;
+  strokeWidth: StrokeWidth;
+}
+
 export type AnnotationItem =
   | ArrowAnnotation
   | LineAnnotation
-  | TextAnnotation;
+  | TextAnnotation
+  | StepAnnotation
+  | PenAnnotation;
 
 export interface UserSettings {
   highlightSelectionBeforeCapture: boolean;

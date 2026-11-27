@@ -13,6 +13,20 @@ export interface Point2D {
 }
 
 export const DEFAULT_HANDLE_HIT_RADIUS_CSS = 10;
+export const DEFAULT_STEP_RADIUS_CSS = 16;
+
+/**
+ * Returns the next sequential step number (`1, 2, 3...`) based on existing StepAnnotations.
+ */
+export function getNextStepNumber(annotations: AnnotationItem[]): number {
+  let maxStep = 0;
+  for (const item of annotations) {
+    if (item.type === 'step' && item.stepNumber > maxStep) {
+      maxStep = item.stepNumber;
+    }
+  }
+  return maxStep + 1;
+}
 
 /**
  * Enforces a horizontal axis lock (`y2 = y1`) when `shiftKey` is held down.
@@ -151,6 +165,42 @@ export function hitTestAnnotationBody(
       ) {
         return item;
       }
+    } else if (item.type === 'step') {
+      const dist = Math.hypot(cssX - item.x, cssY - item.y);
+      if (dist <= item.radius + 4) {
+        return item;
+      }
+    } else if (item.type === 'pen') {
+      const threshold = Math.max(10, item.strokeWidth / 2 + 6);
+      if (item.points.length === 1) {
+        const p0 = item.points[0]!;
+        if (Math.hypot(cssX - p0.x, cssY - p0.y) <= threshold) {
+          return item;
+        }
+      } else {
+        for (let j = 0; j < item.points.length - 1; j += 1) {
+          const p1 = item.points[j]!;
+          const p2 = item.points[j + 1]!;
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const lenSq = dx * dx + dy * dy;
+          const t =
+            lenSq === 0
+              ? 0
+              : Math.max(
+                  0,
+                  Math.min(
+                    1,
+                    ((cssX - p1.x) * dx + (cssY - p1.y) * dy) / lenSq,
+                  ),
+                );
+          const projX = p1.x + t * dx;
+          const projY = p1.y + t * dy;
+          if (Math.hypot(cssX - projX, cssY - projY) <= threshold) {
+            return item;
+          }
+        }
+      }
     }
   }
   return null;
@@ -208,6 +258,12 @@ export function moveAnnotationByDelta<T extends AnnotationItem>(
       y1: item.y1 + dy,
       x2: item.x2 + dx,
       y2: item.y2 + dy,
+    };
+  }
+  if (item.type === 'pen') {
+    return {
+      ...item,
+      points: item.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
     };
   }
   return {

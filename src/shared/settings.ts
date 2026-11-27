@@ -13,7 +13,13 @@ import type {
 
 export const SETTINGS_STORAGE_KEY = 'snapmark_user_settings';
 
-const VALID_TOOLS: ReadonlySet<EditorTool> = new Set(['arrow', 'line', 'text']);
+const VALID_TOOLS: ReadonlySet<EditorTool> = new Set([
+  'arrow',
+  'line',
+  'text',
+  'step',
+  'pen',
+]);
 const VALID_COLORS: ReadonlySet<AnnotationColor> = new Set(
   ANNOTATION_COLORS.map((c) => c.hex),
 );
