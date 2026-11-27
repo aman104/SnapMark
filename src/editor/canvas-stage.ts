@@ -404,6 +404,25 @@ export interface PlacedFrameDrawable {
   placement: FramePlacementPlan;
 }
 
+/**
+ * Computes a fit-to-width display scale (`<= 1`) so wide screenshots fit inside
+ * `.editor-stage` without horizontal scrollbars while keeping full physical DPI backing store.
+ */
+export function computeFitToWidthScale(
+  cssWidth: number,
+  availableWidth: number,
+): number {
+  if (
+    !Number.isFinite(cssWidth) ||
+    cssWidth <= 0 ||
+    !Number.isFinite(availableWidth) ||
+    availableWidth <= 0
+  ) {
+    return 1;
+  }
+  return Math.min(1, availableWidth / cssWidth);
+}
+
 export function renderCanvasStage(
   canvas: HTMLCanvasElement,
   metadata: MockCaptureMetadata,
@@ -411,14 +430,17 @@ export function renderCanvasStage(
   selectedId: string | null,
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  displayScale = 1,
 ): void {
   const physicalWidth = Math.round(metadata.cssWidth * metadata.dpr);
   const physicalHeight = Math.round(metadata.cssHeight * metadata.dpr);
+  const safeScale =
+    Number.isFinite(displayScale) && displayScale > 0 ? displayScale : 1;
 
   canvas.width = physicalWidth;
   canvas.height = physicalHeight;
-  canvas.style.width = `${metadata.cssWidth}px`;
-  canvas.style.height = `${metadata.cssHeight}px`;
+  canvas.style.width = `${Math.round(metadata.cssWidth * safeScale)}px`;
+  canvas.style.height = `${Math.round(metadata.cssHeight * safeScale)}px`;
   canvas.style.borderRadius = '0px';
 
   const ctx = get2DContext(canvas);

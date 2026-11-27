@@ -116,12 +116,13 @@
 /* Scrollable Canvas Workspace (calc(100vh - 56px)) */
 .editor-stage {
   flex: 1;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: var(--space-xxl);
+  padding: 12px;
   background-color: var(--color-canvas);
   background-image: radial-gradient(
     rgba(255, 255, 255, 0.04) 1px,
@@ -135,6 +136,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  max-width: 100%;
   margin: 0 auto;
 }
 
