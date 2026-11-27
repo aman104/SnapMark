@@ -178,12 +178,73 @@ describe('Task 040: M08 polish — stable canvas, pen endpoint handles, icon-onl
     expect(canvas.style.cursor).toBe('grab');
 
     // Click empty area -> deselects step 1 (still 1 step)
-    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 250, clientY: 250, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 30, clientY: 350, button: 0 }));
     expect(controller.getState().selectedAnnotationId).toBeNull();
     expect(controller.getState().annotations.filter((a) => a.type === 'step')).toHaveLength(1);
 
     // Next click on empty area -> adds step 2
-    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 250, clientY: 250, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 30, clientY: 350, button: 0 }));
     expect(controller.getState().annotations.filter((a) => a.type === 'step')).toHaveLength(2);
+  });
+
+  it('Task 042: live crop pixel dimensions, no auto-select on tool switch, aligned text overlay CSS, universal click-off deselect, and editable step number', () => {
+    const css = fs.readFileSync(path.resolve(process.cwd(), 'src/styles/editor.css'), 'utf-8');
+    expect(css).toContain('transform: translate(-11.5px, -8px)');
+
+    const container = document.createElement('div');
+    const controller = initEditor(container, { initialSearch: '?mode=viewport' });
+
+    // Switching tools from toolbar never auto-selects an existing annotation
+    expect(controller.getState().selectedAnnotationId).not.toBeNull();
+    controller.setTool('line');
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+    controller.setTool('arrow');
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+    controller.setTool('text');
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+
+    // Crop tool updates live pixel dimensions during mousemove
+    controller.setTool('crop');
+    const cropCanvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    cropCanvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 40, clientY: 50, button: 0 }));
+    cropCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 340, clientY: 250 }));
+    expect(container.querySelector('#crop-dimensions-label')?.textContent).toBe('300×200 px');
+    expect(container.querySelector<HTMLButtonElement>('#btn-apply-crop')?.disabled).toBe(false);
+    cropCanvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 340, clientY: 250 }));
+    container.querySelector<HTMLButtonElement>('#btn-cancel-crop')?.click();
+
+    // Pen tool click-off deselects newly added pen stroke
+    controller.setTool('pen');
+    const penCanvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    penCanvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 30, clientY: 30, button: 0 }));
+    penCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 70, clientY: 50 }));
+    penCanvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 70, clientY: 50 }));
+    expect(controller.getState().selectedAnnotationId).not.toBeNull();
+    // Click empty area -> deselects
+    penCanvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 300, clientY: 300, button: 0 }));
+    penCanvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 300, clientY: 300 }));
+    expect(controller.getState().selectedAnnotationId).toBeNull();
+
+    // Step tool: place step 1 and edit its number via toolbar controls (#btn-step-inc / #step-number-input)
+    controller.setTool('step');
+    const stepCanvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
+    stepCanvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 120, clientY: 120, button: 0 }));
+    const stepInput = container.querySelector<HTMLInputElement>('#step-number-input');
+    expect(stepInput?.value).toBe('1');
+
+    container.querySelector<HTMLButtonElement>('#btn-step-inc')?.click();
+    const stepAfterInc = controller.getState().annotations.find((a) => a.type === 'step');
+    expect(stepAfterInc?.type === 'step' ? stepAfterInc.stepNumber : 0).toBe(2);
+
+    const stepInput2 = container.querySelector<HTMLInputElement>('#step-number-input')!;
+    stepInput2.value = '7';
+    stepInput2.dispatchEvent(new Event('change'));
+    const stepAfterInput = controller.getState().annotations.find((a) => a.type === 'step');
+    expect(stepAfterInput?.type === 'step' ? stepAfterInput.stepNumber : 0).toBe(7);
+
+    // Undo restores previous step number
+    controller.undo();
+    const stepAfterUndo = controller.getState().annotations.find((a) => a.type === 'step');
+    expect(stepAfterUndo?.type === 'step' ? stepAfterUndo.stepNumber : 0).toBe(2);
   });
 });

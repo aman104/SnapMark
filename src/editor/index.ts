@@ -510,6 +510,31 @@ export function initEditor(
       `
         : '';
 
+    const selectedStep = state.selectedAnnotationId
+      ? state.annotations.find(
+          (item): item is StepAnnotation =>
+            item.id === state.selectedAnnotationId && item.type === 'step',
+        )
+      : undefined;
+
+    const stepNumberHtml = selectedStep
+      ? `
+        <div id="step-number-control" class="step-number-control" role="group" aria-label="Step number">
+          <button type="button" id="btn-step-dec" class="segmented-option" title="Decrease step number" aria-label="Decrease step number">−</button>
+          <input
+            type="number"
+            id="step-number-input"
+            class="step-number-input"
+            min="1"
+            max="99"
+            value="${selectedStep.stepNumber}"
+            aria-label="Step number"
+          />
+          <button type="button" id="btn-step-inc" class="segmented-option" title="Increase step number" aria-label="Increase step number">+</button>
+        </div>
+      `
+      : '';
+
     return `
       <div id="color-picker" class="color-swatch-tray" role="group" aria-label="Annotation color palette">
         ${swatchesHtml}
@@ -517,6 +542,7 @@ export function initEditor(
       ${lineSubtypeHtml}
       ${strokeWidthHtml}
       ${textStyleHtml}
+      ${stepNumberHtml}
     `;
   }
 
@@ -839,14 +865,7 @@ export function initEditor(
     state.cropDraftRect = null;
     previousToolBeforeCrop = tool;
     state.activeTool = tool;
-    if (tool === 'step') {
-      state.selectedAnnotationId = null;
-    } else {
-      const matching = state.annotations.find((item) => item.type === tool);
-      if (matching) {
-        state.selectedAnnotationId = matching.id;
-      }
-    }
+    state.selectedAnnotationId = null;
     void updateUserSettings({ activeTool: tool });
     notifyAndRender();
   }
@@ -962,6 +981,24 @@ export function initEditor(
     }
     void updateUserSettings({ textStyleMode: styleMode });
     notifyAndRender();
+  }
+
+  function setSelectedStepNumber(nextNumber: number): void {
+    if (!state.selectedAnnotationId || !Number.isFinite(nextNumber)) {
+      return;
+    }
+    const clamped = Math.max(1, Math.min(99, Math.round(nextNumber)));
+    const target = state.annotations.find(
+      (item): item is StepAnnotation =>
+        item.id === state.selectedAnnotationId && item.type === 'step',
+    );
+    if (!target || target.stepNumber === clamped) {
+      return;
+    }
+    pushHistorySnapshot();
+    target.stepNumber = clamped;
+    redrawCanvasOnly();
+    refreshToolbarOnly();
   }
 
   function undo(): void {
@@ -1179,6 +1216,48 @@ export function initEditor(
       });
 
     container
+      .querySelector<HTMLButtonElement>('#btn-step-dec')
+      ?.addEventListener('click', () => {
+        const selected = state.annotations.find(
+          (item): item is StepAnnotation =>
+            item.id === state.selectedAnnotationId && item.type === 'step',
+        );
+        if (selected) {
+          setSelectedStepNumber(selected.stepNumber - 1);
+        }
+      });
+
+    container
+      .querySelector<HTMLButtonElement>('#btn-step-inc')
+      ?.addEventListener('click', () => {
+        const selected = state.annotations.find(
+          (item): item is StepAnnotation =>
+            item.id === state.selectedAnnotationId && item.type === 'step',
+        );
+        if (selected) {
+          setSelectedStepNumber(selected.stepNumber + 1);
+        }
+      });
+
+    const stepInput = container.querySelector<HTMLInputElement>('#step-number-input');
+    stepInput?.addEventListener('change', () => {
+      const parsed = Number(stepInput.value);
+      if (Number.isFinite(parsed)) {
+        setSelectedStepNumber(parsed);
+      }
+    });
+    stepInput?.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const parsed = Number(stepInput.value);
+        if (Number.isFinite(parsed)) {
+          setSelectedStepNumber(parsed);
+        }
+        stepInput.blur();
+      }
+    });
+
+    container
       .querySelector<HTMLButtonElement>('#btn-undo')
       ?.addEventListener('click', undo);
 
@@ -1332,6 +1411,14 @@ export function initEditor(
         styleMode: hit.styleMode,
       };
       notifyAndRender();
+    } else if (hit && hit.type === 'step') {
+      state.selectedAnnotationId = hit.id;
+      syncToolbarWithSelectedAnnotation();
+      redrawCanvasOnly();
+      refreshToolbarOnly();
+      const stepInput = container.querySelector<HTMLInputElement>('#step-number-input');
+      stepInput?.focus();
+      stepInput?.select();
     }
   }
 
@@ -1452,8 +1539,15 @@ export function initEditor(
       return;
     }
 
-    // 3. When Text tool is active, spawn an inline <textarea> overlay at (pt.x, pt.y)
+    // 3. When Text tool is active: if something is selected, deselect first; otherwise spawn inline <textarea> overlay
     if (state.activeTool === 'text') {
+      if (state.selectedAnnotationId !== null) {
+        state.selectedAnnotationId = null;
+        redrawCanvasOnly();
+        refreshToolbarOnly();
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
       // Keep the browser's default mousedown focus handling from blurring the
       // newly mounted textarea after it has been focused.
       event.preventDefault();
@@ -1550,6 +1644,18 @@ export function initEditor(
         width: Math.abs(clampedX - activeInteraction.startPoint.x),
         height: Math.abs(clampedY - activeInteraction.startPoint.y),
       };
+      const dimLabel = container.querySelector<HTMLElement>('#crop-dimensions-label');
+      const applyBtn = container.querySelector<HTMLButtonElement>('#btn-apply-crop');
+      const hasValid =
+        state.cropDraftRect.width >= 8 && state.cropDraftRect.height >= 8;
+      if (dimLabel) {
+        dimLabel.textContent = hasValid
+          ? `${Math.round(state.cropDraftRect.width)}×${Math.round(state.cropDraftRect.height)} px`
+          : 'Drag area to crop';
+      }
+      if (applyBtn) {
+        applyBtn.disabled = !hasValid;
+      }
       redrawCanvasOnly();
       return;
     }
@@ -1714,7 +1820,10 @@ export function initEditor(
       return;
     }
     lastProcessedUpEvent = event;
-    if (activeInteraction.kind === 'draw' && !activeInteraction.snapshotPushed) {
+    if (
+      (activeInteraction.kind === 'draw' || activeInteraction.kind === 'pen') &&
+      !activeInteraction.snapshotPushed
+    ) {
       state.selectedAnnotationId = null;
     }
     activeInteraction = null;
@@ -1834,6 +1943,14 @@ export function initEditor(
         cancelCrop();
         return;
       }
+    }
+
+    if (event.key === 'Escape' && state.selectedAnnotationId !== null) {
+      event.preventDefault();
+      state.selectedAnnotationId = null;
+      redrawCanvasOnly();
+      refreshToolbarOnly();
+      return;
     }
 
     if (!event.ctrlKey && !event.metaKey && !event.altKey) {

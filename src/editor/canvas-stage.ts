@@ -606,6 +606,26 @@ export function renderCanvasStage(
     ctx.strokeStyle = '#FF3B30';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, width, height);
+
+    // Live pixel dimensions pill on the crop frame
+    const dimLabel = `${Math.round(width)} × ${Math.round(height)} px`;
+    ctx.font = "600 12px -apple-system, BlinkMacSystemFont, 'Inter', monospace";
+    const textMetrics = ctx.measureText ? ctx.measureText(dimLabel) : { width: dimLabel.length * 7 };
+    const pillPadX = 8;
+    const pillHeight = 22;
+    const pillWidth = Math.ceil((textMetrics?.width ?? 72) + pillPadX * 2);
+    const pillX = Math.max(4, Math.min(metadata.cssWidth - pillWidth - 4, x));
+    const pillY = y >= pillHeight + 6 ? y - pillHeight - 6 : Math.min(metadata.cssHeight - pillHeight - 4, y + 6);
+
+    ctx.fillStyle = 'rgba(15, 17, 21, 0.88)';
+    ctx.fillRect(pillX, pillY, pillWidth, pillHeight);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pillX, pillY, pillWidth, pillHeight);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(dimLabel, pillX + pillPadX, pillY + pillHeight / 2);
   }
 
   ctx.restore();
