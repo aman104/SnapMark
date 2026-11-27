@@ -34,7 +34,7 @@
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "downloads", "scripting", "storage"]` (`downloads` added in M07 only to observe the editor's own PNG download state).
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, no active milestone branch (M07 merged into `main` on 2026-11-22)
+- **Git:** base branch `main`, active milestone branch `milestone/M08-editor-ux-tools-and-clean-viewport`
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
@@ -44,6 +44,7 @@
 - [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
 - [M06] `[x]` accepted — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (3/3 tasks done)
 - [M07] `[x]` accepted (2026-11-22) — Feature: Reliable capture and streamlined editor (6/6 tasks done). All planned milestones are accepted; further work needs a new milestone from `12-feature-advisor`.
+- [M08] `[>]` in progress — Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen (0/5 tasks done)
 
 ## Decisions and deviations
 - none

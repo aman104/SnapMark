@@ -13,7 +13,7 @@
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | done |
 | 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | done |
 | 8+. Evolution | M07 | Reliable full-page capture and a compact, usable annotation editor | done |
-| 8+. Evolution | M08 | Clean viewport capture (no scrollbar), fit-to-width editor without horizontal scroll, interactive Crop tool, numbered Step badges (`1, 2, 3...`), freehand Pen tool, default thick (`8px`) stroke order (`8/4/2`), and popup cleanup | planned |
+| 8+. Evolution | M08 | Clean viewport capture (no scrollbar), fit-to-width editor without horizontal scroll, interactive Crop tool, numbered Step badges (`1, 2, 3...`), freehand Pen tool, default thick (`8px`) stroke order (`8/4/2`), and popup cleanup | in progress |
 
 ## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
@@ -228,7 +228,7 @@
 - **Depends on:** M06
 - **Estimated size:** 4–6 tasks
 
-## [ ] M08 - Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen
+## [>] M08 - Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen
 - **Phase:** 8+ — Evolution
 - **Type:** feature
 - **What you will see:** Zrzut widocznego ekranu nie zawiera już paska przewijania strony; w edytorze zrzut mieści się w szerokości ekranu bez poziomego scrolla; możesz kadrować gotowy zrzut (`Kadruj`), stawiać ponumerowane kółka kroków (`1`, `2`, `3`...) w wybranym kolorze tła, rysować odręcznie pisakiem (`Pisak`), grubości linii/strzałek są w kolejności od grubej (`8px` domyślnie), a z popupu zniknęła zbędna opcja żółtego podświetlania tekstu.
