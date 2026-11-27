@@ -87,7 +87,7 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
     await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
     downloads.emit(41, 'interrupted');
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nie udało się pobrać PNG'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Failed to download PNG'));
     expect(close).not.toHaveBeenCalled();
     expect(controller.getState().annotations).toHaveLength(count);
     expect(downloads.revoke).toHaveBeenCalledWith('blob:test');
@@ -114,7 +114,7 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     const container = document.createElement('div');
     initEditor(container, { initialSearch: '?mode=viewport', onClose: close });
     container.querySelector<HTMLButtonElement>('#btn-download-png')!.click();
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nie udało się pobrać PNG'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Failed to download PNG'));
     expect(close).not.toHaveBeenCalled();
     expect(downloads.revoke).toHaveBeenCalledWith('blob:test');
     expect(downloads.removeListener).toHaveBeenCalledOnce();
@@ -129,7 +129,7 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
     controller.setColor('#34C759');
     downloads.emit(41, 'complete');
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nowe zmiany'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('New edits'));
     expect(close).not.toHaveBeenCalled();
     expect(controller.getState().annotations[0].color).toBe('#34C759');
   });
@@ -148,7 +148,7 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     await vi.waitFor(() => expect(getCurrent).toHaveBeenCalledOnce());
     controller.setColor('#34C759');
     finishLookup({ id: 37 });
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nowe zmiany'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('New edits'));
     expect(remove).not.toHaveBeenCalled();
     expect(controller.getState().annotations[0].color).toBe('#34C759');
   });
@@ -164,7 +164,7 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 20, clientY: 20, button: 0, bubbles: true }));
     const count = controller.getState().annotations.length;
     downloads.emit(41, 'complete');
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nowe zmiany'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('New edits'));
     expect(close).not.toHaveBeenCalled();
     canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 80, bubbles: true }));
     canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 80, button: 0, bubbles: true }));
@@ -192,7 +192,7 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
     expect(controller.getState().annotations).toHaveLength(count);
     failRemoval(new Error('cannot close'));
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('nie udało się zamknąć karty'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('tab could not be closed'));
     expect(container.inert).toBe(false);
     canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas')!;
     canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 20, clientY: 20, button: 0, bubbles: true }));
@@ -216,7 +216,7 @@ describe('Flattened HiDPI PNG Download & ClipboardItem Exporter (Task 022)', () 
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.setSelectionRange(2, 6);
     downloads.emit(41, 'interrupted');
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nie udało się pobrać PNG'));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('Failed to download PNG'));
     expect(container.querySelector('#active-text-input')).toBe(input);
     expect(document.activeElement).toBe(input);
     expect([input.selectionStart, input.selectionEnd]).toEqual([2, 6]);

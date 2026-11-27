@@ -144,7 +144,7 @@ try {
     chrome.downloads.download = async () => { throw new Error('test failure'); };
   });
   await editor.locator('#btn-download-png').click();
-  await editor.locator('#download-status').filter({ hasText: 'Nie udało się pobrać PNG' }).waitFor({ state: 'visible' });
+  await editor.locator('#download-status').filter({ hasText: 'Failed to download PNG' }).waitFor({ state: 'visible' });
   assert.equal(editor.isClosed(), false, 'failed download must leave the editor open');
   assert.notDeepEqual(await sample(165, 125), arrowBefore, 'arrow must survive download failure');
   assert.notDeepEqual(await sample(170, 210), lineBefore, 'line must survive download failure');
@@ -203,7 +203,7 @@ try {
   await popupEval(`(async () => {
     document.querySelector('#btn-capture-fullpage').click();
     for (let i = 0; i < 30; i++) {
-      if (document.querySelector('#scroll-progress-text')?.textContent.includes('Klatka 1 z')) break;
+      if (document.querySelector('#scroll-progress-text')?.textContent.includes('Frame 1 of')) break;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     document.querySelector('#btn-cancel-scroll').click();

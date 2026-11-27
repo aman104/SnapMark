@@ -36,7 +36,7 @@ describe('Task 011: MV3 Background Service Worker & Visible Viewport Capture', (
     expect(blob.size).toBeGreaterThan(20);
   });
 
-  it('registers the 3 context menu items (selection, image, viewport) with Polish titles', () => {
+  it('registers the 3 context menu items (selection, image, viewport) with English titles', () => {
     const createdMenus: chrome.contextMenus.CreateProperties[] = [];
     const removeAllMock = vi.fn((cb?: () => void) => cb?.());
     const createMock = vi.fn(
@@ -58,17 +58,17 @@ describe('Task 011: MV3 Background Service Worker & Visible Viewport Capture', (
     expect(createdMenus).toEqual([
       {
         id: CONTEXT_MENU_IDS.SELECTION,
-        title: 'Zrób screena zaznaczenia',
+        title: 'Capture text selection',
         contexts: ['selection'],
       },
       {
         id: CONTEXT_MENU_IDS.IMAGE,
-        title: 'Edytuj i pobierz obrazek',
+        title: 'Edit and download image',
         contexts: ['image'],
       },
       {
         id: CONTEXT_MENU_IDS.VIEWPORT,
-        title: 'Zrób zrzut widocznego ekranu',
+        title: 'Capture visible screen',
         contexts: ['page'],
       },
     ]);
@@ -150,7 +150,7 @@ describe('Task 011: MV3 Background Service Worker & Visible Viewport Capture', (
     const response = await handleCaptureTrigger('viewport');
     expect(response.ok).toBe(false);
     if (!response.ok) {
-      expect(response.error).toContain('blokuje wykonywanie zrzutów');
+      expect(response.error).toContain('blocks screenshots');
     }
   });
 });

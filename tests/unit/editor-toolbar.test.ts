@@ -14,7 +14,7 @@ describe('Task 005: Vector editor 56px top toolbar and contextual controls', () 
     expect(container.querySelector('#meta-filename')).toBeNull();
     expect(container.querySelector('#meta-dimensions')).toBeNull();
     expect(container.querySelector('#btn-copy-clipboard')).toBeNull();
-    expect(container.querySelector('#btn-close-editor')?.getAttribute('aria-label')).toBe('Zamknij edytor');
+    expect(container.querySelector('#btn-close-editor')?.getAttribute('aria-label')).toBe('Close editor');
 
     const arrowBtn = container.querySelector('#tool-arrow');
     expect(arrowBtn?.classList.contains('is-active')).toBe(true);

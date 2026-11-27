@@ -108,7 +108,7 @@ describe('Task 027: Background Service Worker Interactive Screen Area Selection 
     await expect(captureInteractiveArea(
       { id: 21, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
       new CaptureRateLimiter({ minIntervalMs: 0 }),
-    )).rejects.toThrow('Aktywna karta zmieniła się');
+    )).rejects.toThrow('Active tab changed while selecting screen area.');
     expect(captureVisibleTab).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });

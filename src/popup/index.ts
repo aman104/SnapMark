@@ -48,7 +48,7 @@ export function renderPopup(
   let currentFrame = 3;
   let totalFrames = 8;
   let progressStatusText =
-    'Klatka 3 z 8 • Ukrywanie pływających nagłówków (fixed/sticky)...';
+    'Frame 3 of 8 • Hiding floating headers (fixed/sticky)...';
 
   function render(): void {
     const hasTextSelection = currentState !== 'no-selection';
@@ -68,7 +68,7 @@ export function renderPopup(
             </span>
             <span class="brand-title">SnapMark</span>
           </div>
-          <span class="popup-privacy-pill">Lokalny • MV3</span>
+          <span class="popup-privacy-pill">Local • MV3</span>
         </header>
 
         ${
@@ -76,9 +76,9 @@ export function renderPopup(
             ? `
           <section id="restricted-banner" class="status-banner is-danger" role="alert">
             <div class="restricted-banner-content">
-              <h2 class="restricted-banner-title">Strona chroniona przez przeglądarkę</h2>
+              <h2 class="restricted-banner-title">Browser-protected page</h2>
               <p class="restricted-banner-message">
-                Ze względów bezpieczeństwa Chrome blokuje wykonywanie zrzutów na stronach systemowych (chrome://) oraz w Chrome Web Store. Otwórz dowolną zwykłą stronę WWW.
+                For security reasons, Chrome blocks screenshots on system pages (chrome://) and the Chrome Web Store. Open any regular web page.
               </p>
             </div>
           </section>
@@ -87,7 +87,7 @@ export function renderPopup(
               ? `
           <section id="scroll-progress-panel" class="scroll-progress-panel" aria-live="polite">
             <div class="scroll-progress-header">
-              <h2 class="scroll-progress-title">Przechwytywanie całej strony...</h2>
+              <h2 class="scroll-progress-title">Capturing full page...</h2>
               <span class="scroll-progress-badge">${currentFrame}/${totalFrames}</span>
             </div>
             <p id="scroll-progress-text" class="scroll-progress-detail">
@@ -98,16 +98,16 @@ export function renderPopup(
             </div>
             <div class="scroll-progress-actions">
               <button type="button" id="btn-finish-scroll-demo" class="btn-primary">
-                Otwórz sklejony zrzut w edytorze
+                Open stitched capture in editor
               </button>
               <button type="button" id="btn-cancel-scroll" class="btn-secondary">
-                Anuluj i zatrzymaj (Esc)
+                Cancel and stop (Esc)
               </button>
             </div>
           </section>
         `
               : `
-          <main class="popup-capture-stack" aria-label="Tryby przechwytywania">
+          <main class="popup-capture-stack" aria-label="Capture modes">
             <button type="button" id="btn-capture-viewport" class="popup-action-card">
               <span class="popup-card-left">
                 <svg class="popup-card-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -115,8 +115,8 @@ export function renderPopup(
                   <path d="M6.5 17.5h7M10 14.5v3" />
                 </svg>
                 <span class="popup-card-text">
-                  <span class="popup-card-title">Widoczny ekran</span>
-                  <span class="popup-card-subtitle">Natychmiastowy zrzut aktualnego widoku</span>
+                  <span class="popup-card-title">Visible screen</span>
+                  <span class="popup-card-subtitle">Instant capture of the current viewport</span>
                 </span>
               </span>
               <kbd class="kbd-badge">Alt+Shift+V</kbd>
@@ -129,8 +129,8 @@ export function renderPopup(
                   <path d="M7.5 6.5h5M7.5 10h5M10 12.5v2.5m0 0l-1.5-1.5M10 15l1.5-1.5" />
                 </svg>
                 <span class="popup-card-text">
-                  <span class="popup-card-title">Cała strona ze scrollem</span>
-                  <span class="popup-card-subtitle">Skleja klatki i ukrywa pływające nagłówki</span>
+                  <span class="popup-card-title">Full page scroll</span>
+                  <span class="popup-card-subtitle">Stitches frames and hides floating headers</span>
                 </span>
               </span>
               <kbd class="kbd-badge">Alt+Shift+F</kbd>
@@ -147,12 +147,12 @@ export function renderPopup(
                   <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M10 6v8M6 10h8" />
                 </svg>
                 <span class="popup-card-text">
-                  <span class="popup-card-title">Zaznacz fragment ekranu</span>
+                  <span class="popup-card-title">Select screen area</span>
                   <span id="selection-card-subtitle" class="popup-card-subtitle ${hasTextSelection ? 'is-ready' : 'is-muted'}">
                     ${
                       hasTextSelection
-                        ? 'Włącz celownik i zaznacz kawałek strony'
-                        : 'Zaznacz tekst na stronie lub użyj PPM'
+                        ? 'Enable crosshair and drag any area'
+                        : 'Select text on the page or use right-click'
                     }
                   </span>
                 </span>
@@ -161,14 +161,14 @@ export function renderPopup(
             </button>
           </main>
 
-          <aside class="image-hint-strip" aria-label="Wskazówka dla obrazków">
+          <aside class="image-hint-strip" aria-label="Image capture tip">
             <svg class="image-hint-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="2" y="2.5" width="12" height="11" rx="2" />
               <circle cx="5.5" cy="6" r="1.2" />
               <path d="M14 10.5l-3-3-5.5 5.5" />
             </svg>
             <span>
-              Wskazówka: Kliknij <strong>PPM na dowolnym obrazku</strong>, aby wyciąć go z pominięciem blokad CORS i WebP/AVIF.
+              Tip: <strong>Right-click any image</strong> to crop and edit it bypassing CORS and WebP/AVIF restrictions.
             </span>
           </aside>
         `
@@ -371,7 +371,7 @@ export function renderPopup(
         progressStatusText =
           typeof msg.statusText === 'string' && msg.statusText.length > 0
             ? msg.statusText
-            : `Klatka ${currentFrame} z ${totalFrames} • Ukrywanie pływających nagłówków (fixed/sticky)...`;
+            : `Frame ${currentFrame} of ${totalFrames} • Hiding floating headers (fixed/sticky)...`;
         currentState = 'progress';
         render();
       }

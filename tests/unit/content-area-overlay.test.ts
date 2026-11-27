@@ -27,7 +27,7 @@ describe('Task 026: On-demand Interactive Screen Area Selection Overlay (selectA
     expect(overlay).not.toBeNull();
     expect(
       document.querySelector('[data-snapmark-area-hint]')?.textContent,
-    ).toContain('Przeciągnij myszą, aby zaznaczyć fragment ekranu');
+    ).toContain('Drag to select a screen area');
 
     // Drag from bottom-right (520, 410) to top-left (120, 160) to verify direction normalization
     overlay!.dispatchEvent(
