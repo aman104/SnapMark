@@ -186,6 +186,7 @@ try {
   await popupEval("document.querySelector('#btn-capture-selection').click(); 'started'");
   await source.locator('[data-snapmark-area-overlay]').waitFor({ state: 'visible' });
   await source.mouse.move(100, 100); await source.mouse.down(); await source.mouse.move(250, 220, { steps: 4 }); await source.mouse.up();
+  await source.locator('[data-snapmark-area-apply]').click();
   const area = await areaOpened;
   await area.waitForURL((url) => url.searchParams.get('mode') === 'selection');
   await area.locator('#editor-canvas').waitFor({ state: 'visible' });

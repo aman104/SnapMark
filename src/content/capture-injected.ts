@@ -767,7 +767,7 @@ export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult
     const hintPill = document.createElement('div');
     hintPill.setAttribute('data-snapmark-area-hint', 'true');
     hintPill.textContent =
-      'Drag to select a screen area • Press Esc to cancel';
+      'Drag to select a screen area • Enter to apply • Esc to cancel';
     hintPill.style.cssText = [
       'position: fixed !important',
       'top: 16px !important',
@@ -803,43 +803,221 @@ export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult
     dimensionsBadge.setAttribute('data-snapmark-area-dimensions', 'true');
     dimensionsBadge.style.cssText = [
       'position: absolute !important',
-      'right: 0 !important',
-      'bottom: -26px !important',
+      'left: 0 !important',
+      'top: -28px !important',
       'padding: 2px 8px !important',
-      'background: #FF3B30 !important',
+      'background: rgba(15, 17, 21, 0.9) !important',
       'color: #FFFFFF !important',
+      'border: 1px solid rgba(255, 255, 255, 0.22) !important',
       'border-radius: 4px !important',
       'font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important',
-      'font-size: 11px !important',
+      'font-size: 12px !important',
       'font-weight: 600 !important',
       'line-height: 1.4 !important',
       'white-space: nowrap !important',
       'pointer-events: none !important',
     ].join('; ');
 
+    type HandleRole = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+    const handleSpecs: Array<{ role: HandleRole; posCss: string }> = [
+      { role: 'nw', posCss: 'left: -5px !important; top: -5px !important;' },
+      { role: 'n', posCss: 'left: 50% !important; top: -5px !important; transform: translateX(-50%) !important;' },
+      { role: 'ne', posCss: 'right: -5px !important; top: -5px !important;' },
+      { role: 'e', posCss: 'right: -5px !important; top: 50% !important; transform: translateY(-50%) !important;' },
+      { role: 'se', posCss: 'right: -5px !important; bottom: -5px !important;' },
+      { role: 's', posCss: 'left: 50% !important; bottom: -5px !important; transform: translateX(-50%) !important;' },
+      { role: 'sw', posCss: 'left: -5px !important; bottom: -5px !important;' },
+      { role: 'w', posCss: 'left: -5px !important; top: 50% !important; transform: translateY(-50%) !important;' },
+    ];
+    for (const spec of handleSpecs) {
+      const h = document.createElement('div');
+      h.setAttribute('data-snapmark-area-handle', spec.role);
+      h.style.cssText = [
+        'position: absolute !important',
+        'width: 8px !important',
+        'height: 8px !important',
+        'background: #FFFFFF !important',
+        'border: 1.5px solid #FF3B30 !important',
+        'box-sizing: border-box !important',
+        'pointer-events: none !important',
+        spec.posCss,
+      ].join('; ');
+      selectionBox.appendChild(h);
+    }
+
+    const actionsBar = document.createElement('div');
+    actionsBar.setAttribute('data-snapmark-area-actions', 'true');
+    actionsBar.style.cssText = [
+      'display: none !important',
+      'position: fixed !important',
+      'align-items: center !important',
+      'gap: 6px !important',
+      'padding: 4px !important',
+      'background: rgba(15, 17, 21, 0.94) !important',
+      'border: 1px solid rgba(255, 255, 255, 0.18) !important',
+      'border-radius: 8px !important',
+      'box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important',
+      'transform: translateX(-100%) !important',
+      'pointer-events: auto !important',
+      'z-index: 2147483647 !important',
+      'font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif !important',
+      'white-space: nowrap !important',
+    ].join('; ');
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.setAttribute('data-snapmark-area-cancel', 'true');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = [
+      'padding: 5px 10px !important',
+      'background: #232732 !important',
+      'color: #F3F4F6 !important',
+      'border: 1px solid rgba(255, 255, 255, 0.14) !important',
+      'border-radius: 6px !important',
+      'font-size: 12px !important',
+      'font-weight: 600 !important',
+      'line-height: 1.2 !important',
+      'cursor: pointer !important',
+    ].join('; ');
+
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.setAttribute('data-snapmark-area-apply', 'true');
+    applyBtn.textContent = 'Apply';
+    applyBtn.style.cssText = [
+      'padding: 5px 12px !important',
+      'background: #FF3B30 !important',
+      'color: #FFFFFF !important',
+      'border: 1px solid #FF3B30 !important',
+      'border-radius: 6px !important',
+      'font-size: 12px !important',
+      'font-weight: 600 !important',
+      'line-height: 1.2 !important',
+      'cursor: pointer !important',
+    ].join('; ');
+
+    actionsBar.appendChild(cancelBtn);
+    actionsBar.appendChild(applyBtn);
+
     selectionBox.appendChild(dimensionsBadge);
     overlay.appendChild(hintPill);
     overlay.appendChild(selectionBox);
+    overlay.appendChild(actionsBar);
 
-    let isDragging = false;
+    let rect: CssRect | null = null;
+    let hadValidRectBeforeDown = false;
+    let interaction:
+      | null
+      | { kind: 'draw'; startX: number; startY: number }
+      | { kind: 'move'; lastX: number; lastY: number }
+      | { kind: 'resize'; handle: HandleRole; origin: CssRect; startX: number; startY: number } = null;
     let settled = false;
-    let startX = 0;
-    let startY = 0;
-    let currentX = 0;
-    let currentY = 0;
+
+    function hitTestHandle(px: number, py: number): HandleRole | null {
+      if (!rect || rect.width < 8 || rect.height < 8) {
+        return null;
+      }
+      const { x, y, width, height } = rect;
+      const midX = x + width / 2;
+      const midY = y + height / 2;
+      const pts: Array<[HandleRole, number, number]> = [
+        ['nw', x, y],
+        ['ne', x + width, y],
+        ['se', x + width, y + height],
+        ['sw', x, y + height],
+        ['n', midX, y],
+        ['e', x + width, midY],
+        ['s', midX, y + height],
+        ['w', x, midY],
+      ];
+      for (const [role, hx, hy] of pts) {
+        if (Math.hypot(px - hx, py - hy) <= 10) {
+          return role;
+        }
+      }
+      return null;
+    }
+
+    function cursorForHandle(role: HandleRole): string {
+      if (role === 'nw' || role === 'se') return 'nwse-resize';
+      if (role === 'ne' || role === 'sw') return 'nesw-resize';
+      if (role === 'n' || role === 's') return 'ns-resize';
+      return 'ew-resize';
+    }
+
+    function updateCursor(px: number, py: number): void {
+      if (interaction?.kind === 'resize') {
+        overlay.style.setProperty('cursor', cursorForHandle(interaction.handle), 'important');
+        return;
+      }
+      if (interaction?.kind === 'move') {
+        overlay.style.setProperty('cursor', 'grabbing', 'important');
+        return;
+      }
+      if (interaction?.kind === 'draw') {
+        overlay.style.setProperty('cursor', 'crosshair', 'important');
+        return;
+      }
+      const h = hitTestHandle(px, py);
+      if (h) {
+        overlay.style.setProperty('cursor', cursorForHandle(h), 'important');
+        return;
+      }
+      if (
+        rect &&
+        rect.width >= 8 &&
+        rect.height >= 8 &&
+        px >= rect.x &&
+        px <= rect.x + rect.width &&
+        py >= rect.y &&
+        py <= rect.y + rect.height
+      ) {
+        overlay.style.setProperty('cursor', 'grab', 'important');
+        return;
+      }
+      overlay.style.setProperty('cursor', 'crosshair', 'important');
+    }
 
     function updateBoxVisual(): void {
-      const left = Math.round(Math.min(startX, currentX));
-      const top = Math.round(Math.min(startY, currentY));
-      const width = Math.round(Math.abs(currentX - startX));
-      const height = Math.round(Math.abs(currentY - startY));
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        selectionBox.style.setProperty('display', 'none', 'important');
+        actionsBar.style.setProperty('display', 'none', 'important');
+        overlay.style.setProperty('background', 'rgba(15, 17, 21, 0.35)', 'important');
+        return;
+      }
 
+      const left = Math.round(rect.x);
+      const top = Math.round(rect.y);
+      const width = Math.round(rect.width);
+      const height = Math.round(rect.height);
+
+      overlay.style.setProperty('background', 'transparent', 'important');
       selectionBox.style.setProperty('display', 'block', 'important');
       selectionBox.style.setProperty('left', `${left}px`, 'important');
       selectionBox.style.setProperty('top', `${top}px`, 'important');
       selectionBox.style.setProperty('width', `${width}px`, 'important');
       selectionBox.style.setProperty('height', `${height}px`, 'important');
       dimensionsBadge.textContent = `${width} × ${height} px`;
+      dimensionsBadge.style.setProperty(
+        'top',
+        top >= 32 ? '-28px' : '6px',
+        'important',
+      );
+
+      if (width >= 8 && height >= 8) {
+        const rightPx = left + width;
+        const bottomPx = top + height;
+        const anchorLeft = Math.max(150, Math.min(viewportWidthCss - 4, rightPx));
+        const anchorTop =
+          bottomPx + 46 <= viewportHeightCss
+            ? bottomPx + 8
+            : Math.max(4, bottomPx - 44);
+        actionsBar.style.setProperty('display', 'inline-flex', 'important');
+        actionsBar.style.setProperty('left', `${anchorLeft}px`, 'important');
+        actionsBar.style.setProperty('top', `${anchorTop}px`, 'important');
+      } else {
+        actionsBar.style.setProperty('display', 'none', 'important');
+      }
     }
 
     function cleanup(): void {
@@ -862,67 +1040,24 @@ export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult
       resolve(result);
     }
 
-    function onMouseDown(event: MouseEvent): void {
-      if (event.button !== 0 || settled) {
+    function applySelection(): void {
+      if (settled || !rect || rect.width < 8 || rect.height < 8) {
         return;
       }
-      event.preventDefault();
-      event.stopPropagation();
-      isDragging = true;
-      startX = clampX(event.clientX);
-      startY = clampY(event.clientY);
-      currentX = startX;
-      currentY = startY;
-      overlay.style.setProperty('background', 'transparent', 'important');
-      updateBoxVisual();
-    }
-
-    function onMouseMove(event: MouseEvent): void {
-      if (!isDragging || settled) {
-        return;
-      }
-      event.preventDefault();
-      currentX = clampX(event.clientX);
-      currentY = clampY(event.clientY);
-      updateBoxVisual();
-    }
-
-    function onMouseUp(event: MouseEvent): void {
-      if (!isDragging || settled) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      isDragging = false;
-      currentX = clampX(event.clientX);
-      currentY = clampY(event.clientY);
-
-      const x = Math.round(Math.min(startX, currentX));
-      const y = Math.round(Math.min(startY, currentY));
-      const width = Math.round(Math.abs(currentX - startX));
-      const height = Math.round(Math.abs(currentY - startY));
-
-      if (width < 8 || height < 8) {
-        finish({
-          cancelled: true,
-          cropRectCss: null,
-          viewportWidthCss,
-          viewportHeightCss,
-          dpr,
-        });
-        return;
-      }
-
-      settled = true;
-      cleanup();
-
       const payload: AreaSelectionMeasurementResult = {
         cancelled: false,
-        cropRectCss: { x, y, width, height },
+        cropRectCss: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        },
         viewportWidthCss,
         viewportHeightCss,
         dpr,
       };
+      settled = true;
+      cleanup();
 
       const isJsdom =
         typeof navigator !== 'undefined' &&
@@ -937,8 +1072,201 @@ export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult
       }
     }
 
+    actionsBar.addEventListener('mousedown', (e: MouseEvent) => {
+      e.stopPropagation();
+    });
+    applyBtn.addEventListener('click', (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      applySelection();
+    });
+    cancelBtn.addEventListener('click', (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      finish({
+        cancelled: true,
+        cropRectCss: null,
+        viewportWidthCss,
+        viewportHeightCss,
+        dpr,
+      });
+    });
+
+    function onMouseDown(event: MouseEvent): void {
+      if (event.button !== 0 || settled) {
+        return;
+      }
+      const target = event.target as Node | null;
+      if (target && actionsBar.contains(target)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+
+      const px = clampX(event.clientX);
+      const py = clampY(event.clientY);
+      hadValidRectBeforeDown = Boolean(rect && rect.width >= 8 && rect.height >= 8);
+
+      const handle = hitTestHandle(px, py);
+      if (handle && rect) {
+        interaction = {
+          kind: 'resize',
+          handle,
+          origin: { ...rect },
+          startX: px,
+          startY: py,
+        };
+        updateCursor(px, py);
+        return;
+      }
+
+      if (
+        rect &&
+        rect.width >= 8 &&
+        rect.height >= 8 &&
+        px >= rect.x &&
+        px <= rect.x + rect.width &&
+        py >= rect.y &&
+        py <= rect.y + rect.height
+      ) {
+        interaction = {
+          kind: 'move',
+          lastX: px,
+          lastY: py,
+        };
+        updateCursor(px, py);
+        return;
+      }
+
+      interaction = {
+        kind: 'draw',
+        startX: px,
+        startY: py,
+      };
+      rect = { x: px, y: py, width: 0, height: 0 };
+      updateBoxVisual();
+      updateCursor(px, py);
+    }
+
+    function onMouseMove(event: MouseEvent): void {
+      if (settled) {
+        return;
+      }
+      const px = clampX(event.clientX);
+      const py = clampY(event.clientY);
+
+      if (!interaction) {
+        updateCursor(px, py);
+        return;
+      }
+
+      event.preventDefault();
+
+      if (interaction.kind === 'draw') {
+        rect = {
+          x: Math.min(interaction.startX, px),
+          y: Math.min(interaction.startY, py),
+          width: Math.abs(px - interaction.startX),
+          height: Math.abs(py - interaction.startY),
+        };
+        updateBoxVisual();
+        return;
+      }
+
+      if (interaction.kind === 'move' && rect) {
+        const dx = px - interaction.lastX;
+        const dy = py - interaction.lastY;
+        const maxX = Math.max(0, viewportWidthCss - rect.width);
+        const maxY = Math.max(0, viewportHeightCss - rect.height);
+        rect = {
+          ...rect,
+          x: Math.max(0, Math.min(maxX, rect.x + dx)),
+          y: Math.max(0, Math.min(maxY, rect.y + dy)),
+        };
+        interaction.lastX = px;
+        interaction.lastY = py;
+        updateBoxVisual();
+        return;
+      }
+
+      if (interaction.kind === 'resize') {
+        const { handle, origin, startX, startY } = interaction;
+        const dx = px - startX;
+        const dy = py - startY;
+        const minSize = 16;
+        let left = origin.x;
+        let top = origin.y;
+        let right = origin.x + origin.width;
+        let bottom = origin.y + origin.height;
+
+        if (handle.includes('w')) {
+          left = Math.max(0, Math.min(right - minSize, origin.x + dx));
+        }
+        if (handle.includes('e')) {
+          right = Math.min(
+            viewportWidthCss,
+            Math.max(left + minSize, origin.x + origin.width + dx),
+          );
+        }
+        if (handle.includes('n')) {
+          top = Math.max(0, Math.min(bottom - minSize, origin.y + dy));
+        }
+        if (handle.includes('s')) {
+          bottom = Math.min(
+            viewportHeightCss,
+            Math.max(top + minSize, origin.y + origin.height + dy),
+          );
+        }
+
+        rect = {
+          x: left,
+          y: top,
+          width: right - left,
+          height: bottom - top,
+        };
+        updateBoxVisual();
+      }
+    }
+
+    function onMouseUp(event: MouseEvent): void {
+      if (!interaction || settled) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+
+      const finishedKind = interaction.kind;
+      interaction = null;
+      const px = clampX(event.clientX);
+      const py = clampY(event.clientY);
+
+      if (finishedKind === 'draw') {
+        if (!rect || rect.width < 8 || rect.height < 8) {
+          if (!hadValidRectBeforeDown) {
+            finish({
+              cancelled: true,
+              cropRectCss: null,
+              viewportWidthCss,
+              viewportHeightCss,
+              dpr,
+            });
+            return;
+          }
+          rect = null;
+          updateBoxVisual();
+        } else {
+          updateBoxVisual();
+        }
+      }
+
+      updateCursor(px, py);
+    }
+
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape' && !settled) {
+      if (settled) {
+        return;
+      }
+      if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         finish({
@@ -948,6 +1276,12 @@ export function selectAreaOverlayInDom(): Promise<AreaSelectionMeasurementResult
           viewportHeightCss,
           dpr,
         });
+        return;
+      }
+      if (event.key === 'Enter' && rect && rect.width >= 8 && rect.height >= 8) {
+        event.preventDefault();
+        event.stopPropagation();
+        applySelection();
       }
     }
 
