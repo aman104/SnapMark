@@ -71,9 +71,11 @@ describe('Task 013: Editor IndexedDB Blob consumption, immediate purge, and sett
     expect(canvas?.style.width).toBe('1440px');
     expect(canvas?.style.height).toBe('900px');
 
-    // Hydrated saved preferences from chrome.storage.local
-    expect(controller.getState().activeColor).toBe('#34C759');
+    // Every new capture resets toolbar choices to fresh defaults (ignores previous saved choices)
+    expect(controller.getState().activeTool).toBe('arrow');
+    expect(controller.getState().activeColor).toBe('#FF3B30');
     expect(controller.getState().strokeWidth).toBe(8);
+    expect(controller.getState().textStyleMode).toBe('plain');
 
     // Temporary record in IndexedDB is immediately purged!
     expect(await getCaptureSession('cap_live_viewport_1')).toBeNull();

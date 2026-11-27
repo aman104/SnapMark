@@ -4,8 +4,11 @@ import type {
   AnnotationItem,
   ArrowAnnotation,
   CaptureSession,
+  CssRect,
   LineAnnotation,
   MockCaptureMetadata,
+  PenAnnotation,
+  StepAnnotation,
   TextAnnotation,
 } from '../shared/types';
 import { getArrowheadDimensions, hitTestAnnotationBody } from './vector-engine';
@@ -135,6 +138,7 @@ function createFallback2DContext(): CanvasRenderingContext2D {
     save: noop,
     restore: noop,
     scale: noop,
+    translate: noop,
     clearRect: noop,
     fillRect: noop,
     strokeRect: noop,
@@ -321,6 +325,82 @@ function drawTextAnnotation(
   ctx.restore();
 }
 
+export function drawStepAnnotation(
+  ctx: CanvasRenderingContext2D,
+  item: StepAnnotation,
+  isSelected: boolean,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+  ctx.fillStyle = item.color;
+  ctx.fill();
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = item.color === '#FFFFFF' ? '#1C1C1E' : '#FFFFFF';
+  ctx.stroke();
+
+  const isLightFill = item.color === '#FFFFFF' || item.color === '#FFCC00';
+  ctx.fillStyle = isLightFill ? '#1C1C1E' : '#FFFFFF';
+  ctx.font = `700 ${Math.round(item.radius * 1.05)}px -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(item.stepNumber), item.x, item.y + 0.5);
+
+  if (isSelected) {
+    ctx.beginPath();
+    ctx.arc(item.x, item.y, item.radius + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+export function drawPenAnnotation(
+  ctx: CanvasRenderingContext2D,
+  item: PenAnnotation,
+  isSelected: boolean,
+): void {
+  if (item.points.length === 0) {
+    return;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = item.color;
+  ctx.fillStyle = item.color;
+  ctx.lineWidth = item.strokeWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const first = item.points[0]!;
+  if (item.points.length === 1) {
+    ctx.beginPath();
+    ctx.arc(first.x, first.y, item.strokeWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < item.points.length; i += 1) {
+      const pt = item.points[i]!;
+      ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+  }
+
+  if (isSelected) {
+    const last = item.points[item.points.length - 1] ?? first;
+    drawEndpointHandle(ctx, first.x, first.y);
+    if (item.points.length > 1) {
+      drawEndpointHandle(ctx, last.x, last.y);
+    }
+  }
+
+  ctx.restore();
+}
+
 export function hitTestAnnotations(
   annotations: AnnotationItem[],
   cssX: number,
@@ -404,6 +484,25 @@ export interface PlacedFrameDrawable {
   placement: FramePlacementPlan;
 }
 
+/**
+ * Computes a fit-to-width display scale (`<= 1`) so wide screenshots fit inside
+ * `.editor-stage` without horizontal scrollbars while keeping full physical DPI backing store.
+ */
+export function computeFitToWidthScale(
+  cssWidth: number,
+  availableWidth: number,
+): number {
+  if (
+    !Number.isFinite(cssWidth) ||
+    cssWidth <= 0 ||
+    !Number.isFinite(availableWidth) ||
+    availableWidth <= 0
+  ) {
+    return 1;
+  }
+  return Math.min(1, availableWidth / cssWidth);
+}
+
 export function renderCanvasStage(
   canvas: HTMLCanvasElement,
   metadata: MockCaptureMetadata,
@@ -411,14 +510,19 @@ export function renderCanvasStage(
   selectedId: string | null,
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  displayScale = 1,
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
+  cropDraftRect: CssRect | null = null,
 ): void {
   const physicalWidth = Math.round(metadata.cssWidth * metadata.dpr);
   const physicalHeight = Math.round(metadata.cssHeight * metadata.dpr);
+  const safeScale =
+    Number.isFinite(displayScale) && displayScale > 0 ? displayScale : 1;
 
   canvas.width = physicalWidth;
   canvas.height = physicalHeight;
-  canvas.style.width = `${metadata.cssWidth}px`;
-  canvas.style.height = `${metadata.cssHeight}px`;
+  canvas.style.width = `${Math.round(metadata.cssWidth * safeScale)}px`;
+  canvas.style.height = `${Math.round(metadata.cssHeight * safeScale)}px`;
   canvas.style.borderRadius = '0px';
 
   const ctx = get2DContext(canvas);
@@ -427,6 +531,14 @@ export function renderCanvasStage(
   const hasValidPlacedDrawables = placedFrames.some(
     (pf) => pf.drawable !== null,
   );
+
+  const offsetPxX = Math.round((cropOffsetCss?.x ?? 0) * metadata.dpr);
+  const offsetPxY = Math.round((cropOffsetCss?.y ?? 0) * metadata.dpr);
+
+  ctx.save();
+  if (offsetPxX !== 0 || offsetPxY !== 0) {
+    ctx.translate(-offsetPxX, -offsetPxY);
+  }
 
   if (hasValidPlacedDrawables) {
     for (const pf of placedFrames) {
@@ -445,18 +557,23 @@ export function renderCanvasStage(
       );
     }
   } else if (baseImage) {
-    ctx.drawImage(baseImage, 0, 0, physicalWidth, physicalHeight);
+    const baseImg = baseImage as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number };
+    const drawW = baseImg.naturalWidth || baseImg.width || physicalWidth;
+    const drawH = baseImg.naturalHeight || baseImg.height || physicalHeight;
+    ctx.drawImage(baseImage, 0, 0, drawW, drawH);
   } else {
     // Base screenshot bitmap fallback (prototype / JSDOM test environments)
     renderMockScreenshotBackdrop(
       ctx,
-      metadata.cssWidth,
-      metadata.cssHeight,
+      metadata.cssWidth + (cropOffsetCss?.x ?? 0),
+      metadata.cssHeight + (cropOffsetCss?.y ?? 0),
       metadata.dpr,
       metadata.mode,
       metadata.highlightApplied,
     );
   }
+
+  ctx.restore();
 
   // Vector overlay pass scaled by devicePixelRatio
   ctx.save();
@@ -470,7 +587,70 @@ export function renderCanvasStage(
       drawLineAnnotation(ctx, item, isSelected);
     } else if (item.type === 'text') {
       drawTextAnnotation(ctx, item, isSelected);
+    } else if (item.type === 'step') {
+      drawStepAnnotation(ctx, item, isSelected);
+    } else if (item.type === 'pen') {
+      drawPenAnnotation(ctx, item, isSelected);
     }
+  }
+
+  // Interactive crop selection overlay (never passed during export)
+  if (cropDraftRect && cropDraftRect.width > 0 && cropDraftRect.height > 0) {
+    const { x, y, width, height } = cropDraftRect;
+    ctx.fillStyle = 'rgba(15, 17, 21, 0.55)';
+    ctx.fillRect(0, 0, metadata.cssWidth, y);
+    ctx.fillRect(0, y + height, metadata.cssWidth, Math.max(0, metadata.cssHeight - (y + height)));
+    ctx.fillRect(0, y, x, height);
+    ctx.fillRect(x + width, y, Math.max(0, metadata.cssWidth - (x + width)), height);
+
+    ctx.strokeStyle = '#FF3B30';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, height);
+
+    // 8 resize handles (4 corners + 4 edge midpoints)
+    if (width >= 8 && height >= 8) {
+      const handleSize = 8;
+      const half = handleSize / 2;
+      const midX = x + width / 2;
+      const midY = y + height / 2;
+      const handles: Array<[number, number]> = [
+        [x, y],
+        [midX, y],
+        [x + width, y],
+        [x + width, midY],
+        [x + width, y + height],
+        [midX, y + height],
+        [x, y + height],
+        [x, midY],
+      ];
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#FF3B30';
+      ctx.lineWidth = 1.5;
+      for (const [hx, hy] of handles) {
+        ctx.fillRect(hx - half, hy - half, handleSize, handleSize);
+        ctx.strokeRect(hx - half, hy - half, handleSize, handleSize);
+      }
+    }
+
+    // Live pixel dimensions pill on the crop frame
+    const dimLabel = `${Math.round(width)} × ${Math.round(height)} px`;
+    ctx.font = "600 12px -apple-system, BlinkMacSystemFont, 'Inter', monospace";
+    const textMetrics = ctx.measureText ? ctx.measureText(dimLabel) : { width: dimLabel.length * 7 };
+    const pillPadX = 8;
+    const pillHeight = 22;
+    const pillWidth = Math.ceil((textMetrics?.width ?? 72) + pillPadX * 2);
+    const pillX = Math.max(4, Math.min(metadata.cssWidth - pillWidth - 4, x));
+    const pillY = y >= pillHeight + 6 ? y - pillHeight - 6 : Math.min(metadata.cssHeight - pillHeight - 4, y + 6);
+
+    ctx.fillStyle = 'rgba(15, 17, 21, 0.88)';
+    ctx.fillRect(pillX, pillY, pillWidth, pillHeight);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pillX, pillY, pillWidth, pillHeight);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(dimLabel, pillX + pillPadX, pillY + pillHeight / 2);
   }
 
   ctx.restore();

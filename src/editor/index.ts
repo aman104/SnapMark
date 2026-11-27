@@ -1,5 +1,6 @@
 import {
   ANNOTATION_COLORS,
+  DEFAULT_LINE_STROKE_WIDTH,
   DEFAULT_TEXT_FONT_SIZE_CSS,
   DEFAULT_USER_SETTINGS,
   HIGHLIGHTER_ALPHA,
@@ -13,23 +14,27 @@ import {
   getMockCaptureMetadata,
   parseEditorStateFromSearch,
 } from '../shared/mock-captures';
-import { loadUserSettings, updateUserSettings } from '../shared/settings';
+import { updateUserSettings } from '../shared/settings';
 import type {
   AnnotationColor,
   AnnotationItem,
   ArrowAnnotation,
   CaptureMode,
+  CssRect,
   EditorPrototypeState,
   EditorTool,
   LineAnnotation,
   LineSubtype,
   MockCaptureMetadata,
+  PenAnnotation,
+  StepAnnotation,
   StrokeWidth,
   TextAnnotation,
   TextStyleMode,
 } from '../shared/types';
 import {
   buildSessionCompositePlacements,
+  computeFitToWidthScale,
   decodeBlobToDrawable,
   type FramePlacementPlan,
   hitTestAnnotations,
@@ -44,7 +49,9 @@ import {
 } from './text-overlay';
 import {
   applyShiftHorizontalLock,
+  DEFAULT_STEP_RADIUS_CSS,
   type EndpointHandleRole,
+  getNextStepNumber,
   hitTestEndpointHandle,
   moveAnnotationByDelta,
   type Point2D,
@@ -59,6 +66,7 @@ export interface EditorState {
   lineSubtype: LineSubtype;
   activeColor: AnnotationColor;
   strokeWidth: StrokeWidth;
+  lineStrokeWidth: StrokeWidth;
   textStyleMode: TextStyleMode;
   annotations: AnnotationItem[];
   historyStack: AnnotationItem[][];
@@ -66,6 +74,8 @@ export interface EditorState {
   warningDismissed: boolean;
   isLiveCapture: boolean;
   framePlacements: FramePlacementPlan[];
+  cropOffsetCss: { x: number; y: number };
+  cropDraftRect: CssRect | null;
 }
 
 export interface InitEditorOptions {
@@ -94,6 +104,8 @@ function cloneAnnotations(items: AnnotationItem[]): AnnotationItem[] {
   return cloneAnnotationList(items);
 }
 
+type CropResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
 type ActiveCanvasInteraction =
   | {
       kind: 'handle';
@@ -113,6 +125,26 @@ type ActiveCanvasInteraction =
       newId: string;
       startPoint: Point2D;
       snapshotPushed: boolean;
+    }
+  | {
+      kind: 'pen';
+      newId: string;
+      points: Point2D[];
+      snapshotPushed: boolean;
+    }
+  | {
+      kind: 'crop';
+      startPoint: Point2D;
+    }
+  | {
+      kind: 'crop-move';
+      lastPoint: Point2D;
+    }
+  | {
+      kind: 'crop-resize';
+      handle: CropResizeHandle;
+      originRect: CssRect;
+      startPoint: Point2D;
     };
 
 export function initEditor(
@@ -143,6 +175,7 @@ export function initEditor(
     lineSubtype: 'highlighter',
     activeColor: DEFAULT_USER_SETTINGS.activeColor,
     strokeWidth: DEFAULT_USER_SETTINGS.strokeWidth,
+    lineStrokeWidth: DEFAULT_LINE_STROKE_WIDTH,
     textStyleMode: DEFAULT_USER_SETTINGS.textStyleMode,
     annotations: cloneAnnotations(initialAnnotations),
     historyStack:
@@ -153,12 +186,15 @@ export function initEditor(
     warningDismissed: false,
     isLiveCapture: Boolean(captureIdParam),
     framePlacements: [],
+    cropOffsetCss: { x: 0, y: 0 },
+    cropDraftRect: null,
   };
 
   let baseDrawable: CanvasImageSource | null = null;
   let placedFrameDrawables: PlacedFrameDrawable[] = [];
   let activeInteraction: ActiveCanvasInteraction | null = null;
   let activeTextDraft: ActiveTextEditorDraft | null = null;
+  let previousToolBeforeCrop: Exclude<EditorTool, 'crop'> = 'arrow';
   let toolbarRefreshPending = false;
   let toolbarPointerDown = false;
   let downloadInProgress = false;
@@ -183,14 +219,31 @@ export function initEditor(
     container.setAttribute('aria-busy', closing ? 'true' : 'false');
   }
 
+  interface StageGeometrySnapshot {
+    cssWidth: number;
+    cssHeight: number;
+    cropOffsetCss: { x: number; y: number };
+  }
+  const geometryHistoryStack: Array<StageGeometrySnapshot | null> =
+    state.historyStack.map(() => null);
+
   const historyManager = new UndoHistoryStack(state.historyStack);
 
   function syncHistoryState(): void {
     state.historyStack = historyManager.getSnapshots();
   }
 
-  function pushHistorySnapshot(): void {
+  function pushHistorySnapshot(includeGeometry = false): void {
     historyManager.pushSnapshot(state.annotations);
+    geometryHistoryStack.push(
+      includeGeometry
+        ? {
+            cssWidth: state.metadata.cssWidth,
+            cssHeight: state.metadata.cssHeight,
+            cropOffsetCss: { ...state.cropOffsetCss },
+          }
+        : null,
+    );
     syncHistoryState();
   }
 
@@ -220,20 +273,22 @@ export function initEditor(
         if (trimmed.length === 0) {
           pushHistorySnapshot();
           state.annotations.splice(idx, 1);
-          state.selectedAnnotationId = state.annotations[0]?.id ?? null;
-        } else if (
-          existing.text !== trimmed ||
-          existing.color !== draft.color ||
-          existing.styleMode !== draft.styleMode
-        ) {
-          pushHistorySnapshot();
-          state.annotations[idx] = {
-            ...existing,
-            text: trimmed,
-            color: draft.color,
-            styleMode: draft.styleMode,
-          };
-          state.selectedAnnotationId = existing.id;
+          state.selectedAnnotationId = null;
+        } else {
+          if (
+            existing.text !== trimmed ||
+            existing.color !== draft.color ||
+            existing.styleMode !== draft.styleMode
+          ) {
+            pushHistorySnapshot();
+            state.annotations[idx] = {
+              ...existing,
+              text: trimmed,
+              color: draft.color,
+              styleMode: draft.styleMode,
+            };
+          }
+          state.selectedAnnotationId = toolbarTarget ? existing.id : null;
         }
       }
     } else if (trimmed.length > 0) {
@@ -250,7 +305,7 @@ export function initEditor(
         styleMode: draft.styleMode,
       };
       state.annotations.push(newText);
-      state.selectedAnnotationId = newText.id;
+      state.selectedAnnotationId = toolbarTarget ? newText.id : null;
     }
 
     if (toolbarTarget) {
@@ -280,6 +335,71 @@ export function initEditor(
     notifyAndRender();
   }
 
+  function getStageDisplayScale(): number {
+    const stage = container.querySelector<HTMLElement>('#editor-stage');
+    const stageWidth = stage?.clientWidth ?? 0;
+    if (stageWidth <= 24) {
+      return 1;
+    }
+    return computeFitToWidthScale(state.metadata.cssWidth, stageWidth - 24);
+  }
+
+  function syncFloatingCropActions(): void {
+    const overlay = container.querySelector<HTMLElement>('#crop-actions-overlay');
+    if (!overlay) {
+      return;
+    }
+    const rect = state.cropDraftRect;
+    if (
+      state.activeTool !== 'crop' ||
+      !rect ||
+      rect.width < 8 ||
+      rect.height < 8
+    ) {
+      overlay.innerHTML = '';
+      return;
+    }
+
+    const displayScale = getStageDisplayScale();
+    const canvasDisplayW = Math.round(state.metadata.cssWidth * displayScale);
+    const canvasDisplayH = Math.round(state.metadata.cssHeight * displayScale);
+    const rightPx = Math.round((rect.x + rect.width) * displayScale);
+    const bottomPx = Math.round((rect.y + rect.height) * displayScale);
+    const anchorLeft = Math.max(150, Math.min(canvasDisplayW - 4, rightPx));
+    const anchorTop =
+      bottomPx + 46 <= canvasDisplayH
+        ? bottomPx + 8
+        : Math.max(4, bottomPx - 44);
+
+    let bar = overlay.querySelector<HTMLElement>('#crop-floating-actions');
+    if (!bar) {
+      overlay.innerHTML = `
+        <div id="crop-floating-actions" class="crop-floating-actions" role="group" aria-label="Crop actions">
+          <button type="button" id="btn-floating-cancel-crop" class="btn-secondary">Cancel</button>
+          <button type="button" id="btn-floating-apply-crop" class="btn-primary">Apply</button>
+        </div>
+      `;
+      bar = overlay.querySelector<HTMLElement>('#crop-floating-actions');
+      bar?.addEventListener('mousedown', (e) => e.stopPropagation());
+      bar
+        ?.querySelector<HTMLButtonElement>('#btn-floating-apply-crop')
+        ?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          applyCrop();
+        });
+      bar
+        ?.querySelector<HTMLButtonElement>('#btn-floating-cancel-crop')
+        ?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          cancelCrop();
+        });
+    }
+    if (bar) {
+      bar.style.left = `${anchorLeft}px`;
+      bar.style.top = `${anchorTop}px`;
+    }
+  }
+
   function redrawCanvasOnly(): void {
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
@@ -290,8 +410,12 @@ export function initEditor(
         state.selectedAnnotationId,
         baseDrawable,
         placedFrameDrawables,
+        getStageDisplayScale(),
+        state.cropOffsetCss,
+        state.cropDraftRect,
       );
     }
+    syncFloatingCropActions();
   }
 
   function syncToolbarWithSelectedAnnotation(): void {
@@ -306,7 +430,7 @@ export function initEditor(
     }
     state.activeTool = selected.type;
     state.activeColor = selected.color;
-    if (selected.type === 'arrow') {
+    if (selected.type === 'arrow' || selected.type === 'pen') {
       state.strokeWidth = selected.strokeWidth;
     } else if (selected.type === 'line') {
       state.lineSubtype = selected.subtype;
@@ -315,7 +439,7 @@ export function initEditor(
         selected.strokeWidth === 4 ||
         selected.strokeWidth === 8
       ) {
-        state.strokeWidth = selected.strokeWidth;
+        state.lineStrokeWidth = selected.strokeWidth;
       }
     } else if (selected.type === 'text') {
       state.textStyleMode = selected.styleMode;
@@ -341,6 +465,25 @@ export function initEditor(
   }
 
   function renderContextualPropertiesHtml(): string {
+    if (state.activeTool === 'crop') {
+      const hasValidCrop =
+        state.cropDraftRect !== null &&
+        state.cropDraftRect.width >= 8 &&
+        state.cropDraftRect.height >= 8;
+      const cropLabel = hasValidCrop && state.cropDraftRect
+        ? `${Math.round(state.cropDraftRect.width)}×${Math.round(state.cropDraftRect.height)} px`
+        : 'Drag area to crop';
+      return `
+        <span class="shift-hint-pill" id="crop-dimensions-label">${cropLabel}</span>
+        <button type="button" id="btn-apply-crop" class="btn-primary" ${hasValidCrop ? '' : 'disabled'}>
+          Apply
+        </button>
+        <button type="button" id="btn-cancel-crop" class="btn-secondary">
+          Cancel
+        </button>
+      `;
+    }
+
     const swatchesHtml = ANNOTATION_COLORS.map(
       (swatch) => `
         <button
@@ -349,7 +492,7 @@ export function initEditor(
           data-color="${swatch.hex}"
           style="background-color: ${swatch.hex};"
           title="${swatch.label}"
-          aria-label="Kolor ${swatch.label}"
+          aria-label="Color ${swatch.label}"
           aria-pressed="${state.activeColor === swatch.hex ? 'true' : 'false'}"
         ></button>
       `,
@@ -357,18 +500,22 @@ export function initEditor(
 
     const showStrokeWidth =
       state.activeTool === 'arrow' ||
+      state.activeTool === 'pen' ||
       (state.activeTool === 'line' && state.lineSubtype === 'underline');
+
+    const activeWidthForTool =
+      state.activeTool === 'line' ? state.lineStrokeWidth : state.strokeWidth;
 
     const strokeWidthHtml = showStrokeWidth
       ? `
-        <div id="stroke-width-picker" class="segmented-control" role="group" aria-label="Grubość linii">
+        <div id="stroke-width-picker" class="segmented-control" role="group" aria-label="Stroke width">
           ${STROKE_WIDTHS.map(
             (sw) => `
               <button
                 type="button"
-                class="segmented-option ${state.strokeWidth === sw.value ? 'is-active' : ''}"
+                class="segmented-option ${activeWidthForTool === sw.value ? 'is-active' : ''}"
                 data-stroke-width="${sw.value}"
-                aria-pressed="${state.strokeWidth === sw.value ? 'true' : 'false'}"
+                aria-pressed="${activeWidthForTool === sw.value ? 'true' : 'false'}"
               >
                 ${sw.shortLabel}
               </button>
@@ -381,14 +528,14 @@ export function initEditor(
     const lineSubtypeHtml =
       state.activeTool === 'line'
         ? `
-        <div id="line-subtype-picker" class="segmented-control" role="group" aria-label="Tryb linii i markera">
+        <div id="line-subtype-picker" class="segmented-control" role="group" aria-label="Line and highlighter mode">
           <button
             type="button"
             class="segmented-option ${state.lineSubtype === 'underline' ? 'is-active' : ''}"
             data-line-subtype="underline"
             aria-pressed="${state.lineSubtype === 'underline' ? 'true' : 'false'}"
           >
-            Podkreślenie
+            Underline
           </button>
           <button
             type="button"
@@ -396,26 +543,23 @@ export function initEditor(
             data-line-subtype="highlighter"
             aria-pressed="${state.lineSubtype === 'highlighter' ? 'true' : 'false'}"
           >
-            Zakreślacz
+            Highlighter
           </button>
         </div>
-        <span id="shift-axis-hint" class="shift-hint-pill" title="Przytrzymaj klawisz Shift, aby wymusić idealny poziom">
-          <kbd class="kbd-badge">Shift</kbd> = poziom
-        </span>
       `
         : '';
 
     const textStyleHtml =
       state.activeTool === 'text'
         ? `
-        <div id="text-style-picker" class="segmented-control" role="group" aria-label="Tryb czytelności tekstu">
+        <div id="text-style-picker" class="segmented-control" role="group" aria-label="Text readability mode">
           <button
             type="button"
             class="segmented-option ${state.textStyleMode === 'background' ? 'is-active' : ''}"
             data-text-style="background"
             aria-pressed="${state.textStyleMode === 'background' ? 'true' : 'false'}"
           >
-            Tło
+            Background
           </button>
           <button
             type="button"
@@ -423,7 +567,7 @@ export function initEditor(
             data-text-style="outline"
             aria-pressed="${state.textStyleMode === 'outline' ? 'true' : 'false'}"
           >
-            Obrys
+            Outline
           </button>
           <button
             type="button"
@@ -431,19 +575,45 @@ export function initEditor(
             data-text-style="plain"
             aria-pressed="${state.textStyleMode === 'plain' ? 'true' : 'false'}"
           >
-            Czysty
+            Plain
           </button>
         </div>
       `
         : '';
 
+    const selectedStep = state.selectedAnnotationId
+      ? state.annotations.find(
+          (item): item is StepAnnotation =>
+            item.id === state.selectedAnnotationId && item.type === 'step',
+        )
+      : undefined;
+
+    const stepNumberHtml = selectedStep
+      ? `
+        <div id="step-number-control" class="step-number-control" role="group" aria-label="Step number">
+          <button type="button" id="btn-step-dec" class="segmented-option" title="Decrease step number" aria-label="Decrease step number">−</button>
+          <input
+            type="number"
+            id="step-number-input"
+            class="step-number-input"
+            min="1"
+            max="99"
+            value="${selectedStep.stepNumber}"
+            aria-label="Step number"
+          />
+          <button type="button" id="btn-step-inc" class="segmented-option" title="Increase step number" aria-label="Increase step number">+</button>
+        </div>
+      `
+      : '';
+
     return `
-      <div id="color-picker" class="color-swatch-tray" role="group" aria-label="Paleta kolorów adnotacji">
+      <div id="color-picker" class="color-swatch-tray" role="group" aria-label="Annotation color palette">
         ${swatchesHtml}
       </div>
-      ${strokeWidthHtml}
       ${lineSubtypeHtml}
+      ${strokeWidthHtml}
       ${textStyleHtml}
+      ${stepNumberHtml}
     `;
   }
 
@@ -458,17 +628,17 @@ export function initEditor(
             </svg>
           </div>
           <h1 id="empty-state-heading" class="empty-state-title">
-            Brak aktywnego zrzutu na płótnie
+            No active screenshot on canvas
           </h1>
           <p class="empty-state-description">
-            Zrzuty tymczasowe są usuwane z pamięci zaraz po wczytaniu dla ochrony prywatności. Wykonaj nowy zrzut z menu kontekstowego (PPM), popupu wtyczki lub wklej obraz bezpośrednio ze schowka.
+            Temporary captures are deleted from memory immediately after loading for privacy. Take a new capture from the extension popup, right-click menu, or paste an image from your clipboard.
           </p>
           <div class="empty-state-actions">
             <button type="button" id="btn-paste-clipboard" class="btn-primary">
-              Wklej ze schowka (Ctrl+V)
+              Paste from clipboard (Ctrl+V)
             </button>
             <button type="button" id="btn-open-file" class="btn-secondary">
-              Wczytaj plik PNG/JPG...
+              Open PNG/JPG file...
             </button>
             <input type="file" id="input-open-file" accept="image/*" hidden />
           </div>
@@ -484,10 +654,10 @@ export function initEditor(
         <div class="editor-banner-region">
           <div id="max-height-banner" class="status-banner is-warning" role="status">
             <span>
-              Osiągnięto maksymalną bezpieczną wysokość płótna w pełnej rozdzielczości Retina. Zrzut został zapisany do tej wysokości.
+              Maximum safe Retina canvas height reached. The screenshot was saved up to this height.
             </span>
             <button type="button" id="btn-dismiss-warning" class="banner-dismiss-btn">
-              Zamknij
+              Dismiss
             </button>
           </div>
         </div>
@@ -499,6 +669,7 @@ export function initEditor(
       <div class="canvas-wrapper" id="canvas-wrapper">
         <canvas id="editor-canvas"></canvas>
         <div id="text-overlay-layer"></div>
+        <div id="crop-actions-overlay"></div>
       </div>
     `;
   }
@@ -508,9 +679,9 @@ export function initEditor(
     const hasSelection = state.selectedAnnotationId !== null;
     const isEmptyState = state.prototypeState === 'empty';
     return `
-        <header class="editor-toolbar" role="toolbar" aria-label="Pasek narzędzi edytora SnapMark">
+        <header class="editor-toolbar" role="toolbar" aria-label="SnapMark editor toolbar">
           <div class="toolbar-left-group">
-            <!-- Cluster 1: Brand & Capture Metadata -->
+            <!-- Cluster 1: Brand -->
             <div class="toolbar-cluster" id="cluster-brand-meta">
               <div class="brand-badge">
                 <span class="brand-logo" aria-hidden="true">
@@ -521,56 +692,89 @@ export function initEditor(
                 </span>
                 <span class="brand-title">SnapMark</span>
               </div>
-
             </div>
 
             <span class="toolbar-divider" aria-hidden="true"></span>
 
-            <!-- Cluster 2: Primary Vector Tools -->
-            <div class="toolbar-cluster" id="cluster-primary-tools" role="group" aria-label="Narzędzia rysowania">
+            <!-- Cluster 2: Primary Vector Tools (Icon-Only) -->
+            <div class="toolbar-cluster" id="cluster-primary-tools" role="group" aria-label="Drawing tools">
               <button
                 type="button"
                 id="tool-arrow"
-                aria-label="Strzałka"
+                aria-label="Arrow"
                 class="toolbar-tool-btn ${state.activeTool === 'arrow' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'arrow' ? 'true' : 'false'}"
-                title="Strzałka wektorowa (1)"
+                title="Arrow (1)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 13L13 3M13 3H7M13 3v6" />
                 </svg>
-                <span>Strzałka</span>
-                <kbd class="kbd-badge">1</kbd>
               </button>
 
               <button
                 type="button"
                 id="tool-line"
-                aria-label="Linia / Marker"
+                aria-label="Line / Highlighter"
                 class="toolbar-tool-btn ${state.activeTool === 'line' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'line' ? 'true' : 'false'}"
-                title="Podkreślenie i zakreślacz (2)"
+                title="Underline & Highlighter (2)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M2.5 13.5h11M4 9.5l5.5-5.5 2.5 2.5L6.5 12H4V9.5z" />
                 </svg>
-                <span>Linia / Marker</span>
-                <kbd class="kbd-badge">2</kbd>
               </button>
 
               <button
                 type="button"
                 id="tool-text"
-                aria-label="Tekst"
+                aria-label="Text"
                 class="toolbar-tool-btn ${state.activeTool === 'text' ? 'is-active' : ''}"
                 aria-pressed="${state.activeTool === 'text' ? 'true' : 'false'}"
-                title="Pole tekstowe (3)"
+                title="Text (3)"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 3.5h10M8 3.5v9M5.5 12.5h5" />
                 </svg>
-                <span>Tekst</span>
-                <kbd class="kbd-badge">3</kbd>
+              </button>
+
+              <button
+                type="button"
+                id="tool-step"
+                aria-label="Step numbers"
+                class="toolbar-tool-btn ${state.activeTool === 'step' ? 'is-active' : ''}"
+                aria-pressed="${state.activeTool === 'step' ? 'true' : 'false'}"
+                title="Step numbers 1, 2, 3... (4)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6" />
+                  <path d="M7.2 5.7L8.3 5v6" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                id="tool-pen"
+                aria-label="Pen"
+                class="toolbar-tool-btn ${state.activeTool === 'pen' ? 'is-active' : ''}"
+                aria-pressed="${state.activeTool === 'pen' ? 'true' : 'false'}"
+                title="Freehand Pen (5)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M11.5 2.5l2 2-7.5 7.5-3 .8.8-3 7.7-7.3z" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                id="tool-crop"
+                aria-label="Crop"
+                class="toolbar-tool-btn ${state.activeTool === 'crop' ? 'is-active' : ''}"
+                aria-pressed="${state.activeTool === 'crop' ? 'true' : 'false'}"
+                title="Crop screenshot (C)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4.5 2v9.5H14M2 4.5h9.5V14" />
+                </svg>
               </button>
             </div>
           </div>
@@ -592,17 +796,15 @@ export function initEditor(
               <button
                 type="button"
                 id="btn-undo"
-                aria-label="Cofnij ostatnią zmianę"
+                aria-label="Undo"
                 class="btn-secondary"
                 ${canUndo ? '' : 'disabled'}
-                title="Cofnij ostatnią zmianę (Ctrl+Z)"
+                title="Undo last change"
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3.5 6.5h6a3.5 3.5 0 1 1 0 7H6M3.5 6.5L6 4M3.5 6.5L6 9" />
                 </svg>
-                <span>Cofnij</span>
-                <kbd class="kbd-badge">Ctrl+Z</kbd>
-                <span id="undo-count" class="undo-count-badge">${state.historyStack.length}</span>
+                <span>Undo</span>
               </button>
 
               <button
@@ -610,8 +812,8 @@ export function initEditor(
                 id="btn-delete-selected"
                 class="btn-danger-ghost"
                 ${hasSelection ? '' : 'disabled'}
-                title="Usuń zaznaczony obiekt (Delete / Backspace)"
-                aria-label="Usuń zaznaczony obiekt"
+                title="Delete selected annotation (Delete / Backspace)"
+                aria-label="Delete selected annotation"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.5 4.5l.6 8.5a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8.5" />
@@ -624,15 +826,15 @@ export function initEditor(
                 class="btn-primary"
                 ${isEmptyState ? 'disabled' : ''}
                 aria-disabled="${isEmptyState || downloadInProgress ? 'true' : 'false'}"
-                title="Pobierz spłaszczony plik PNG"
+                title="Download flattened PNG"
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M8 2.5v7.5m0 0L5.5 7.5M8 10l2.5-2.5M3 12.5h10" />
                 </svg>
-                <span>Pobierz PNG</span>
+                <span>Download PNG</span>
               </button>
 
-              <button type="button" id="btn-close-editor" class="btn-secondary" title="Zamknij edytor" aria-label="Zamknij edytor">
+              <button type="button" id="btn-close-editor" class="btn-secondary" title="Close editor" aria-label="Close editor">
                 <span aria-hidden="true">✕</span>
               </button>
             </div>
@@ -674,6 +876,7 @@ export function initEditor(
     `;
 
     syncDownloadUi();
+    const displayScale = getStageDisplayScale();
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     if (canvas) {
       renderCanvasStage(
@@ -683,13 +886,24 @@ export function initEditor(
         state.selectedAnnotationId,
         baseDrawable,
         placedFrameDrawables,
+        displayScale,
+        state.cropOffsetCss,
+        state.cropDraftRect,
       );
     }
 
     const overlayLayer = container.querySelector<HTMLElement>(
       '#text-overlay-layer',
     );
-    renderTextOverlayLayer(overlayLayer, activeTextDraft, {
+    const scaledTextDraft = activeTextDraft
+      ? {
+          ...activeTextDraft,
+          x: Math.round(activeTextDraft.x * displayScale),
+          y: Math.round(activeTextDraft.y * displayScale),
+          fontSize: Math.max(12, Math.round(activeTextDraft.fontSize * displayScale)),
+        }
+      : null;
+    renderTextOverlayLayer(overlayLayer, scaledTextDraft, {
       onInput: (text) => {
         if (activeTextDraft) {
           activeTextDraft.text = text;
@@ -704,19 +918,64 @@ export function initEditor(
     });
 
     bindToolbarAndStageEvents();
+    syncFloatingCropActions();
   }
 
   function setTool(tool: EditorTool): void {
     if (activeTextDraft && tool !== 'text') {
       commitActiveTextDraft();
     }
-    state.activeTool = tool;
-    const matching = state.annotations.find((item) => item.type === tool);
-    if (matching) {
-      state.selectedAnnotationId = matching.id;
+    if (tool === 'crop') {
+      if (state.activeTool !== 'crop') {
+        previousToolBeforeCrop = state.activeTool;
+      }
+      state.activeTool = 'crop';
+      state.selectedAnnotationId = null;
+      state.cropDraftRect = null;
+      notifyAndRender();
+      return;
     }
+    state.cropDraftRect = null;
+    previousToolBeforeCrop = tool;
+    state.activeTool = tool;
+    state.selectedAnnotationId = null;
     void updateUserSettings({ activeTool: tool });
     notifyAndRender();
+  }
+
+  function applyCrop(): void {
+    const rect = state.cropDraftRect;
+    if (!rect || rect.width < 8 || rect.height < 8) {
+      return;
+    }
+    const cropX = Math.max(0, Math.round(rect.x));
+    const cropY = Math.max(0, Math.round(rect.y));
+    const cropW = Math.max(8, Math.min(state.metadata.cssWidth - cropX, Math.round(rect.width)));
+    const cropH = Math.max(8, Math.min(state.metadata.cssHeight - cropY, Math.round(rect.height)));
+
+    pushHistorySnapshot(true);
+    state.annotations = state.annotations.map((item) =>
+      moveAnnotationByDelta(item, -cropX, -cropY),
+    );
+    state.cropOffsetCss = {
+      x: state.cropOffsetCss.x + cropX,
+      y: state.cropOffsetCss.y + cropY,
+    };
+    state.metadata = {
+      ...state.metadata,
+      cssWidth: cropW,
+      cssHeight: cropH,
+    };
+    state.cropDraftRect = null;
+    state.activeTool = previousToolBeforeCrop;
+    state.selectedAnnotationId = null;
+    notifyAndRender();
+  }
+
+  function cancelCrop(): void {
+    state.cropDraftRect = null;
+    redrawCanvasOnly();
+    refreshToolbarOnly();
   }
 
   function setColor(color: AnnotationColor): void {
@@ -735,18 +994,30 @@ export function initEditor(
   }
 
   function setStrokeWidth(width: StrokeWidth): void {
-    state.strokeWidth = width;
+    if (state.activeTool === 'line') {
+      state.lineStrokeWidth = width;
+    } else {
+      state.strokeWidth = width;
+    }
     if (state.selectedAnnotationId) {
       const target = state.annotations.find(
         (item) => item.id === state.selectedAnnotationId,
       );
-      if (target && (target.type === 'arrow' || target.type === 'line')) {
+      if (
+        target &&
+        (target.type === 'arrow' ||
+          target.type === 'line' ||
+          target.type === 'pen')
+      ) {
         pushHistorySnapshot();
         target.strokeWidth = width;
       }
     }
-    void updateUserSettings({ strokeWidth: width });
-    notifyAndRender();
+    if (state.activeTool !== 'line') {
+      void updateUserSettings({ strokeWidth: width });
+    }
+    redrawCanvasOnly();
+    refreshToolbarOnly();
   }
 
   function setLineSubtype(subtype: LineSubtype): void {
@@ -762,7 +1033,7 @@ export function initEditor(
         target.strokeWidth =
           subtype === 'highlighter'
             ? HIGHLIGHTER_STROKE_WIDTH_CSS
-            : state.strokeWidth;
+            : state.lineStrokeWidth;
       }
     }
     notifyAndRender();
@@ -783,13 +1054,41 @@ export function initEditor(
     notifyAndRender();
   }
 
+  function setSelectedStepNumber(nextNumber: number): void {
+    if (!state.selectedAnnotationId || !Number.isFinite(nextNumber)) {
+      return;
+    }
+    const clamped = Math.max(1, Math.min(99, Math.round(nextNumber)));
+    const target = state.annotations.find(
+      (item): item is StepAnnotation =>
+        item.id === state.selectedAnnotationId && item.type === 'step',
+    );
+    if (!target || target.stepNumber === clamped) {
+      return;
+    }
+    pushHistorySnapshot();
+    target.stepNumber = clamped;
+    redrawCanvasOnly();
+    refreshToolbarOnly();
+  }
+
   function undo(): void {
     const previous = historyManager.undo();
     if (!previous) {
       return;
     }
+    const prevGeometry = geometryHistoryStack.pop() ?? null;
     syncHistoryState();
     state.annotations = previous;
+    if (prevGeometry) {
+      state.metadata = {
+        ...state.metadata,
+        cssWidth: prevGeometry.cssWidth,
+        cssHeight: prevGeometry.cssHeight,
+      };
+      state.cropOffsetCss = { ...prevGeometry.cropOffsetCss };
+      state.cropDraftRect = null;
+    }
     if (
       state.selectedAnnotationId &&
       !state.annotations.some((item) => item.id === state.selectedAnnotationId)
@@ -834,7 +1133,7 @@ export function initEditor(
 
   async function loadImageBlob(
     blob: Blob,
-    sourceLabel = 'schowek',
+    sourceLabel = 'clipboard',
   ): Promise<void> {
     const decoded = await decodeBlobToDrawable(blob, 1280, 800);
     baseDrawable = decoded.drawable;
@@ -866,10 +1165,10 @@ export function initEditor(
     if (status) {
       status.hidden = downloadError === null;
       status.textContent = downloadError === 'close'
-        ? 'PNG został pobrany, ale nie udało się zamknąć karty.'
+        ? 'PNG downloaded, but the tab could not be closed.'
         : downloadError === 'changed'
-          ? 'PNG został pobrany. Nowe zmiany nie są w pliku — pobierz ponownie.'
-          : downloadError === 'download' ? 'Nie udało się pobrać PNG. Spróbuj ponownie.' : '';
+          ? 'PNG downloaded. New edits are not included — download again.'
+          : downloadError === 'download' ? 'Failed to download PNG. Please try again.' : '';
     }
     container.querySelector<HTMLButtonElement>('#btn-download-png')?.setAttribute('aria-disabled', downloadInProgress || state.prototypeState === 'empty' ? 'true' : 'false');
   }
@@ -924,6 +1223,26 @@ export function initEditor(
       ?.addEventListener('click', () => setTool('text'));
 
     container
+      .querySelector<HTMLButtonElement>('#tool-step')
+      ?.addEventListener('click', () => setTool('step'));
+
+    container
+      .querySelector<HTMLButtonElement>('#tool-pen')
+      ?.addEventListener('click', () => setTool('pen'));
+
+    container
+      .querySelector<HTMLButtonElement>('#tool-crop')
+      ?.addEventListener('click', () => setTool('crop'));
+
+    container
+      .querySelector<HTMLButtonElement>('#btn-apply-crop')
+      ?.addEventListener('click', applyCrop);
+
+    container
+      .querySelector<HTMLButtonElement>('#btn-cancel-crop')
+      ?.addEventListener('click', cancelCrop);
+
+    container
       .querySelectorAll<HTMLButtonElement>('.color-swatch')
       .forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -968,6 +1287,48 @@ export function initEditor(
       });
 
     container
+      .querySelector<HTMLButtonElement>('#btn-step-dec')
+      ?.addEventListener('click', () => {
+        const selected = state.annotations.find(
+          (item): item is StepAnnotation =>
+            item.id === state.selectedAnnotationId && item.type === 'step',
+        );
+        if (selected) {
+          setSelectedStepNumber(selected.stepNumber - 1);
+        }
+      });
+
+    container
+      .querySelector<HTMLButtonElement>('#btn-step-inc')
+      ?.addEventListener('click', () => {
+        const selected = state.annotations.find(
+          (item): item is StepAnnotation =>
+            item.id === state.selectedAnnotationId && item.type === 'step',
+        );
+        if (selected) {
+          setSelectedStepNumber(selected.stepNumber + 1);
+        }
+      });
+
+    const stepInput = container.querySelector<HTMLInputElement>('#step-number-input');
+    stepInput?.addEventListener('change', () => {
+      const parsed = Number(stepInput.value);
+      if (Number.isFinite(parsed)) {
+        setSelectedStepNumber(parsed);
+      }
+    });
+    stepInput?.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const parsed = Number(stepInput.value);
+        if (Number.isFinite(parsed)) {
+          setSelectedStepNumber(parsed);
+        }
+        stepInput.blur();
+      }
+    });
+
+    container
       .querySelector<HTMLButtonElement>('#btn-undo')
       ?.addEventListener('click', undo);
 
@@ -994,6 +1355,7 @@ export function initEditor(
           state.annotations,
           baseDrawable,
           placedFrameDrawables,
+          state.cropOffsetCss,
         ).then(async () => {
           const canClose = (): boolean => !activeTextDraft && !activeInteraction && JSON.stringify({ metadata: state.metadata, annotations: state.annotations }) === exportedState;
           if (!canClose()) {
@@ -1035,7 +1397,7 @@ export function initEditor(
                 const imgType = item.types.find((t) => t.startsWith('image/'));
                 if (imgType) {
                   const blob = await item.getType(imgType);
-                  await loadImageBlob(blob, 'schowek');
+                  await loadImageBlob(blob, 'clipboard');
                   return;
                 }
               }
@@ -1087,14 +1449,13 @@ export function initEditor(
     canvas?.addEventListener('mouseup', handleCanvasMouseUp);
     canvas?.addEventListener('dblclick', handleCanvasDoubleClick);
     canvas?.addEventListener('click', (event: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const cssX = event.clientX - rect.left;
-      const cssY = event.clientY - rect.top;
-      const hit = hitTestAnnotations(state.annotations, cssX, cssY);
+      const pt = getCanvasCssPoint(canvas, event);
+      const hit = hitTestAnnotations(state.annotations, pt.x, pt.y);
       if (hit && hit.id !== state.selectedAnnotationId) {
         state.selectedAnnotationId = hit.id;
         syncToolbarWithSelectedAnnotation();
-        notifyAndRender();
+        redrawCanvasOnly();
+        refreshToolbarOnly();
       }
     });
   }
@@ -1121,6 +1482,14 @@ export function initEditor(
         styleMode: hit.styleMode,
       };
       notifyAndRender();
+    } else if (hit && hit.type === 'step') {
+      state.selectedAnnotationId = hit.id;
+      syncToolbarWithSelectedAnnotation();
+      redrawCanvasOnly();
+      refreshToolbarOnly();
+      const stepInput = container.querySelector<HTMLInputElement>('#step-number-input');
+      stepInput?.focus();
+      stepInput?.select();
     }
   }
 
@@ -1132,10 +1501,108 @@ export function initEditor(
       return { x: event.clientX, y: event.clientY };
     }
     const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? state.metadata.cssWidth / rect.width : 1;
+    const scaleY = rect.height > 0 ? state.metadata.cssHeight / rect.height : 1;
     return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
+      x: (event.clientX - rect.left) * scaleX,
+      y: (event.clientY - rect.top) * scaleY,
     };
+  }
+
+  function hitTestCropHandle(
+    rect: CssRect | null,
+    pt: Point2D,
+    tolerance = 10,
+  ): CropResizeHandle | null {
+    if (!rect || rect.width < 8 || rect.height < 8) {
+      return null;
+    }
+    const { x, y, width, height } = rect;
+    const midX = x + width / 2;
+    const midY = y + height / 2;
+    const points: Array<[CropResizeHandle, number, number]> = [
+      ['nw', x, y],
+      ['ne', x + width, y],
+      ['se', x + width, y + height],
+      ['sw', x, y + height],
+      ['n', midX, y],
+      ['e', x + width, midY],
+      ['s', midX, y + height],
+      ['w', x, midY],
+    ];
+    for (const [role, hx, hy] of points) {
+      if (Math.hypot(pt.x - hx, pt.y - hy) <= tolerance) {
+        return role;
+      }
+    }
+    return null;
+  }
+
+  function getCursorForCropHandle(handle: CropResizeHandle): string {
+    if (handle === 'nw' || handle === 'se') return 'nwse-resize';
+    if (handle === 'ne' || handle === 'sw') return 'nesw-resize';
+    if (handle === 'n' || handle === 's') return 'ns-resize';
+    return 'ew-resize';
+  }
+
+  function updateCanvasCursor(
+    canvas: HTMLCanvasElement | null,
+    pt?: Point2D,
+  ): void {
+    if (!canvas) {
+      return;
+    }
+    if (activeInteraction?.kind === 'crop-resize') {
+      canvas.style.cursor = getCursorForCropHandle(activeInteraction.handle);
+      return;
+    }
+    if (
+      activeInteraction?.kind === 'move' ||
+      activeInteraction?.kind === 'handle' ||
+      activeInteraction?.kind === 'crop-move'
+    ) {
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+    if (activeInteraction) {
+      canvas.style.cursor = 'crosshair';
+      return;
+    }
+    if (pt && state.activeTool === 'crop' && state.cropDraftRect) {
+      const r = state.cropDraftRect;
+      const handle = hitTestCropHandle(r, pt);
+      if (handle) {
+        canvas.style.cursor = getCursorForCropHandle(handle);
+        return;
+      }
+      if (
+        r.width >= 8 &&
+        r.height >= 8 &&
+        pt.x >= r.x &&
+        pt.x <= r.x + r.width &&
+        pt.y >= r.y &&
+        pt.y <= r.y + r.height
+      ) {
+        canvas.style.cursor = 'grab';
+        return;
+      }
+    }
+    if (pt && state.activeTool !== 'crop') {
+      if (state.selectedAnnotationId) {
+        const selectedItem = state.annotations.find(
+          (item) => item.id === state.selectedAnnotationId,
+        );
+        if (hitTestEndpointHandle(selectedItem, pt.x, pt.y)) {
+          canvas.style.cursor = 'grab';
+          return;
+        }
+      }
+      if (hitTestAnnotations(state.annotations, pt.x, pt.y)) {
+        canvas.style.cursor = 'grab';
+        return;
+      }
+    }
+    canvas.style.cursor = state.activeTool === 'text' ? 'text' : 'crosshair';
   }
 
   function handleCanvasMouseDown(event: MouseEvent): void {
@@ -1148,6 +1615,54 @@ export function initEditor(
     }
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
     const pt = getCanvasCssPoint(canvas, event);
+
+    // 0. Crop tool mode: resize handles, drag inside to move, or drag outside to draw a new crop rectangle
+    if (state.activeTool === 'crop') {
+      const existingRect = state.cropDraftRect;
+      const cropHandle = hitTestCropHandle(existingRect, pt);
+      if (cropHandle && existingRect) {
+        activeInteraction = {
+          kind: 'crop-resize',
+          handle: cropHandle,
+          originRect: { ...existingRect },
+          startPoint: pt,
+        };
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
+      if (
+        existingRect &&
+        existingRect.width >= 8 &&
+        existingRect.height >= 8 &&
+        pt.x >= existingRect.x &&
+        pt.x <= existingRect.x + existingRect.width &&
+        pt.y >= existingRect.y &&
+        pt.y <= existingRect.y + existingRect.height
+      ) {
+        activeInteraction = {
+          kind: 'crop-move',
+          lastPoint: pt,
+        };
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
+      const clampedStart = {
+        x: Math.max(0, Math.min(state.metadata.cssWidth, pt.x)),
+        y: Math.max(0, Math.min(state.metadata.cssHeight, pt.y)),
+      };
+      state.cropDraftRect = {
+        x: clampedStart.x,
+        y: clampedStart.y,
+        width: 0,
+        height: 0,
+      };
+      activeInteraction = {
+        kind: 'crop',
+        startPoint: clampedStart,
+      };
+      redrawCanvasOnly();
+      return;
+    }
 
     // 1. Check if user grabbed an endpoint handle (x1, y1) or (x2, y2) of the selected arrow/line
     if (state.selectedAnnotationId) {
@@ -1162,6 +1677,7 @@ export function initEditor(
           handle: hitHandle,
           snapshotPushed: false,
         };
+        updateCanvasCursor(canvas, pt);
         return;
       }
     }
@@ -1177,12 +1693,20 @@ export function initEditor(
         lastPoint: pt,
         snapshotPushed: false,
       };
+      updateCanvasCursor(canvas, pt);
       redrawCanvasOnly();
       return;
     }
 
-    // 3. When Text tool is active, spawn an inline <textarea> overlay at (pt.x, pt.y)
+    // 3. When Text tool is active: if something is selected, deselect first; otherwise spawn inline <textarea> overlay
     if (state.activeTool === 'text') {
+      if (state.selectedAnnotationId !== null) {
+        state.selectedAnnotationId = null;
+        redrawCanvasOnly();
+        refreshToolbarOnly();
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
       // Keep the browser's default mousedown focus handling from blurring the
       // newly mounted textarea after it has been focused.
       event.preventDefault();
@@ -1196,6 +1720,47 @@ export function initEditor(
         styleMode: state.textStyleMode,
       };
       notifyAndRender();
+      return;
+    }
+
+    // 3b. When Step tool is active: if something is selected, deselect first; next click places the next numbered badge
+    if (state.activeTool === 'step') {
+      if (state.selectedAnnotationId !== null) {
+        state.selectedAnnotationId = null;
+        redrawCanvasOnly();
+        refreshToolbarOnly();
+        updateCanvasCursor(canvas, pt);
+        return;
+      }
+      pushHistorySnapshot();
+      annotationSeq += 1;
+      const stepNumber = getNextStepNumber(state.annotations);
+      const newStep: StepAnnotation = {
+        id: `ann_step_${Date.now()}_${annotationSeq}`,
+        type: 'step',
+        x: pt.x,
+        y: pt.y,
+        stepNumber,
+        color: state.activeColor,
+        radius: DEFAULT_STEP_RADIUS_CSS,
+      };
+      state.annotations.push(newStep);
+      state.selectedAnnotationId = newStep.id;
+      redrawCanvasOnly();
+      refreshToolbarOnly();
+      updateCanvasCursor(canvas, pt);
+      return;
+    }
+
+    // 3c. When Pen tool is active, start a freehand pen stroke
+    if (state.activeTool === 'pen') {
+      annotationSeq += 1;
+      activeInteraction = {
+        kind: 'pen',
+        newId: `ann_pen_${Date.now()}_${annotationSeq}`,
+        points: [pt],
+        snapshotPushed: false,
+      };
       return;
     }
 
@@ -1213,13 +1778,107 @@ export function initEditor(
   }
 
   function handleCanvasMouseMove(event: MouseEvent): void {
-    if (!activeInteraction || event === lastProcessedMoveEvent) {
+    if (event === lastProcessedMoveEvent) {
       return;
     }
     lastProcessedMoveEvent = event;
 
     const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    if (!activeInteraction) {
+      if (canvas && event.target === canvas) {
+        updateCanvasCursor(canvas, getCanvasCssPoint(canvas, event));
+      }
+      return;
+    }
+
     const pt = getCanvasCssPoint(canvas, event);
+    updateCanvasCursor(canvas, pt);
+
+    if (activeInteraction.kind === 'crop-resize') {
+      const { handle, originRect, startPoint } = activeInteraction;
+      const dx = pt.x - startPoint.x;
+      const dy = pt.y - startPoint.y;
+      const minSize = 16;
+      let left = originRect.x;
+      let top = originRect.y;
+      let right = originRect.x + originRect.width;
+      let bottom = originRect.y + originRect.height;
+
+      if (handle.includes('w')) {
+        left = Math.max(0, Math.min(right - minSize, originRect.x + dx));
+      }
+      if (handle.includes('e')) {
+        right = Math.min(
+          state.metadata.cssWidth,
+          Math.max(left + minSize, originRect.x + originRect.width + dx),
+        );
+      }
+      if (handle.includes('n')) {
+        top = Math.max(0, Math.min(bottom - minSize, originRect.y + dy));
+      }
+      if (handle.includes('s')) {
+        bottom = Math.min(
+          state.metadata.cssHeight,
+          Math.max(top + minSize, originRect.y + originRect.height + dy),
+        );
+      }
+
+      state.cropDraftRect = {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      };
+      const dimLabel = container.querySelector<HTMLElement>('#crop-dimensions-label');
+      if (dimLabel) {
+        dimLabel.textContent = `${Math.round(state.cropDraftRect.width)}×${Math.round(state.cropDraftRect.height)} px`;
+      }
+      redrawCanvasOnly();
+      return;
+    }
+
+    if (activeInteraction.kind === 'crop-move') {
+      const rect = state.cropDraftRect;
+      if (rect) {
+        const dx = pt.x - activeInteraction.lastPoint.x;
+        const dy = pt.y - activeInteraction.lastPoint.y;
+        const maxX = Math.max(0, state.metadata.cssWidth - rect.width);
+        const maxY = Math.max(0, state.metadata.cssHeight - rect.height);
+        state.cropDraftRect = {
+          ...rect,
+          x: Math.max(0, Math.min(maxX, rect.x + dx)),
+          y: Math.max(0, Math.min(maxY, rect.y + dy)),
+        };
+        activeInteraction.lastPoint = pt;
+        redrawCanvasOnly();
+      }
+      return;
+    }
+
+    if (activeInteraction.kind === 'crop') {
+      const clampedX = Math.max(0, Math.min(state.metadata.cssWidth, pt.x));
+      const clampedY = Math.max(0, Math.min(state.metadata.cssHeight, pt.y));
+      state.cropDraftRect = {
+        x: Math.min(activeInteraction.startPoint.x, clampedX),
+        y: Math.min(activeInteraction.startPoint.y, clampedY),
+        width: Math.abs(clampedX - activeInteraction.startPoint.x),
+        height: Math.abs(clampedY - activeInteraction.startPoint.y),
+      };
+      const dimLabel = container.querySelector<HTMLElement>('#crop-dimensions-label');
+      const applyBtn = container.querySelector<HTMLButtonElement>('#btn-apply-crop');
+      const hasValid =
+        state.cropDraftRect.width >= 8 && state.cropDraftRect.height >= 8;
+      if (dimLabel) {
+        dimLabel.textContent = hasValid
+          ? `${Math.round(state.cropDraftRect.width)}×${Math.round(state.cropDraftRect.height)} px`
+          : 'Drag area to crop';
+      }
+      if (applyBtn) {
+        applyBtn.disabled = !hasValid;
+      }
+      redrawCanvasOnly();
+      return;
+    }
 
     if (activeInteraction.kind === 'handle') {
       const targetId = activeInteraction.itemId;
@@ -1269,6 +1928,40 @@ export function initEditor(
       return;
     }
 
+    if (activeInteraction.kind === 'pen') {
+      const lastPt =
+        activeInteraction.points[activeInteraction.points.length - 1];
+      if (lastPt && Math.hypot(pt.x - lastPt.x, pt.y - lastPt.y) < 2) {
+        return;
+      }
+      activeInteraction.points.push(pt);
+      if (!activeInteraction.snapshotPushed) {
+        pushHistorySnapshot();
+        activeInteraction.snapshotPushed = true;
+        const newPen: PenAnnotation = {
+          id: activeInteraction.newId,
+          type: 'pen',
+          points: activeInteraction.points.map((p) => ({ ...p })),
+          color: state.activeColor,
+          strokeWidth: state.strokeWidth,
+        };
+        state.annotations.push(newPen);
+        state.selectedAnnotationId = newPen.id;
+      } else {
+        const penId = activeInteraction.newId;
+        const idx = state.annotations.findIndex((item) => item.id === penId);
+        const existing = idx >= 0 ? state.annotations[idx] : undefined;
+        if (existing && existing.type === 'pen') {
+          state.annotations[idx] = {
+            ...existing,
+            points: activeInteraction.points.map((p) => ({ ...p })),
+          };
+        }
+      }
+      redrawCanvasOnly();
+      return;
+    }
+
     if (activeInteraction.kind === 'draw') {
       const dist = Math.hypot(
         pt.x - activeInteraction.startPoint.x,
@@ -1313,7 +2006,7 @@ export function initEditor(
             strokeWidth:
               state.lineSubtype === 'highlighter'
                 ? HIGHLIGHTER_STROKE_WIDTH_CSS
-                : state.strokeWidth,
+                : state.lineStrokeWidth,
             alpha:
               state.lineSubtype === 'highlighter' ? HIGHLIGHTER_ALPHA : 1.0,
           };
@@ -1347,26 +2040,28 @@ export function initEditor(
       return;
     }
     lastProcessedUpEvent = event;
-    const isUnmovedSelection = (activeInteraction.kind === 'move' || activeInteraction.kind === 'handle') && !activeInteraction.snapshotPushed;
-    if (activeInteraction.kind === 'draw' && !activeInteraction.snapshotPushed) {
+    if (
+      (activeInteraction.kind === 'draw' || activeInteraction.kind === 'pen') &&
+      !activeInteraction.snapshotPushed
+    ) {
       state.selectedAnnotationId = null;
     }
     activeInteraction = null;
-    if (isUnmovedSelection) {
-      // Update selection controls without replacing the canvas between clicks.
-      refreshToolbarOnly();
-    } else {
-      notifyAndRender();
-    }
+    const canvas = container.querySelector<HTMLCanvasElement>('#editor-canvas');
+    updateCanvasCursor(canvas, canvas ? getCanvasCssPoint(canvas, event) : undefined);
+    redrawCanvasOnly();
+    refreshToolbarOnly();
   }
 
   async function hydrateFromStorageAndIndexedDb(): Promise<void> {
     if (captureIdParam) {
-      const savedSettings = await loadUserSettings();
-      state.activeTool = savedSettings.activeTool;
-      state.activeColor = savedSettings.activeColor;
-      state.strokeWidth = savedSettings.strokeWidth;
-      state.textStyleMode = savedSettings.textStyleMode;
+      // Every new screenshot starts with fresh default toolbar selections
+      state.activeTool = DEFAULT_USER_SETTINGS.activeTool;
+      state.activeColor = DEFAULT_USER_SETTINGS.activeColor;
+      state.strokeWidth = DEFAULT_USER_SETTINGS.strokeWidth;
+      state.lineStrokeWidth = DEFAULT_LINE_STROKE_WIDTH;
+      state.lineSubtype = 'highlighter';
+      state.textStyleMode = DEFAULT_USER_SETTINGS.textStyleMode;
 
       const session = await consumeCaptureSession(captureIdParam);
       if (!session || session.frames.length === 0) {
@@ -1459,6 +2154,27 @@ export function initEditor(
       return;
     }
 
+    if (state.activeTool === 'crop') {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyCrop();
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelCrop();
+        return;
+      }
+    }
+
+    if (event.key === 'Escape' && state.selectedAnnotationId !== null) {
+      event.preventDefault();
+      state.selectedAnnotationId = null;
+      redrawCanvasOnly();
+      refreshToolbarOnly();
+      return;
+    }
+
     if (!event.ctrlKey && !event.metaKey && !event.altKey) {
       if (event.key === '1') {
         setTool('arrow');
@@ -1466,6 +2182,12 @@ export function initEditor(
         setTool('line');
       } else if (event.key === '3') {
         setTool('text');
+      } else if (event.key === '4') {
+        setTool('step');
+      } else if (event.key === '5') {
+        setTool('pen');
+      } else if (event.key.toLowerCase() === 'c') {
+        setTool('crop');
       }
     }
   };
@@ -1474,6 +2196,7 @@ export function initEditor(
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('mousemove', handleCanvasMouseMove);
     window.addEventListener('mouseup', handleCanvasMouseUp);
+    window.addEventListener('resize', redrawCanvasOnly);
     window.addEventListener('paste', (event: ClipboardEvent) => {
       if (closingAfterDownload) {
         event.preventDefault();
@@ -1486,7 +2209,7 @@ export function initEditor(
         if (item && item.type.startsWith('image/')) {
           const file = item.getAsFile();
           if (file) {
-            void loadImageBlob(file, 'schowek');
+            void loadImageBlob(file, 'clipboard');
             break;
           }
         }

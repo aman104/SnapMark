@@ -120,7 +120,7 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
     });
   });
 
-  it('returns a clear Polish error when selection capture is triggered with no text selected', async () => {
+  it('returns a clear English error when selection capture is triggered with no text selected', async () => {
     vi.stubGlobal('chrome', {
       tabs: {
         query: vi.fn(async () => [
@@ -147,7 +147,7 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
     const res = await handleCaptureTrigger('selection');
     expect(res.ok).toBe(false);
     if (!res.ok) {
-      expect(res.error).toContain('Najpierw zaznacz fragment tekstu');
+      expect(res.error).toContain('Select some text on the page first.');
     }
   });
 
@@ -348,7 +348,7 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
     await expect(captureFullPageScroll(
       { id: 1, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
       new CaptureRateLimiter({ minIntervalMs: 0 }),
-    )).rejects.toThrow('Nie udało się potwierdzić pozycji');
+    )).rejects.toThrow('Could not verify page scroll position.');
     expect(capture).not.toHaveBeenCalled();
     expect(restore).toHaveBeenCalledOnce();
   });
@@ -398,7 +398,7 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
       { id: 1, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab,
       new CaptureRateLimiter({ minIntervalMs: 0 }),
     );
-    const assertion = expect(capture).rejects.toThrow('Przekroczono czas');
+    const assertion = expect(capture).rejects.toThrow('Timed out waiting for page scroll to settle.');
     await vi.advanceTimersByTimeAsync(3000);
     await assertion;
     expect(restore).toHaveBeenCalledOnce();
@@ -456,7 +456,7 @@ describe('Task 017: Selection, Image, and Full-Page Scroll orchestration in Back
 
     await expect(
       captureFullPageScroll(undefined, fastLimiter),
-    ).rejects.toThrow(/anulowane/i);
+    ).rejects.toThrow(/cancelled/i);
 
     expect(restored).toBe(true);
     expect(tabsCreateMock).not.toHaveBeenCalled();

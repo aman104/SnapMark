@@ -70,7 +70,7 @@ describe('Interactive Arrow and 2-in-1 Line/Highlighter Canvas Drawing & Handle 
     const drawnArrow = afterDraw[afterDraw.length - 1] as ArrowAnnotation;
     expect(drawnArrow.type).toBe('arrow');
     expect(drawnArrow.color).toBe('#FF3B30');
-    expect(drawnArrow.strokeWidth).toBe(4);
+    expect(drawnArrow.strokeWidth).toBe(8);
     expect(drawnArrow.x1).toBe(50);
     expect(drawnArrow.y1).toBe(80);
     expect(drawnArrow.x2).toBe(220);

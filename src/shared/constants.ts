@@ -6,12 +6,12 @@ export interface ColorSwatchOption {
 }
 
 export const ANNOTATION_COLORS: readonly ColorSwatchOption[] = [
-  { hex: '#FF3B30', label: 'Czerwony (Signal Red)' },
-  { hex: '#FFCC00', label: 'Żółty (Vivid Yellow)' },
-  { hex: '#34C759', label: 'Zielony (Emerald Green)' },
-  { hex: '#007AFF', label: 'Niebieski (Electric Blue)' },
-  { hex: '#FFFFFF', label: 'Biały (Pure White)' },
-  { hex: '#1C1C1E', label: 'Ciemny (Carbon Dark)' },
+  { hex: '#FF3B30', label: 'Red (Signal Red)' },
+  { hex: '#FFCC00', label: 'Yellow (Vivid Yellow)' },
+  { hex: '#34C759', label: 'Green (Emerald Green)' },
+  { hex: '#007AFF', label: 'Blue (Electric Blue)' },
+  { hex: '#FFFFFF', label: 'White (Pure White)' },
+  { hex: '#1C1C1E', label: 'Dark (Carbon Dark)' },
 ] as const;
 
 export interface StrokeWidthOption {
@@ -21,9 +21,9 @@ export interface StrokeWidthOption {
 }
 
 export const STROKE_WIDTHS: readonly StrokeWidthOption[] = [
-  { value: 2, shortLabel: 'Cienka (2px)', label: 'Cienka 2px' },
-  { value: 4, shortLabel: 'Średnia (4px)', label: 'Średnia 4px' },
-  { value: 8, shortLabel: 'Gruba (8px)', label: 'Gruba 8px' },
+  { value: 8, shortLabel: 'Thick (8px)', label: 'Thick 8px' },
+  { value: 4, shortLabel: 'Medium (4px)', label: 'Medium 4px' },
+  { value: 2, shortLabel: 'Thin (2px)', label: 'Thin 2px' },
 ] as const;
 
 export const DEFAULT_USER_SETTINGS: Readonly<UserSettings> = {
@@ -31,9 +31,11 @@ export const DEFAULT_USER_SETTINGS: Readonly<UserSettings> = {
   selectionPaddingPx: 20,
   activeTool: 'arrow',
   activeColor: '#FF3B30',
-  strokeWidth: 4,
-  textStyleMode: 'background',
+  strokeWidth: 8,
+  textStyleMode: 'plain',
 };
+
+export const DEFAULT_LINE_STROKE_WIDTH: StrokeWidth = 4;
 
 export const SELECTION_PADDING_PX = 20;
 export const SCROLL_CAPTURE_THROTTLE_MS = 550;

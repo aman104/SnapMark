@@ -13,7 +13,7 @@
 | 6–7. Quality & release | M05 | Automated Playwright Chromium Extension E2E test suite loading `./dist`, edge-case & security hardening (`MAX_CANVAS_HEIGHT` banner, `finally` DOM cleanup verification, zero network requests check), GitHub Actions CI, and a packaged Chrome Web Store `.zip` release with documentation | done |
 | 8+. Evolution | M06 | **Zaznacz fragment ekranu**: interactive crosshair area selection overlay on the webpage triggered from `popup.html` and `Alt+Shift+S`, cropping the dragged region at native Retina DPI and opening it in `editor.html` (while preserving PPM text selection capture) | done |
 | 8+. Evolution | M07 | Reliable full-page capture and a compact, usable annotation editor | done |
-| 8+. Evolution | M08 | Clean viewport capture (no scrollbar), fit-to-width editor without horizontal scroll, interactive Crop tool, numbered Step badges (`1, 2, 3...`), freehand Pen tool, default thick (`8px`) stroke order (`8/4/2`), and popup cleanup | planned |
+| 8+. Evolution | M08 | Clean viewport capture (no scrollbar), fit-to-width editor without horizontal scroll, interactive Crop tool, numbered Step badges (`1, 2, 3...`), freehand Pen tool, default thick (`8px`) stroke order (`8/4/2`), and popup cleanup | done |
 
 ## [x] M01 - Look & feel and clickable prototype
 - **Phase:** 1–2 — Look & feel & Clickable prototype
@@ -228,7 +228,7 @@
 - **Depends on:** M06
 - **Estimated size:** 4–6 tasks
 
-## [ ] M08 - Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen
+## [x] M08 - Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen
 - **Phase:** 8+ — Evolution
 - **Type:** feature
 - **What you will see:** Zrzut widocznego ekranu nie zawiera już paska przewijania strony; w edytorze zrzut mieści się w szerokości ekranu bez poziomego scrolla; możesz kadrować gotowy zrzut (`Kadruj`), stawiać ponumerowane kółka kroków (`1`, `2`, `3`...) w wybranym kolorze tła, rysować odręcznie pisakiem (`Pisak`), grubości linii/strzałek są w kolejności od grubej (`8px` domyślnie), a z popupu zniknęła zbędna opcja żółtego podświetlania tekstu.
@@ -245,12 +245,12 @@
 - **Demo for the operator:**
   - Zrób zrzut widocznego ekranu (brak scrollbara na zrzucie) → sprawdź brak poziomego scrolla w `editor.html` → przytnij zrzut narzędziem **Kadruj** → postaw kroki `1`, `2`, `3` narzędziem **Kroki** → zakreśl fragment odręcznie **Pisakiem** → narysuj grubą (`8px`) strzałkę → pobierz PNG.
 - **Exit criteria:**
-  - [ ] Zrzut widocznego ekranu ukrywa pasek przewijania na czas `captureVisibleTab` i przywraca go w `finally`
-  - [ ] Edytor dopasowuje podgląd zrzutu do dostępnej szerokości bez poziomego scrolla, a rysowanie i eksport PNG zachowują pełną precyzję HiDPI
-  - [ ] Narzędzie **Kadruj (`C`)** przycina zrzut, przesuwa adnotacje, eksportuje przycięty obraz i wspiera `Ctrl+Z`
-  - [ ] Narzędzie **Kroki (`4`)** wstawia numerowane kółka `1, 2, 3...` z wybranym kolorem tła i automatycznym kontrastem cyfry, a **Pisak (`5`)** pozwala rysować odręcznie
-  - [ ] Kolejność grubości to `8px / 4px / 2px` z domyślną grubością `8px`, a opcja żółtego podświetlenia zniknęła z popupu
-  - [ ] Wszystkie testy jednostkowe, E2E, typecheck, build i pakowanie przechodzą (`npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package`)
+  - [x] Zrzut widocznego ekranu ukrywa pasek przewijania na czas `captureVisibleTab` i przywraca go w `finally`
+  - [x] Edytor dopasowuje podgląd zrzutu do dostępnej szerokości bez poziomego scrolla, a rysowanie i eksport PNG zachowują pełną precyzję HiDPI
+  - [x] Narzędzie **Kadruj (`C`)** przycina zrzut, przesuwa adnotacje, eksportuje przycięty obraz i wspiera `Ctrl+Z`
+  - [x] Narzędzie **Kroki (`4`)** wstawia numerowane kółka `1, 2, 3...` z wybranym kolorem tła i automatycznym kontrastem cyfry, a **Pisak (`5`)** pozwala rysować odręcznie
+  - [x] Kolejność grubości to `8px / 4px / 2px` z domyślną grubością `8px`, a opcja żółtego podświetlenia zniknęła z popupu
+  - [x] Wszystkie testy jednostkowe, E2E, typecheck, build i pakowanie przechodzą (`npm run typecheck && npm test && npm run build && npm run test:e2e && npm run package`)
 - **Depends on:** M07
 - **Estimated size:** 5 tasks
 

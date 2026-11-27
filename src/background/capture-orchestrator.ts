@@ -3,11 +3,13 @@ import {
   cleanupSelectionHighlightInDom,
   type FullPageScrollPlan,
   hideFixedAndStickyElementsInDom,
+  hideViewportScrollbarInDom,
   type ImageMeasurementResult,
   measureSelectionInDom,
   measureTargetImageInDom,
   prepareFullPageScrollInDom,
   restoreFullPageScrollInDom,
+  restoreViewportScrollbarInDom,
   settleFullPageScrollInDom,
   selectAreaOverlayInDom,
   type SelectionMeasurementResult,
@@ -70,17 +72,17 @@ export function registerContextMenus(): void {
   const createItems = (): void => {
     chrome.contextMenus.create({
       id: CONTEXT_MENU_IDS.SELECTION,
-      title: 'Zrób screena zaznaczenia',
+      title: 'Capture text selection',
       contexts: ['selection'],
     });
     chrome.contextMenus.create({
       id: CONTEXT_MENU_IDS.IMAGE,
-      title: 'Edytuj i pobierz obrazek',
+      title: 'Edit and download image',
       contexts: ['image'],
     });
     chrome.contextMenus.create({
       id: CONTEXT_MENU_IDS.VIEWPORT,
-      title: 'Zrób zrzut widocznego ekranu',
+      title: 'Capture visible screen',
       contexts: ['page'],
     });
   };
@@ -158,7 +160,7 @@ async function resolveActiveTab(
   });
   const activeTab = tabs[0];
   if (!activeTab) {
-    throw new Error('Brak aktywnej karty do wykonania zrzutu ekranu.');
+    throw new Error('No active tab available for capture.');
   }
   return activeTab;
 }
@@ -166,10 +168,10 @@ async function resolveActiveTab(
 function assertTabUrlAllowed(tab: chrome.tabs.Tab): string {
   if (isRestrictedBrowserUrl(tab.url)) {
     throw new Error(
-      'Przeglądarka Chrome ze względów bezpieczeństwa blokuje wykonywanie zrzutów na stronach systemowych i w Chrome Web Store.',
+      'For security reasons, Chrome blocks screenshots on system pages and the Chrome Web Store.',
     );
   }
-  return tab.url ?? 'https://strona.local';
+  return tab.url ?? 'https://page.local';
 }
 
 async function openEditorForSession(session: CaptureSession): Promise<void> {
@@ -237,11 +239,42 @@ export async function captureVisibleViewport(
   const sourceUrl = assertTabUrlAllowed(tab);
   const metrics = await readTabViewportMetrics(tab);
 
-  const dataUrl = await rateLimiter.schedule(async () => {
-    return await chrome.tabs.captureVisibleTab(tab.windowId, {
-      format: 'png',
+  const canRunScripting =
+    typeof tab.id === 'number' &&
+    typeof chrome !== 'undefined' &&
+    Boolean(chrome.scripting) &&
+    typeof chrome.scripting.executeScript === 'function';
+
+  let dataUrl: string;
+  try {
+    if (canRunScripting && typeof tab.id === 'number') {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: hideViewportScrollbarInDom,
+        });
+      } catch {
+        // Proceed with capture if scripting is unavailable on the page
+      }
+    }
+
+    dataUrl = await rateLimiter.schedule(async () => {
+      return await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: 'png',
+      });
     });
-  });
+  } finally {
+    if (canRunScripting && typeof tab.id === 'number') {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: restoreViewportScrollbarInDom,
+        });
+      } catch {
+        // Ignore cleanup errors if tab was closed
+      }
+    }
+  }
 
   const blob = dataUrlToBlob(dataUrl);
   const id = `cap_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -284,7 +317,7 @@ export async function captureInteractiveArea(
   const sourceUrl = assertTabUrlAllowed(tab);
 
   if (typeof tab.id !== 'number') {
-    throw new Error('Brak identyfikatora aktywnej karty.');
+    throw new Error('Missing active tab ID.');
   }
 
   const execResults = await chrome.scripting.executeScript({
@@ -303,7 +336,7 @@ export async function captureInteractiveArea(
   const dataUrl = await rateLimiter.schedule(async () => {
     const [activeTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
     if (activeTab?.id !== tab.id) {
-      throw new Error('Aktywna karta zmieniła się podczas zaznaczania obszaru.');
+      throw new Error('Active tab changed while selecting screen area.');
     }
     return await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: 'png',
@@ -352,7 +385,7 @@ export async function captureTextSelection(
   const sourceUrl = assertTabUrlAllowed(tab);
 
   if (typeof tab.id !== 'number') {
-    throw new Error('Brak identyfikatora aktywnej karty.');
+    throw new Error('Missing active tab ID.');
   }
 
   const settings = await loadUserSettings();
@@ -376,7 +409,7 @@ export async function captureTextSelection(
 
     if (!measurement || !measurement.hasSelection || !measurement.cropRectCss) {
       updateExtensionBadge('!');
-      throw new Error('Najpierw zaznacz fragment tekstu na stronie.');
+      throw new Error('Select some text on the page first.');
     }
 
     highlightWasApplied = measurement.highlightApplied;
@@ -441,7 +474,7 @@ export async function captureImageElement(
   const sourceUrl = assertTabUrlAllowed(tab);
 
   if (typeof tab.id !== 'number') {
-    throw new Error('Brak identyfikatora aktywnej karty.');
+    throw new Error('Missing active tab ID.');
   }
 
   const execResults = await chrome.scripting.executeScript({
@@ -455,7 +488,7 @@ export async function captureImageElement(
     | undefined;
 
   if (!measurement || !measurement.found || !measurement.cropRectCss) {
-    throw new Error('Nie znaleziono wybranego obrazka na stronie.');
+    throw new Error('Selected image was not found on the page.');
   }
 
   const dataUrl = await rateLimiter.schedule(async () => {
@@ -505,7 +538,7 @@ export async function captureFullPageScroll(
   const sourceUrl = assertTabUrlAllowed(tab);
 
   if (typeof tab.id !== 'number') {
-    throw new Error('Brak identyfikatora aktywnej karty.');
+    throw new Error('Missing active tab ID.');
   }
 
   activeScrollCaptureCancelled = false;
@@ -521,7 +554,7 @@ export async function captureFullPageScroll(
 
     const plan = planResults?.[0]?.result as FullPageScrollPlan | undefined;
     if (!plan || plan.frameOffsetsY.length === 0) {
-      throw new Error('Nie udało się przygotować przewijania strony.');
+      throw new Error('Failed to prepare full-page scrolling.');
     }
 
     originalScrollX = plan.originalScrollX;
@@ -534,7 +567,7 @@ export async function captureFullPageScroll(
 
     for (let i = 0; i < totalFrames; i += 1) {
       if (activeScrollCaptureCancelled) {
-        throw new Error('Przechwytywanie całej strony zostało anulowane.');
+        throw new Error('Full-page capture was cancelled.');
       }
 
       const targetY = plan.frameOffsetsY[i] ?? 0;
@@ -545,8 +578,8 @@ export async function captureFullPageScroll(
         frameNum,
         totalFrames,
         i === 0
-          ? `Klatka ${frameNum} z ${totalFrames} • Przechwytywanie góry strony...`
-          : `Klatka ${frameNum} z ${totalFrames} • Ukrywanie pływających nagłówków (fixed/sticky)...`,
+          ? `Frame ${frameNum} of ${totalFrames} • Capturing top of page...`
+          : `Frame ${frameNum} of ${totalFrames} • Hiding floating headers (fixed/sticky)...`,
       );
 
       let actualScrollY = 0;
@@ -583,26 +616,26 @@ export async function captureFullPageScroll(
           args: [targetY],
         }),
         new Promise<never>((_, reject) => {
-          settleTimer = setTimeout(() => reject(new Error('Przekroczono czas oczekiwania na odświeżenie strony.')), 3000);
+          settleTimer = setTimeout(() => reject(new Error('Timed out waiting for page scroll to settle.')), 3000);
         }),
       ]).finally(() => clearTimeout(settleTimer));
       if (activeScrollCaptureCancelled) {
-        throw new Error('Przechwytywanie całej strony zostało anulowane.');
+        throw new Error('Full-page capture was cancelled.');
       }
       const settledY = settledResults?.[0]?.result;
       if (typeof settledY !== 'number') {
-        throw new Error('Nie udało się potwierdzić pozycji przewijania strony.');
+        throw new Error('Could not verify page scroll position.');
       }
       if (i > 0 && settledY === lastActualScrollY) break;
       if (Math.abs(settledY - targetY) > 1) {
-        throw new Error('Nie udało się potwierdzić pozycji przewijania strony.');
+        throw new Error('Could not verify page scroll position.');
       }
       actualScrollY = settledY;
       lastActualScrollY = actualScrollY;
 
       const dataUrl = await rateLimiter.schedule(async () => {
         if (activeScrollCaptureCancelled) {
-          throw new Error('Przechwytywanie całej strony zostało anulowane.');
+          throw new Error('Full-page capture was cancelled.');
         }
         return await chrome.tabs.captureVisibleTab(tab.windowId, {
           format: 'png',
@@ -618,7 +651,7 @@ export async function captureFullPageScroll(
     }
 
     if (activeScrollCaptureCancelled || frames.length === 0) {
-      throw new Error('Przechwytywanie całej strony zostało anulowane.');
+      throw new Error('Full-page capture was cancelled.');
     }
 
     const lastFrame = frames[frames.length - 1];
@@ -678,7 +711,7 @@ export async function handleCaptureTrigger(
         if (!areaSession) {
           return {
             ok: false,
-            error: 'Anulowano zaznaczanie fragmentu ekranu.',
+            error: 'Screen area selection cancelled.',
           };
         }
         session = areaSession;
@@ -702,7 +735,7 @@ export async function handleCaptureTrigger(
     const message =
       error instanceof Error
         ? error.message
-        : 'Nie udało się wykonać zrzutu ekranu.';
+        : 'Failed to capture screenshot.';
     return {
       ok: false,
       error: message,

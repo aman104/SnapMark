@@ -34,7 +34,7 @@
   - Manifest V3 permissions restricted to `["activeTab", "contextMenus", "downloads", "scripting", "storage"]` (`downloads` added in M07 only to observe the editor's own PNG download state).
 - **Environment:** Node.js 20+, npm, local browser / JSDOM for unit tests.
 - **Parallel isolation:** not set up
-- **Git:** base branch `main`, no active milestone branch (M07 merged into `main` on 2026-11-22)
+- **Git:** base branch `main`, active milestone branch `milestone/M08-editor-ux-tools-and-clean-viewport`
 
 ## Milestones
 - [M01] `[x]` accepted (2026-11-21) — Look & feel and clickable prototype (6/6 tasks done)
@@ -44,6 +44,7 @@
 - [M05] `[x]` accepted (2026-11-21) — Quality and release: Playwright E2E tests, edge-case hardening and Web Store package (3/3 tasks done)
 - [M06] `[x]` accepted — Feature: Interactive screen area selection overlay (Zaznacz fragment ekranu) (3/3 tasks done)
 - [M07] `[x]` accepted (2026-11-22) — Feature: Reliable capture and streamlined editor (6/6 tasks done). All planned milestones are accepted; further work needs a new milestone from `12-feature-advisor`.
+- [M08] `[?]` in review — Feature: Clean viewport capture, fit-to-width editor, crop, step badges and freehand pen (5/5 tasks done)
 
 ## Decisions and deviations
 - none
@@ -111,3 +112,9 @@
 - [034] [x] 2026-11-22 — Added and independently verified real Chromium extension workflow and package checks.
 - [M07] [?] 2026-11-22 — Ready for operator review; real Chromium workflow passed with documented limitations.
 - [M07] [x] 2026-11-22 — Accepted by operator (`--accept M07`), spec changes applied to `02-General-PRD.md`, `04-Interface-spec.md` and `05-Tech-Stack.md`, merged into main. Roadmap complete: no `[ ]` milestone left to plan.
+- [035] [x] 2026-11-27 — Hidden viewport scrollbars during capture (`finally` restored), removed yellow highlight toggle from popup, and set default stroke width to `8px` (`8 / 4 / 2`).
+- [036] [x] 2026-11-27 — Added fit-to-width editor canvas scaling (`12px` stage padding, zero horizontal scroll, scaled pointer/overlay mapping, full Retina export).
+- [037] [x] 2026-11-27 — Added numbered Step badges (`1, 2, 3...`, key `4`) and Freehand Pen drawing (`key 5`) with full selection, moving, recoloring, and undo.
+- [038] [x] 2026-11-27 — Added interactive Crop tool (`Kadruj`, key `C`) with annotation shifting, HiDPI cropped export, and geometry-aware `Ctrl+Z` undo.
+- [039] [x] 2026-11-27 — Updated E2E tests and `README.md`; verified unit (137), E2E (4 + 8 Chromium workflows), build, and `snapmark-extension.zip`.
+- [M08] [?] 2026-11-27 — Milestone M08 completed and ready for operator review.

@@ -24,7 +24,7 @@ describe('Task 006: Editor HiDPI canvas stage, sample vector preview, and fallba
     expect(container.querySelector('#editor-empty-state')).not.toBeNull();
     expect(container.querySelector('#editor-canvas')).toBeNull();
     expect(container.querySelector('.empty-state-title')?.textContent).toContain(
-      'Brak aktywnego zrzutu na płótnie',
+      'No active screenshot on canvas',
     );
     expect(
       container
@@ -51,7 +51,7 @@ describe('Task 006: Editor HiDPI canvas stage, sample vector preview, and fallba
     const banner = container.querySelector('#max-height-banner');
     expect(banner).not.toBeNull();
     expect(banner?.textContent).toContain(
-      'Osiągnięto maksymalną bezpieczną wysokość płótna',
+      'Maximum safe Retina canvas height reached',
     );
 
     container

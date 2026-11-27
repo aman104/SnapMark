@@ -21,6 +21,7 @@ export function createFlattenedExportCanvas(
   annotations: AnnotationItem[],
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
 ): HTMLCanvasElement {
   const exportCanvas = document.createElement('canvas');
   renderCanvasStage(
@@ -30,6 +31,9 @@ export function createFlattenedExportCanvas(
     null,
     baseImage,
     placedFrames,
+    1,
+    cropOffsetCss,
+    null,
   );
   return exportCanvas;
 }
@@ -55,22 +59,23 @@ export async function canvasToPngBlob(
         return blob;
       }
     } catch {
-      throw new Error('Nie udało się przygotować obrazu PNG.');
+      throw new Error('Failed to prepare PNG image.');
     }
   }
 
-  throw new Error('Nie udało się przygotować obrazu PNG.');
+  throw new Error('Failed to prepare PNG image.');
 }
 
 /**
  * Flattens the screenshot and vector annotations at full DPI (without selection handles)
- * and triggers a browser file download with `<znormalizowana-domena>_YYYY-MM-DD_HH-mm.png`.
+ * and triggers a browser file download with `<domain>_YYYY-MM-DD_HH-mm.png`.
  */
 export async function exportFlattenedPngDownload(
   metadata: MockCaptureMetadata,
   annotations: AnnotationItem[],
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
 ): Promise<{
   filename: string;
   blob: Blob;
@@ -81,12 +86,13 @@ export async function exportFlattenedPngDownload(
     annotations,
     baseImage,
     placedFrames,
+    cropOffsetCss,
   );
   const blob = await canvasToPngBlob(canvas);
   const filename = metadata.filename;
 
   if (typeof chrome === 'undefined' || !chrome.downloads?.download || !chrome.downloads.onChanged || !chrome.downloads.search || typeof URL.createObjectURL !== 'function') {
-    throw new Error('Pobieranie PNG jest niedostępne w tej przeglądarce.');
+    throw new Error('PNG download is not available in this browser.');
   }
 
   const objectUrl = URL.createObjectURL(blob);
@@ -106,10 +112,10 @@ export async function exportFlattenedPngDownload(
     const early = earlyStates.get(downloadId);
     if (early) resolveState(early);
     const items = await chrome.downloads.search({ id: downloadId });
-    if (!items.length) throw new Error('Nie można potwierdzić stanu pobierania PNG.');
+    if (!items.length) throw new Error('Could not verify PNG download status.');
     if (items[0].state === 'complete' || items[0].state === 'interrupted') resolveState(items[0].state);
     const finalState = await completed;
-    if (finalState !== 'complete') throw new Error('Pobieranie PNG przerwano lub anulowano.');
+    if (finalState !== 'complete') throw new Error('PNG download was interrupted or cancelled.');
   } finally {
     chrome.downloads.onChanged.removeListener(listener);
     URL.revokeObjectURL(objectUrl);
@@ -131,12 +137,14 @@ export async function exportFlattenedToClipboard(
   annotations: AnnotationItem[],
   baseImage: CanvasImageSource | null = null,
   placedFrames: PlacedFrameDrawable[] = [],
+  cropOffsetCss: { x: number; y: number } = { x: 0, y: 0 },
 ): Promise<Blob> {
   const canvas = createFlattenedExportCanvas(
     metadata,
     annotations,
     baseImage,
     placedFrames,
+    cropOffsetCss,
   );
   const blob = await canvasToPngBlob(canvas);
 

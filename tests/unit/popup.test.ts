@@ -20,7 +20,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
       'SnapMark',
     );
     expect(container.querySelector('.popup-privacy-pill')?.textContent).toBe(
-      'Lokalny • MV3',
+      'Local • MV3',
     );
 
     const viewportBtn = container.querySelector('#btn-capture-viewport');
@@ -33,13 +33,12 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     expect(selectionBtn?.getAttribute('aria-disabled')).toBe('false');
     expect(
       container.querySelector('#selection-card-subtitle')?.textContent,
-    ).toContain('Włącz celownik i zaznacz kawałek strony');
+    ).toContain('Enable crosshair and drag any area');
     expect(
       container.querySelector('.image-hint-strip')?.textContent,
-    ).toContain('PPM na dowolnym obrazku');
+    ).toContain('Right-click any image');
 
-    const toggle = container.querySelector('#toggle-highlight');
-    expect(toggle?.getAttribute('aria-checked')).toBe('false');
+    expect(container.querySelector('#toggle-highlight')).toBeNull();
   });
 
   it('renders the no-selection state with muted disabled selection card', () => {
@@ -52,7 +51,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     expect(selectionBtn?.getAttribute('aria-disabled')).toBe('true');
     expect(
       container.querySelector('#selection-card-subtitle')?.textContent,
-    ).toContain('Zaznacz tekst na stronie lub użyj PPM');
+    ).toContain('Select text on the page or use right-click');
 
     const onNavigate = vi.fn();
     renderPopup(container, {
@@ -65,7 +64,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
-  it('toggles yellow highlight switch, persists it in settings, and navigates to editor.html', async () => {
+  it('omits yellow highlight toggle and navigates to editor.html for selection and viewport modes', async () => {
     const container = document.createElement('div');
     const onNavigate = vi.fn();
     const controller = renderPopup(container, {
@@ -74,36 +73,13 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     });
     await controller.ready;
 
-    const toggle =
-      container.querySelector<HTMLButtonElement>('#toggle-highlight');
+    expect(container.querySelector('#toggle-highlight')).toBeNull();
     expect(controller.isHighlightEnabled()).toBe(false);
-
-    toggle?.click();
-    expect(controller.isHighlightEnabled()).toBe(true);
-    expect(toggle?.getAttribute('aria-checked')).toBe('true');
-
-    // Allow the async updateUserSettings() write microtask to complete
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Re-mounting a fresh popup instance loads the persisted highlight setting
-    const secondContainer = document.createElement('div');
-    const secondController = renderPopup(secondContainer, {
-      initialSearch: '?state=default',
-    });
-    await secondController.ready;
-    expect(secondController.isHighlightEnabled()).toBe(true);
-    expect(
-      secondContainer
-        .querySelector('#toggle-highlight')
-        ?.getAttribute('aria-checked'),
-    ).toBe('true');
 
     container
       .querySelector<HTMLButtonElement>('#btn-capture-selection')
       ?.click();
-    expect(onNavigate).toHaveBeenCalledWith(
-      'editor.html?mode=selection&highlight=1',
-    );
+    expect(onNavigate).toHaveBeenCalledWith('editor.html?mode=selection');
 
     container
       .querySelector<HTMLButtonElement>('#btn-capture-viewport')
@@ -128,7 +104,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     expect(progressPanel).not.toBeNull();
     expect(
       container.querySelector('#scroll-progress-text')?.textContent,
-    ).toContain('Klatka 3 z 8');
+    ).toContain('Frame 3 of 8');
 
     container
       .querySelector<HTMLButtonElement>('#btn-finish-scroll-demo')
@@ -151,7 +127,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
 
     const banner = container.querySelector('#restricted-banner');
     expect(banner).not.toBeNull();
-    expect(banner?.textContent).toContain('Strona chroniona przez przeglądarkę');
+    expect(banner?.textContent).toContain('Browser-protected page');
 
     // Live detection via chrome.tabs.query without explicit ?state=
     vi.stubGlobal('chrome', {
@@ -219,7 +195,7 @@ describe('Task 004 & 012: Extension popup UI states, persistent settings, and li
     await controller.ready;
     const button = container.querySelector<HTMLButtonElement>('#btn-capture-selection')!;
     expect(button.getAttribute('aria-disabled')).toBe('false');
-    expect(button.textContent).toContain('Zaznacz fragment ekranu');
+    expect(button.textContent).toContain('Select screen area');
     button.click();
     expect(sendMessage).toHaveBeenCalledWith({ type: 'SNAPMARK_TRIGGER_CAPTURE', mode: 'selection' });
   });
