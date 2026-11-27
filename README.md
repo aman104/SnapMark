@@ -1,5 +1,13 @@
 # SnapMark
 
+![Manifest V3](https://img.shields.io/badge/Chrome_Extension-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=flat-square&logo=vite&logoColor=white)
+![HTML5 Canvas](https://img.shields.io/badge/HTML5-2D_Canvas-E34F26?style=flat-square&logo=html5&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-Unit_Tests-6E9F18?style=flat-square&logo=vitest&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-Chromium_E2E-2EAD33?style=flat-square&logo=playwright&logoColor=white)
+![Privacy](https://img.shields.io/badge/Privacy-100%25_Local_%7C_Zero_Network-FF3B30?style=flat-square)
+
 **Fast contextual screenshots with a lightweight, privacy-first vector annotation editor — built as a Chrome Extension (Manifest V3).**
 
 SnapMark turns the multi-step routine of capturing, cropping, annotating, and exporting screenshots into a single local workflow. Capture a clean visible viewport (without browser scrollbars), an interactive screen area with adjustable handles, a full scrolling page with floating headers hidden, a right-clicked `<img>` bypassing CORS/AVIF/WebP blocks, or a text selection — then annotate at full Retina DPI and export a crisp PNG in one click.
